@@ -170,3 +170,13 @@ One deliberate divergence from the Python CLI: its `storage get` accepts either 
 command, ten of which call one shared helper; here one command probes every configured
 service and reports them together, so an unreachable service shows as a row rather than
 aborting the run. It exits non-zero if any service fails to answer.
+
+## Shell completion
+
+```bash
+osdu completion bash > /usr/local/etc/bash_completion.d/osdu
+```
+
+`zsh`, `fish` and `powershell` are also supported; each script carries its own install line
+as a comment. Completion needs no configuration, no network and no token — Tab never
+authenticates.

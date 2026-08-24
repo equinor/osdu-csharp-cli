@@ -509,8 +509,44 @@ count how many compile. Storage needed only the pom fix.
 5. **NativeAOT does not build.** Attempted 2026-08-24 on osx-arm64; three blockers, all in
    osdu-csharp-client's facade rather than the CLI. Details in §8.7. CI stays on
    self-contained single-file, which does publish cleanly.
-6. **Shell completion has no registration scripts.** Completion resolves correctly; nothing
-   installs it into a shell.
+6. ~~**Shell completion has no registration scripts.**~~ **Done** (2026-08-24), and the
+   claim it was replacing turned out to be wrong — see §8.8.
+
+### Shell completion: the earlier claim was wrong
+
+§5 and §6 recorded that completion "resolves at every level — nouns, nested groups, verbs,
+and enum values". It did not. `ParseResult.GetCompletions()` in System.CommandLine 2.0.11
+returns **option names and nothing else**: no subcommands at any depth, no enum values, and
+nothing from a hand-written `CompletionSources`. Measured, not inferred —
+`osdu complete -- record ""` returned `--config --debug --help …`.
+
+So the candidate list is now built directly from the parsed command: subcommands, then
+argument completion sources, then options as a fallback. Options appear only once the user
+types `-`, or when nothing better exists at that position — otherwise `osdu <Tab>` leads
+with eleven spellings of `--help` and buries the nouns.
+
+`osdu completion bash|zsh|fish|powershell` prints a registration script; the hidden
+`osdu complete` is what those scripts call. Deliberately not `dotnet-suggest`: that means a
+second global tool installed and this one registered with it, which is a poor ask for an
+enterprise rollout and another executable for WDAC to allow.
+
+**A bug the scripts only revealed by being run.** The obvious bash idiom is wrong:
+
+```bash
+local IFS=$'\n'
+COMPREPLY=( $(osdu complete -- "${COMP_WORDS[@]:1}") )   # broken
+```
+
+With `IFS` already set, bash collapses `"${COMP_WORDS[@]:1}"` into a single joined argument,
+so the CLI sees `record ` instead of `record` plus an empty word and returns nothing.
+Completion worked at the root and nowhere else. Capture first, split second. A test asserts
+the ordering so it cannot regress.
+
+Verified end to end by sourcing the emitted script in real bash and zsh and driving
+`_osdu_complete` directly — nouns, verbs, partial words, enum values and the `status`
+service list all resolve. **Also noticed:** the Python `osdu` is installed on this machine
+and shadowed the build during that test. Both tools claim the `osdu` name, which is a
+migration question nobody has answered.
 
 ### NativeAOT: what actually blocks it
 
@@ -596,9 +632,10 @@ the thing works and can be shipped safely.
 5. ~~Add a test project for the runtime layer~~ — **done**, see §8.4. ~~Try a NativeAOT
    publish~~ — **attempted, and it does not work today**; see §8.7 for the blocker chain.
    CI stays on self-contained single-file until the client library is AOT-clean.
-6. **Write shell completion registration scripts.** Completion itself works; nothing
-   registers it. Windows PowerShell execution policy may block the profile approach — worth
-   checking with the Windows team alongside the WDAC question.
+6. ~~Write shell completion registration scripts~~ — **done**, see §8.8. The PowerShell
+   execution-policy question is still worth raising with the Windows team alongside WDAC;
+   the emitted script says what to do about it, but nobody has tried it on a managed
+   machine.
 
 `config`, `version`, `list` and `dataload` stay hand-written by design and never enter a
 manifest.

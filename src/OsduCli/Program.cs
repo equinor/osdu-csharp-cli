@@ -13,6 +13,11 @@ foreach (var command in GeneratedCommands.All())
 
 root.Subcommands.Add(StatusCommand.Build());
 
+// Added after the rest of the tree: `osdu complete` parses against this same root, so
+// everything it should be able to suggest has to be registered first.
+foreach (var command in CompletionCommand.Build(root))
+    root.Subcommands.Add(command);
+
 try
 {
     var parseResult = root.Parse(args);
