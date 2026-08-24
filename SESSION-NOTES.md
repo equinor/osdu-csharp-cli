@@ -474,17 +474,20 @@ count how many compile. Storage needed only the pom fix.
 
 ### Not done, in priority order
 
-1. **The MSAL token cache is still plaintext.** `MsalInteractiveTokenProvider` writes
-   `SerializeMsalV3()` straight to `~/.osdu/msal_cache.bin` — unencrypted refresh tokens on
-   disk, on both platforms. Fix is one package: `Microsoft.Identity.Client.Extensions.Msal`
-   → `MsalCacheHelper`, which is DPAPI on Windows, Keychain on macOS, libsecret on Linux.
-   This is the first thing a security reviewer will ask about, and the rollout is already
-   blocked on security concerns.
+1. ~~**The MSAL token cache is still plaintext.**~~ **Done** (2026-08-24), in
+   osdu-csharp-client on branch `fix/encrypt-msal-token-cache`, not yet pushed or merged.
+   `TokenCacheStorage` registers `MsalCacheHelper` — DPAPI on Windows, Keychain on macOS,
+   libsecret on Linux — for both the interactive and device-flow providers. Where no secure
+   store exists it falls back to **in-memory only**, never to a plaintext file. A cache left
+   by the old version is detected (MSAL v3 blobs are JSON, so they start with `{`) and
+   deleted, so the fix does not ship while the plaintext token stays readable. 50/50 client
+   tests pass, 4 of them new.
 2. **Nothing has run against a live OSDU instance.** Auth, real responses and HTTP error
    mapping are all unproven — and the surface that is unproven is now 80 commands across 12
    services, not 11 across two.
-3. **The repo is not `git init`'d, so CI has never run.** The manifest gate, staleness check
-   and three-platform build have only ever been executed by hand.
+3. ~~**The repo is not `git init`'d.**~~ **Done** (2026-08-24) — 44 files committed as
+   `Steinar Hjellvik <steh@equinor.com>`. **CI has still never run**, since there is no
+   remote: the manifest gate, staleness check and three-platform build remain hand-executed.
 4. **No test project.** The runtime layer deserves one; it was verified with a throwaway
    harness that has since been deleted.
 5. **No NativeAOT publish.** CI uses self-contained single-file across three platforms.
@@ -531,10 +534,9 @@ feature half.
 The command-surface question is now answered; what remains is almost entirely about proving
 the thing works and can be shipped safely.
 
-1. **Swap the token cache to `MsalCacheHelper`** — small, and it unblocks the security
-   conversation that started all of this. Unchanged as the top item all session.
-2. **`git init` the repo.** CI has never run; the manifest gate, staleness check and
-   three-platform build are all unproven outside my shell.
+1. ~~Swap the token cache to `MsalCacheHelper`~~ — **done**, see §8.1. Needs review and a
+   push; the branch exists only locally.
+2. ~~`git init` the repo~~ — **done**, see §8.3. Still needs a remote before CI can run.
 3. **Point the CLI at a real OSDU instance** and run the 80 commands. This is now the single
    biggest source of unknowns: auth, real response shapes, HTTP error mapping and the output
    projections in 12 manifests are all unverified against a live service.
