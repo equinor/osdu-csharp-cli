@@ -1,0 +1,100 @@
+name: Run Tests
+
+on:
+  pull_request:
+    branches: [main]
+  # Called by the release workflow so nothing is published without a green test run.
+  workflow_call:
+
+permissions: {}
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  manifests:
+    name: Check manifests
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          path: osdu-csharp-cli
+
+      # The generator reads the specs from the client repo. Only this job needs them —
+      # the generated commands are committed, so building does not.
+      - name: Checkout the client for its specs
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          repository: equinor/osdu-csharp-client
+          path: osdu-csharp-client
+
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.13"
+
+      - run: pip install pyyaml
+
+      # Fails when an upstream endpoint is neither mapped, hand-written nor excluded, so a
+      # new OSDU endpoint surfaces here by name instead of silently going missing.
+      - name: Check manifests against specs
+        working-directory: osdu-csharp-cli
+        run: python3 tools/generate_cli.py --check
+
+      # Fails when the committed generated commands are stale.
+      - name: Check generated code is up to date
+        working-directory: osdu-csharp-cli
+        run: |
+          python3 tools/generate_cli.py
+          git diff --exit-code -- src/OsduCli/Commands/Generated
+
+  test:
+    name: Build and test
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: read # Equinor.OsduCsharpClient comes from GitHub Packages
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Set up .NET
+        uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6.0.0
+        with:
+          dotnet-version: "10.x"
+
+      # GitHub Packages requires authentication even for public packages.
+      - name: Authenticate to GitHub Packages
+        run: >
+          dotnet nuget update source equinor-github
+          --username ${{ github.actor }}
+          --password ${GITHUB_TOKEN}
+          --store-password-in-clear-text
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build
+        run: dotnet build OsduCli.slnx --configuration Release
+
+      - name: Run tests
+        run: >
+          dotnet test tests/OsduCli.Tests/OsduCli.Tests.csproj
+          --configuration Release
+          --no-build
+          --report-xunit-trx --report-xunit-trx-filename test-results.trx
+
+      - name: Upload test results
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: test-results
+          path: "**/TestResults/*.trx"
+          retention-days: 5

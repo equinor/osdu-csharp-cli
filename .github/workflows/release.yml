@@ -1,0 +1,91 @@
+name: Release
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions: {}
+
+jobs:
+  release-please:
+    name: Release Please
+    if: github.event_name == 'push'
+    permissions:
+      contents: write # Required to update changelog file
+      pull-requests: write # Required to create release PRs
+    uses: equinor/ops-actions/.github/workflows/release-please-manifest.yml@2bcfd866433034d2106755d203635aeed68b6f6f # v9.40.0
+
+  test:
+    name: Test
+    needs: release-please
+    if: ${{ always() && (github.event_name == 'workflow_dispatch' || needs.release-please.outputs.releases_created == 'true') }}
+    permissions:
+      contents: read
+      packages: read
+    uses: ./.github/workflows/run-tests.yml
+
+  # One job per platform because a self-contained build has to run on the platform it
+  # targets. Each uploads its own archive to the release created above.
+  publish:
+    name: Publish ${{ matrix.rid }}
+    needs: [release-please, test]
+    # needs.test must have succeeded — never publish a binary whose tests did not pass.
+    if: ${{ always() && needs.test.result == 'success' && needs.release-please.outputs.releases_created == 'true' }}
+    strategy:
+      matrix:
+        include:
+          - { os: ubuntu-latest, rid: linux-x64, archive: tar.gz }
+          - { os: windows-latest, rid: win-x64, archive: zip }
+          - { os: macos-latest, rid: osx-arm64, archive: tar.gz }
+    runs-on: ${{ matrix.os }}
+    permissions:
+      contents: write # Required to attach assets to the release
+      packages: read # Equinor.OsduCsharpClient comes from GitHub Packages
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Set up .NET
+        uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6.0.0
+        with:
+          dotnet-version: "10.x"
+
+      # GitHub Packages requires authentication even for public packages.
+      - name: Authenticate to GitHub Packages
+        run: >
+          dotnet nuget update source equinor-github
+          --username ${{ github.actor }}
+          --password ${GITHUB_TOKEN}
+          --store-password-in-clear-text
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      # Self-contained, not NativeAOT: AOT does not build yet (see SESSION-NOTES §8.7).
+      # ~80 MB per platform, which is the cost of needing no .NET runtime on the machine.
+      - name: Publish
+        working-directory: src/OsduCli
+        run: >
+          dotnet publish --configuration Release
+          --runtime ${{ matrix.rid }}
+          --self-contained
+          -p:PublishSingleFile=true
+          -p:DebugType=none
+          --output publish
+
+      - name: Archive (tar.gz)
+        if: matrix.archive == 'tar.gz'
+        run: tar -czf osducs-${{ matrix.rid }}.tar.gz -C src/OsduCli/publish osducs
+
+      - name: Archive (zip)
+        if: matrix.archive == 'zip'
+        run: Compress-Archive -Path src/OsduCli/publish/osducs.exe -DestinationPath osducs-${{ matrix.rid }}.zip
+        shell: pwsh
+
+      - name: Attach to release
+        run: gh release upload "${TAG}" osducs-${{ matrix.rid }}.${{ matrix.archive }} --clobber
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ needs.release-please.outputs.tag_name }}

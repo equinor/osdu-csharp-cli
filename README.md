@@ -7,6 +7,50 @@ specs instead of hand-written?**
 The answer, on this evidence, is yes for the bulk of it — with an editorial layer that has to
 stay hand-written, and which this PoC makes explicit rather than implicit.
 
+## Install
+
+Download the archive for your platform from the [latest release][releases], extract it, and
+put `osducs` on your `PATH`.
+
+```bash
+# macOS (Apple silicon)
+curl -L -o osducs.tar.gz https://github.com/equinor/osdu-csharp-cli/releases/latest/download/osducs-osx-arm64.tar.gz
+tar -xzf osducs.tar.gz && chmod +x osducs
+
+# macOS quarantines anything downloaded from a browser or curl. Until the binary is
+# signed and notarized, clear it yourself:
+xattr -d com.apple.quarantine ./osducs
+```
+
+Linux is `osducs-linux-x64.tar.gz`; Windows is `osducs-win-x64.zip`. Around 30 MB
+compressed. Nothing else is needed — the .NET runtime is inside the binary.
+
+The command is `osducs`, not `osdu`, so it sits alongside the Python
+[`osducli`](https://community.opengroup.org/osdu/platform/data-flow/data-loading/osdu-cli)
+rather than replacing it.
+
+[releases]: https://github.com/equinor/osdu-csharp-cli/releases/latest
+
+## First run
+
+**If you already use the Python CLI, there is nothing to configure.** `osducs` reads the
+same profiles from `~/.osducli/`:
+
+```bash
+osducs status -c dev
+```
+
+```
+Service       Status  Version          Build
+------------  ------  ---------------  ------------------------
+crs-catalog   ok      0.29.2-SNAPSHOT  2026-08-05T09:49:35.371Z
+storage       ok      0.29.4-SNAPSHOT  2026-08-05T19:04:12.267Z
+...
+```
+
+Otherwise create `~/.osdu/config.json` with an `Osdu` section, or set `OSDU_SERVER`,
+`OSDU_DATA_PARTITION_ID`, `OSDU_AUTHORITY`, `OSDU_CLIENT_ID` and `OSDU_SCOPES`.
+
 ## Why
 
 The Python CLI is 149 commands / ~11,900 lines. Of those, 83 are Wellbore DDMS and 10 wrap

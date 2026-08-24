@@ -3,6 +3,7 @@
   <PropertyGroup>
     <OutputType>Exe</OutputType>
     <AssemblyName>osducs</AssemblyName>
+    <Version>0.1.0</Version>
     <RootNamespace>Equinor.OsduCli</RootNamespace>
     <InvariantGlobalization>true</InvariantGlobalization>
   </PropertyGroup>
@@ -20,10 +21,11 @@
     <PackageReference Include="Microsoft.Extensions.Configuration.EnvironmentVariables" Version="10.0.11" />
   </ItemGroup>
 
-  <!-- PoC: project reference. Swap for <PackageReference Include="Equinor.OsduCsharpClient" />
-       once the CLI lives in its own repo. -->
+  <!-- The client is consumed as a package, not a sibling checkout, so this repo builds on
+       its own. NOTE: 1.1.6 still writes an unencrypted MSAL token cache; equinor/osdu-csharp-client#98
+       fixes that and releases 1.1.7. Bump to 1.1.7 before distributing any binary. -->
   <ItemGroup>
-    <ProjectReference Include="../../../osdu-csharp-client/src/OsduCsharpClient/OsduCsharpClient.csproj" />
+    <PackageReference Include="Equinor.OsduCsharpClient" Version="1.1.6" />
   </ItemGroup>
 
 </Project>
