@@ -1,0 +1,131 @@
+# CLI manifest for the OSDU Workflow service.
+#
+# Two nouns, because they are genuinely two things: a `workflow` is the definition, a
+# `workflow run` is one execution of it. The Python CLI's `workflow runs` flattens that,
+# leaving no way to name a single run even though every run-scoped endpoint takes a runId.
+
+service: workflow
+spec: workflow
+client: Workflow
+description: Workflow service — ingestion and processing pipelines.
+
+groups:
+  workflow: Work with workflows — the ingestion and processing pipelines of OSDU.
+  workflow run: Inspect and manage individual workflow executions.
+
+commands:
+  - command: workflow list
+    summary: List workflows registered in the partition.
+    op: { method: get, path: /v1/workflow }
+    params:
+      prefix: { flag: --prefix, help: Return only workflows whose name starts with this. }
+    output:
+      columns:
+        Name: workflowName
+        Description: description
+        CreatedBy: createdBy
+
+  - command: workflow get
+    summary: Get a workflow definition by name.
+    op: { method: get, path: "/v1/workflow/{workflow_name}" }
+    params:
+      workflow_name: { flag: --name, short: -n, required: true, help: Workflow name. }
+    output: raw
+
+  - command: workflow add
+    summary: Register a workflow definition from a JSON file.
+    op: { method: post, path: /v1/workflow }
+    body:
+      flag: --file
+      short: -f
+      help: JSON file containing the workflow definition.
+    output:
+      columns:
+        Name: workflowName
+        Id: workflowId
+
+  - command: workflow delete
+    summary: Delete a workflow definition by name.
+    op: { method: delete, path: "/v1/workflow/{workflow_name}" }
+    params:
+      workflow_name: { flag: --name, short: -n, required: true, help: Workflow name to delete. }
+    output:
+      message: Workflow deleted
+
+  - command: workflow run list
+    summary: List the runs of a workflow.
+    op: { method: get, path: "/v1/workflow/{workflow_name}/workflowRun" }
+    params:
+      workflow_name: { flag: --name, short: -n, required: true, help: Workflow name. }
+    output:
+      columns:
+        RunId: runId
+        Status: status
+        StartTimeStamp: startTimeStamp
+
+  - command: workflow run get
+    summary: Get one workflow run.
+    op: { method: get, path: "/v1/workflow/{workflow_name}/workflowRun/{runId}" }
+    params:
+      workflow_name: { flag: --name, short: -n, required: true, help: Workflow name. }
+      runId:         { flag: --run, short: -r, required: true, help: Run id. }
+    output: raw
+
+  - command: workflow run trigger
+    summary: Start a new run of a workflow.
+    op: { method: post, path: "/v1/workflow/{workflow_name}/workflowRun" }
+    params:
+      workflow_name: { flag: --name, short: -n, required: true, help: Workflow name to run. }
+    body:
+      flag: --file
+      short: -f
+      help: JSON file containing the run request, including its executionContext.
+    output:
+      columns:
+        RunId: runId
+        Status: status
+
+  - command: workflow run update
+    summary: Update the status of a workflow run.
+    op: { method: put, path: "/v1/workflow/{workflow_name}/workflowRun/{runId}" }
+    params:
+      workflow_name: { flag: --name, short: -n, required: true, help: Workflow name. }
+      runId:         { flag: --run, short: -r, required: true, help: Run id. }
+    body:
+      fields:
+        status:
+          flag: --status
+          required: true
+          help: New status for the run.
+    output:
+      columns:
+        RunId: runId
+        Status: status
+
+  - command: workflow run latest
+    summary: Show execution detail for the most recent task of a run.
+    op: { method: get, path: "/v1/workflow/{workflow_name}/workflowRun/{runId}/latestInfo" }
+    params:
+      workflow_name: { flag: --name, short: -n, required: true, help: Workflow name. }
+      runId:         { flag: --run, short: -r, required: true, help: Run id. }
+    output: raw
+
+exclude:
+  - op: { method: post, path: /v1/workflow/system }
+    reason: >
+      System workflows are partition-independent and managed by platform operators. Kept
+      out for the same reason as the system schema endpoint: too close a neighbour to
+      `workflow add` to risk confusing the two.
+  - op: { method: delete, path: "/v1/workflow/system/{workflow_name}" }
+    reason: Paired with POST /v1/workflow/system, which is excluded.
+  - op: { method: get, path: /readiness_check }
+    reason: Infrastructure probe, covered by `osdu status`.
+  - op: { method: get, path: /liveness_check }
+    reason: Infrastructure probe, covered by `osdu status`.
+
+handwritten:
+  - command: status
+    op: { method: get, path: /v1/info }
+    reason: >
+      Reported by `osdu status`, which probes every service's /info in one command rather
+      than giving each service its own. See cli-manifest/storage.yaml for the rationale.

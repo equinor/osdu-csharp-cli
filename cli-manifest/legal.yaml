@@ -1,0 +1,116 @@
+# CLI manifest for the OSDU Legal service.
+#
+# The noun is `legaltag`, not `legal`: the service manages LegalTags, and every command here
+# acts on one. `osdu legal list` would leave the reader asking "list what?".
+
+service: legal
+spec: legal
+client: Legal
+description: Legal service — LegalTags, which govern how data may be used.
+
+groups:
+  legaltag: Work with LegalTags — the compliance metadata attached to every record.
+
+commands:
+  - command: legaltag list
+    summary: List LegalTags in the partition.
+    op: { method: get, path: /legaltags }
+    params:
+      valid: { flag: --valid, type: bool, help: "Return only valid tags (true) or only invalid ones (false). Omit for all." }
+    output:
+      root: legalTags
+      columns:
+        Name: name
+        Description: description
+
+  - command: legaltag get
+    summary: Get a LegalTag by name.
+    op: { method: get, path: "/legaltags/{name}" }
+    params:
+      name: { flag: --name, short: -n, required: true, help: LegalTag name. }
+    output: raw
+
+  - command: legaltag add
+    summary: Create a LegalTag from a JSON file.
+    op: { method: post, path: /legaltags }
+    body:
+      flag: --file
+      short: -f
+      help: JSON file containing the LegalTag definition.
+    output:
+      columns:
+        Name: name
+        Description: description
+
+  - command: legaltag update
+    summary: Update an existing LegalTag from a JSON file.
+    op: { method: put, path: /legaltags }
+    body:
+      flag: --file
+      short: -f
+      help: JSON file containing the LegalTag changes.
+    output:
+      columns:
+        Name: name
+        Description: description
+
+  - command: legaltag delete
+    summary: Delete a LegalTag by name.
+    op: { method: delete, path: "/legaltags/{name}" }
+    params:
+      name: { flag: --name, short: -n, required: true, help: LegalTag name to delete. }
+    output:
+      message: LegalTag deleted
+
+  - command: legaltag validate
+    summary: Check which of the given LegalTag names are invalid, and why.
+    # Kiota folds `/legaltags:validate` into one `LegaltagsValidate` property rather than an
+    # indexer, so the accessor cannot be derived from the path.
+    op: { method: post, path: "/legaltags:validate" }
+    builder: LegaltagsValidate
+    body:
+      fields:
+        names:
+          flag: --name
+          short: -n
+          type: string[]
+          required: true
+          help: LegalTag name to check. Repeat for several.
+    output:
+      root: invalidLegalTags
+      columns:
+        Name: name
+        Reason: reason
+
+  # Not `legaltag property list`: it returns the allowed values for every property at once,
+  # so there is nothing to nest under and a group holding a single command adds a level for
+  # no gain.
+  - command: legaltag properties
+    summary: Show the allowed values for LegalTag properties.
+    op: { method: get, path: "/legaltags:properties" }
+    builder: LegaltagsProperties
+    output: raw
+
+exclude:
+  - op: { method: post, path: "/legaltags:batchRetrieve" }
+    reason: >
+      Batch form of `legaltag get`, keyed by a list of names in a body. Same GET/POST twin
+      problem as elsewhere — COMMAND-GRAMMAR.md §3.1.
+  - op: { method: post, path: "/legaltags:query" }
+    reason: >
+      Structured query over LegalTag attributes, with a nested body the manifest cannot
+      express as flags. `legaltag list` plus `--valid` covers the case users actually hit;
+      revisit if anyone asks for attribute filtering.
+  - op: { method: get, path: /jobs/updateLegalTagStatus }
+    reason: Triggers and reports the compliance recheck job — operator tooling, not a data-user command.
+  - op: { method: get, path: /_ah/readiness_check }
+    reason: Infrastructure probe, covered by `osdu status`.
+  - op: { method: get, path: /_ah/liveness_check }
+    reason: Infrastructure probe, covered by `osdu status`.
+
+handwritten:
+  - command: status
+    op: { method: get, path: /info }
+    reason: >
+      Reported by `osdu status`, which probes every service's /info in one command rather
+      than giving each service its own. See cli-manifest/storage.yaml for the rationale.

@@ -1,0 +1,64 @@
+using System.CommandLine;
+using Microsoft.Kiota.Abstractions;
+using Microsoft.Kiota.Serialization.Json;
+using Equinor.OsduCsharpClient.Facade;
+
+namespace Equinor.OsduCli.Runtime;
+
+/// <summary>
+/// Per-invocation state handed to every generated command action: an authenticated
+/// <see cref="OsduClient"/> and a configured <see cref="OutputWriter"/>.
+/// </summary>
+public sealed class CliContext : IDisposable
+{
+    public OsduClient Client { get; }
+    public OutputWriter Output { get; }
+
+    private CliContext(OsduClient client, OutputWriter output)
+    {
+        Client = client;
+        Output = output;
+    }
+
+    /// <summary>
+    /// Builds the context from the parsed command line. Kiota's serializer registry is
+    /// process-global and is normally populated as a side effect of constructing a service
+    /// client; we register up front so <see cref="OsduJson"/> works even for commands that
+    /// deserialise a request body before touching a client.
+    /// </summary>
+    public static CliContext Create(ParseResult parseResult)
+    {
+        ApiClientBuilder.RegisterDefaultSerializer<JsonSerializationWriterFactory>();
+        ApiClientBuilder.RegisterDefaultDeserializer<JsonParseNodeFactory>();
+
+        var config = CliConfig.Load(parseResult.GetValue(GlobalOptions.Config));
+
+        var format = string.Equals(parseResult.GetValue(GlobalOptions.Output), "json",
+            StringComparison.OrdinalIgnoreCase)
+            ? OutputFormat.Json
+            : OutputFormat.Table;
+
+        return new CliContext(new OsduClient(config), new OutputWriter(format, Console.Out));
+    }
+
+    /// <summary>Reads and returns the contents of a JSON file passed via a command option.</summary>
+    public static async Task<string> ReadBodyFileAsync(string path, CancellationToken cancellationToken)
+    {
+        if (!File.Exists(path))
+            throw new OsduException($"File not found: {path}");
+        return await File.ReadAllTextAsync(path, cancellationToken);
+    }
+
+    /// <summary>
+    /// Wraps a bare JSON object in an array. Several OSDU create endpoints take a list of
+    /// records, but users overwhelmingly hand the CLI a single record file — the Python CLI
+    /// does the same wrap in <c>wellbore add</c>.
+    /// </summary>
+    public static string WrapAsArray(string json)
+    {
+        var trimmed = json.TrimStart();
+        return trimmed.StartsWith('[') ? json : $"[{json}]";
+    }
+
+    public void Dispose() => Client.Dispose();
+}

@@ -1,0 +1,40 @@
+# CLI manifest for the OSDU CRS Conversion service.
+#
+# The second contributor to the `crs` noun — see crs_catalog.yaml for why the two services
+# are merged behind one command group.
+
+service: crs_conversion
+spec: crs_conversion
+client: CrsConversion
+description: CRS Conversion service — convert coordinates between reference systems.
+
+# No `groups:` entry for `crs`: crs_catalog.yaml describes it. The generator rejects two
+# services describing the same group, so exactly one manifest must own each description.
+
+commands:
+  - command: crs convert
+    summary: Convert a list of points to another coordinate reference system.
+    op: { method: post, path: /v4/convert }
+    body:
+      flag: --file
+      short: -f
+      help: JSON file containing the points and the target CRS.
+    output: raw
+
+  - command: crs convert-trajectory
+    summary: Convert wellbore trajectory stations to another coordinate reference system.
+    op: { method: post, path: /v4/convertTrajectory }
+    body:
+      flag: --file
+      short: -f
+      help: JSON file containing the trajectory stations and the target CRS.
+    output: raw
+
+  - command: crs convert-geojson
+    summary: Convert a GeoJSON structure to another coordinate reference system.
+    op: { method: post, path: /v4/convertGeoJson }
+    body:
+      flag: --file
+      short: -f
+      help: JSON file containing the GeoJSON or AnyCrsGeoJson structure.
+    output: raw

@@ -1,0 +1,23 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <AssemblyName>osdu</AssemblyName>
+    <RootNamespace>Equinor.OsduCli</RootNamespace>
+    <InvariantGlobalization>true</InvariantGlobalization>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="System.CommandLine" Version="2.0.11" />
+    <PackageReference Include="Microsoft.Extensions.Configuration" Version="10.0.11" />
+    <PackageReference Include="Microsoft.Extensions.Configuration.Json" Version="10.0.11" />
+    <PackageReference Include="Microsoft.Extensions.Configuration.EnvironmentVariables" Version="10.0.11" />
+  </ItemGroup>
+
+  <!-- PoC: project reference. Swap for <PackageReference Include="Equinor.OsduCsharpClient" />
+       once the CLI lives in its own repo. -->
+  <ItemGroup>
+    <ProjectReference Include="../../../osdu-csharp-client/src/OsduCsharpClient/OsduCsharpClient.csproj" />
+  </ItemGroup>
+
+</Project>

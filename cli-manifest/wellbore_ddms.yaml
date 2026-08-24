@@ -1,0 +1,71 @@
+# CLI manifest for the Wellbore DDMS service.
+#
+# Wellbore DDMS is the largest spec in the estate (84 operations). Triaging all 84 at once is
+# not useful, so this manifest declares a `scope`: the generator enforces full coverage
+# inside it and reports everything outside it as untriaged rather than failing. Widening the
+# scope one prefix at a time is how a service gets adopted.
+#
+# Note on priority: Wellbore DDMS was a late addition to the Python CLI and is not part of
+# its core command set. This manifest exists to exercise the `scope:` mechanism. The core
+# services — entitlements, workflow, search, schema — come first.
+
+service: wellbore_ddms
+spec: wellbore_ddms
+client: WellboreDdms
+description: Wellbore DDMS — typed wellbore records.
+
+groups:
+  wellbore: Manage Wellbore records in the Wellbore DDMS.
+  wellbore version: Inspect Wellbore record version history.
+
+scope:
+  - "/ddms/v3/wellbores*"
+
+commands:
+  - command: wellbore get
+    summary: Get a Wellbore record by id.
+    op: { method: get, path: "/ddms/v3/wellbores/{record_id}" }
+    params:
+      record_id: { flag: --id, short: -id, required: true, help: Wellbore record id. }
+    output: raw
+
+  - command: wellbore add
+    summary: Add a Wellbore record from a JSON file.
+    op: { method: post, path: "/ddms/v3/wellbores" }
+    body:
+      flag: --file
+      short: -f
+      required: true
+      help: JSON file containing the Wellbore record.
+      # The endpoint takes an array; users pass a single record file. The Python CLI wraps
+      # it the same way in `wellbore add`.
+      wrap-single: true
+    output:
+      root: recordIds
+
+  - command: wellbore delete
+    summary: Soft-delete a Wellbore record by id.
+    op: { method: delete, path: "/ddms/v3/wellbores/{record_id}" }
+    params:
+      record_id: { flag: --id, short: -id, required: true, help: Wellbore record id to delete. }
+    output:
+      message: 1 record deleted
+
+  - command: wellbore version list
+    summary: List all versions of a Wellbore record.
+    op: { method: get, path: "/ddms/v3/wellbores/{record_id}/versions" }
+    params:
+      record_id: { flag: --id, short: -id, required: true, help: Wellbore record id. }
+    output: raw
+
+  - command: wellbore version get
+    summary: Get a specific version of a Wellbore record.
+    op: { method: get, path: "/ddms/v3/wellbores/{record_id}/versions/{version}" }
+    params:
+      record_id: { flag: --id, short: -id, required: true, help: Wellbore record id. }
+      version:   { flag: --version, short: -v, required: true, help: Wellbore record version. }
+    output: raw
+
+handwritten: []
+
+exclude: []

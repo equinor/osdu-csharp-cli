@@ -1,0 +1,275 @@
+# CLI manifest for the OSDU Unit service (v3).
+#
+# The largest core service, and the one where flat naming would hurt most: 28 in-scope
+# operations that are really four different resources tangled into one URL space. Unit v2 is
+# deprecated and deliberately absent — v3 only.
+#
+# The tree here mirrors the resources, not the URLs:
+#   unit …               the units themselves, plus their conversions and catalog
+#   measurement …        the quantities units measure
+#   unit-system …        named collections of preferred units
+#
+# `by-<thing>` is used where an endpoint is a filtered list rather than a lookup of one
+# item, so that `get` keeps its R3 meaning of "fetch exactly one".
+
+service: unit_v3
+spec: unit/v3
+client: UnitV3
+description: Unit service — unit catalog, measurements and conversions.
+
+groups:
+  unit: Work with units of measure — look them up and derive conversions between them.
+  unit conversion: Derive the arithmetic that converts one unit to another.
+  unit catalog: Inspect the unit catalog as a whole.
+  measurement: Work with measurements — the quantities that units measure.
+  unit-system: Work with unit systems — named sets of preferred units.
+
+commands:
+  # ---- unit --------------------------------------------------------------------------
+  - command: unit list
+    summary: List all units in the catalog.
+    op: { method: get, path: /v3/unit }
+    params:
+      offset: { flag: --offset, type: int, help: Number of units to skip. }
+      limit:  { flag: --limit,  type: int, help: Maximum number of units to return. }
+    output:
+      root: units
+      columns:
+        Name: name
+        Symbol: displaySymbol
+        Namespace: namespace
+
+  - command: unit get
+    summary: Get one unit by namespace and symbol.
+    op: { method: get, path: /v3/unit/symbol }
+    params:
+      namespaces: { flag: --namespace, help: "Namespace to look in, e.g. Energistics_UoM." }
+      symbol:     { flag: --symbol, short: -s, required: true, help: "Unit symbol, e.g. m or ft." }
+    output: raw
+
+  - command: unit search
+    summary: Search the unit catalog.
+    op: { method: post, path: /v3/unit/search }
+    params:
+      offset: { flag: --offset, type: int, help: Number of results to skip. }
+      limit:  { flag: --limit,  type: int, help: Maximum number of results to return. }
+    body:
+      fields:
+        query:
+          flag: --query
+          short: -q
+          required: true
+          help: Search expression.
+    output:
+      root: units
+      columns:
+        Name: name
+        Symbol: displaySymbol
+        Namespace: namespace
+
+  - command: unit by-symbol
+    summary: List every unit that uses a given symbol, across all namespaces.
+    op: { method: get, path: /v3/unit/symbols }
+    params:
+      symbol: { flag: --symbol, short: -s, required: true, help: "Unit symbol, e.g. m." }
+    output:
+      root: units
+      columns:
+        Name: name
+        Symbol: displaySymbol
+        Namespace: namespace
+
+  - command: unit by-measurement
+    summary: List the units that can measure a given measurement.
+    op: { method: get, path: /v3/unit/measurement }
+    params:
+      ancestry: { flag: --measurement, short: -m, required: true, help: "Measurement ancestry, e.g. Length." }
+    output:
+      root: units
+      columns:
+        Name: name
+        Symbol: displaySymbol
+        Namespace: namespace
+
+  - command: unit by-system
+    summary: Get the unit a unit system prefers for a given measurement.
+    op: { method: get, path: /v3/unit/unitsystem }
+    params:
+      unitSystemName: { flag: --system, required: true, help: Unit system name. }
+      ancestry:       { flag: --measurement, short: -m, required: true, help: Measurement ancestry. }
+    output: raw
+
+  - command: unit preferred
+    summary: List the preferred units for a given measurement.
+    op: { method: get, path: /v3/unit/measurement/preferred }
+    params:
+      ancestry: { flag: --measurement, short: -m, required: true, help: Measurement ancestry. }
+    output:
+      root: units
+      columns:
+        Name: name
+        Symbol: displaySymbol
+        Namespace: namespace
+
+  - command: unit maps
+    summary: List mappings between units in different namespaces.
+    op: { method: get, path: /v3/unit/maps }
+    params:
+      offset: { flag: --offset, type: int, help: Number of mappings to skip. }
+      limit:  { flag: --limit,  type: int, help: Maximum number of mappings to return. }
+    output: raw
+
+  # ---- unit conversion ---------------------------------------------------------------
+  - command: unit conversion scale
+    summary: Get the scale and offset that convert one unit to another.
+    op: { method: get, path: /v3/conversion/scale }
+    params:
+      namespaces: { flag: --namespace, help: "Namespace to resolve the symbols in, e.g. Energistics_UoM." }
+      fromSymbol: { flag: --from, required: true, help: "Symbol to convert from, e.g. ft." }
+      toSymbol:   { flag: --to,   required: true, help: "Symbol to convert to, e.g. m." }
+    output: raw
+
+  - command: unit conversion abcd
+    summary: Get the ABCD rational-function coefficients converting one unit to another.
+    op: { method: get, path: /v3/conversion/abcd }
+    params:
+      namespaces: { flag: --namespace, help: "Namespace to resolve the symbols in, e.g. Energistics_UoM." }
+      fromSymbol: { flag: --from, required: true, help: Symbol to convert from. }
+      toSymbol:   { flag: --to,   required: true, help: Symbol to convert to. }
+    output: raw
+
+  # ---- unit catalog ------------------------------------------------------------------
+  - command: unit catalog get
+    summary: Get the whole unit catalog.
+    op: { method: get, path: /v3/catalog }
+    output: raw
+
+  - command: unit catalog search
+    summary: Search across every kind of item in the catalog.
+    op: { method: post, path: /v3/catalog/search }
+    params:
+      offset: { flag: --offset, type: int, help: Number of results to skip. }
+      limit:  { flag: --limit,  type: int, help: Maximum number of results to return. }
+    body:
+      fields:
+        query:
+          flag: --query
+          short: -q
+          required: true
+          help: Search expression.
+    output: raw
+
+  - command: unit catalog map-states
+    summary: List the states a unit or measurement mapping can be in.
+    op: { method: get, path: /v3/catalog/mapstates }
+    params:
+      offset: { flag: --offset, type: int, help: Number of states to skip. }
+      limit:  { flag: --limit,  type: int, help: Maximum number of states to return. }
+    output: raw
+
+  - command: unit catalog last-modified
+    summary: Show when the catalog was last changed.
+    op: { method: get, path: /v3/catalog/lastmodified }
+    output: raw
+
+  # ---- measurement -------------------------------------------------------------------
+  - command: measurement list
+    summary: List all measurements in the catalog.
+    op: { method: get, path: /v3/measurement/list }
+    params:
+      offset: { flag: --offset, type: int, help: Number of measurements to skip. }
+      limit:  { flag: --limit,  type: int, help: Maximum number of measurements to return. }
+    output:
+      root: measurements
+      columns:
+        Name: name
+        Ancestry: ancestry
+        Namespace: namespace
+
+  - command: measurement get
+    summary: Get one measurement by ancestry.
+    op: { method: get, path: /v3/measurement }
+    params:
+      ancestry: { flag: --measurement, short: -m, required: true, help: "Measurement ancestry, e.g. Length." }
+    output: raw
+
+  - command: measurement search
+    summary: Search the measurement catalog.
+    op: { method: post, path: /v3/measurement/search }
+    params:
+      offset: { flag: --offset, type: int, help: Number of results to skip. }
+      limit:  { flag: --limit,  type: int, help: Maximum number of results to return. }
+    body:
+      fields:
+        query:
+          flag: --query
+          short: -q
+          required: true
+          help: Search expression.
+    output:
+      root: measurements
+      columns:
+        Name: name
+        Ancestry: ancestry
+        Namespace: namespace
+
+  - command: measurement maps
+    summary: List mappings between measurements in different namespaces.
+    op: { method: get, path: /v3/measurement/maps }
+    params:
+      offset: { flag: --offset, type: int, help: Number of mappings to skip. }
+      limit:  { flag: --limit,  type: int, help: Maximum number of mappings to return. }
+    output: raw
+
+  # ---- unit-system -------------------------------------------------------------------
+  - command: unit-system list
+    summary: List the available unit systems.
+    op: { method: get, path: /v3/unitsystem/list }
+    params:
+      offset: { flag: --offset, type: int, help: Number of unit systems to skip. }
+      limit:  { flag: --limit,  type: int, help: Maximum number of unit systems to return. }
+    output: raw
+
+  - command: unit-system get
+    summary: Get one unit system by name.
+    op: { method: get, path: /v3/unitsystem }
+    params:
+      name:   { flag: --name, short: -n, required: true, help: Unit system name. }
+      offset: { flag: --offset, type: int, help: Number of entries to skip. }
+      limit:  { flag: --limit,  type: int, help: Maximum number of entries to return. }
+    output: raw
+
+exclude:
+  # Eight GET/POST twins — by far the densest cluster of them in OSDU. In every case the
+  # POST takes the same selectors the GET takes as query parameters, wrapped in a body, so
+  # that callers can send many at once. COMMAND-GRAMMAR.md §3.1 keeps the GET.
+  - op: { method: post, path: /v3/unit }
+    reason: >
+      Body form of `unit get`: it takes a unit essence in the body and returns the single
+      matching unit, rather than listing units the way GET /v3/unit does. GET/POST twin,
+      see COMMAND-GRAMMAR.md §3.1.
+  - op: { method: post, path: /v3/unit/measurement }
+    reason: Body form of `unit by-measurement`; GET/POST twin.
+  - op: { method: post, path: /v3/unit/measurement/preferred }
+    reason: Body form of `unit preferred`; GET/POST twin.
+  - op: { method: post, path: /v3/unit/unitsystem }
+    reason: Body form of `unit by-system`; GET/POST twin.
+  - op: { method: post, path: /v3/unitsystem }
+    reason: Body form of `unit-system get`; GET/POST twin.
+  - op: { method: post, path: /v3/measurement }
+    reason: Body form of `measurement get`; GET/POST twin.
+  - op: { method: post, path: /v3/conversion/scale }
+    reason: Body form of `unit conversion scale`; GET/POST twin.
+  - op: { method: post, path: /v3/conversion/abcd }
+    reason: Body form of `unit conversion abcd`; GET/POST twin.
+  - op: { method: get, path: /v3/_ah/readiness_check }
+    reason: Infrastructure probe, covered by `osdu status`.
+  - op: { method: get, path: /v3/_ah/liveness_check }
+    reason: Infrastructure probe, covered by `osdu status`.
+
+handwritten:
+  - command: status
+    op: { method: get, path: /v3/info }
+    reason: >
+      Reported by `osdu status`, which probes every service's /info in one command rather
+      than giving each service its own. See cli-manifest/storage.yaml for the rationale.

@@ -1,0 +1,136 @@
+# CLI manifest for the OSDU Storage service.
+#
+# This file is the editorial layer over openapi_specs/storage/openapi.yaml. The spec says
+# what the service can do; this says what the CLI should expose, what to call it, and what
+# a human wants to see in the output. Everything else is generated.
+#
+# The command group is `record`, not `storage`: commands are named for the resource the
+# user is acting on, not the OSDU service that happens to host it. See COMMAND-GRAMMAR.md.
+#
+# Every operation in the spec must appear here in exactly one of `commands`, `handwritten`
+# or `exclude`. tools/generate_cli.py fails the build otherwise, so a new upstream endpoint
+# surfaces as a build error naming the endpoint rather than silently going missing.
+
+service: storage          # ServiceRegistry attr
+spec: storage            # openapi_specs/storage/openapi.yaml
+client: Storage           # OsduClient property
+description: Storage service — generic, kind-agnostic records.
+
+# Help text for every command group this manifest contributes to. Group help is global: a
+# noun can be reached from more than one service, so two manifests describing the same
+# group differently is a build failure.
+groups:
+  record: Work with records — the generic, kind-agnostic unit of OSDU data.
+  record version: Inspect record version history.
+
+commands:
+  - command: record list
+    summary: List records of a given kind.
+    op: { method: get, path: /query/records }
+    params:
+      kind:   { flag: --kind,   short: -k, required: true, help: Kind of records to list. }
+      limit:  { flag: --limit,             help: Maximum number of records to return. }
+      cursor: { flag: --cursor,            help: Cursor returned by a previous page. }
+    output:
+      root: results
+      columns:
+        Id: id
+        Version: version
+        Kind: kind
+
+  # Divergence from the Python CLI, deliberate: `osdu storage get` there accepts either
+  # --kind or --id and dispatches to a different endpoint for each, which duplicates
+  # the list command and cannot be expressed as one operation. Here `get` is id-only.
+  - command: record get
+    summary: Get the latest version of a record by id.
+    op: { method: get, path: "/records/{id}" }
+    params:
+      id:        { flag: --id, short: -id, required: true, help: Record id. }
+      attribute: { flag: --attributes, short: -a, help: Restrict the returned fields of the record. }
+    output:
+      columns:
+        Id: id
+        Version: version
+        Kind: kind
+        CreateUser: createUser
+        CreateTime: createTime
+
+  - command: record delete
+    summary: Soft-delete a record by id.
+    # `/records/{id}:delete` — Kiota renders a `:action` suffix as a method, not an indexer,
+    # so the accessor cannot be derived from the path and is given explicitly.
+    op: { method: post, path: "/records/{id}:delete" }
+    builder: Records.WithIdDelete({id})
+    params:
+      id: { flag: --id, short: -id, required: true, help: Record id to delete. }
+    output:
+      message: 1 record deleted
+
+  - command: record version list
+    summary: List all versions of a record.
+    op: { method: get, path: "/records/versions/{id}" }
+    params:
+      id: { flag: --id, short: -id, required: true, help: Record id. }
+    output:
+      root: versions
+
+  - command: record version get
+    summary: Get a specific version of a record.
+    op: { method: get, path: "/records/{id}/{version}" }
+    params:
+      id:        { flag: --id, short: -id, required: true, help: Record id. }
+      version:   { flag: --version, short: -v, required: true, help: Record version. }
+      attribute: { flag: --attributes, short: -a, help: Restrict the returned fields of the record. }
+    output:
+      columns:
+        Id: id
+        Version: version
+        Kind: kind
+        CreateUser: createUser
+        CreateTime: createTime
+
+handwritten:
+  - command: storage add
+    op: { method: put, path: /records }
+    reason: >
+      Globs a local path, chunks the records into batches, issues one call per batch and
+      aggregates the failures. Orchestration around the endpoint, not a single request.
+
+  - command: status
+    op: { method: get, path: /info }
+    reason: >
+      Service identity is not a record verb, so it does not belong under `record`. The
+      ten OSDU services each expose an identical /info; the Python CLI turns that into ten
+      separate `<service> info` commands that all call the same helper. Here one
+      hand-written `osdu status` probes every configured service and reports them together.
+
+exclude:
+  - op: { method: get, path: /records }
+    reason: Superseded by `record list`, which is the kind-scoped query users actually want.
+  - op: { method: patch, path: /records }
+    reason: Bulk metadata patch; no CLI surface in the Python tool and no demand yet.
+  - op: { method: put, path: /records/copy }
+    reason: Namespace copy is an admin operation, not a CLI one.
+  - op: { method: post, path: /replay }
+    reason: Operator tooling; triggers a full reindex.
+  - op: { method: get, path: "/replay/status/{id}" }
+    reason: Paired with /replay, which is excluded.
+  - op: { method: post, path: /records/delete }
+    reason: Bulk soft-delete; too easy to fire by accident from a shell.
+  - op: { method: post, path: /query/records }
+    reason: Body-based multi-id fetch; `record get` covers the single-id case.
+  - op: { method: post, path: "/query/records:batch" }
+    reason: Frame-of-reference conversion batch fetch; specialised, no CLI demand.
+  - op: { method: delete, path: "/records/{id}" }
+    reason: Hard purge. Destructive and irreversible; deliberately not exposed.
+  - op: { method: delete, path: "/records/{id}/versions" }
+    reason: Hard purge of versions. Destructive and irreversible.
+  - op: { method: patch, path: "/records/{id}" }
+    reason: Single-record merge patch; superseded by `record add` for CLI purposes.
+  - op: { method: get, path: /liveness_check }
+    reason: Infrastructure probe, covered by the `status` command across all services.
+  - op: { method: post, path: /query/records/headers }
+    reason: >
+      Body-based multi-id header fetch (added upstream 2026-08). Same family as
+      POST /query/records, which is excluded for the same reason: `record get` covers
+      the single-id case and the batch form has no CLI demand yet.

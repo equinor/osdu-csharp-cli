@@ -1,0 +1,163 @@
+# CLI manifest for the OSDU Entitlements service.
+#
+# This manifest contributes TWO top-level nouns, `group` and `member`, because the service's
+# central relation is symmetric: `GET /groups/{email}/members` and
+# `GET /members/{email}/groups` are the same membership edge read from either end. The
+# Python CLI exposes only the second, as `entitlements mygroups`, so "who is in this group?"
+# has no command at all despite the endpoint existing.
+#
+# Naming commands after the service would force those two into one `entitlements` group and
+# lose the symmetry. See COMMAND-GRAMMAR.md and Runtime/CommandTree.cs.
+
+service: entitlements
+spec: entitlements
+client: Entitlements
+description: Entitlements service — groups and the members who belong to them.
+
+groups:
+  group: Work with entitlement groups — the access control lists of OSDU.
+  group member: Manage who belongs to a group.
+  member: Work with members — the users and service principals inside groups.
+  member group: Inspect the groups a member belongs to.
+
+commands:
+  - command: group list
+    summary: List groups the caller belongs to.
+    op: { method: get, path: /groups }
+    params:
+      roleRequired: { flag: --role-required, type: bool, help: Include the caller's role in each group. }
+    output:
+      root: groups
+      columns:
+        Email: email
+        Name: name
+        Description: description
+
+  - command: group add
+    summary: Create a group.
+    op: { method: post, path: /groups }
+    body:
+      fields:
+        name:
+          flag: --name
+          short: -n
+          required: true
+          help: "Group name, without the partition suffix, e.g. users.datalake.viewers."
+        description:
+          flag: --description
+          short: -d
+          help: What the group is for.
+    output:
+      columns:
+        Email: email
+        Name: name
+
+  - command: group delete
+    summary: Delete a group.
+    op: { method: delete, path: "/groups/{group_email}" }
+    params:
+      group_email: { flag: --group, short: -g, required: true, help: Group email address. }
+    output:
+      message: Group deleted
+
+  - command: group member list
+    summary: List the members of a group.
+    op: { method: get, path: "/groups/{group_email}/members" }
+    params:
+      group_email: { flag: --group, short: -g, required: true, help: Group email address. }
+      role:        { flag: --role, help: Return only members with this role. }
+      includeType: { flag: --include-type, type: bool, help: Include each member's type in the output. }
+    output:
+      root: members
+      columns:
+        Email: email
+        Role: role
+
+  - command: group member add
+    summary: Add a member to a group.
+    op: { method: post, path: "/groups/{group_email}/members" }
+    params:
+      group_email: { flag: --group, short: -g, required: true, help: Group email address. }
+    body:
+      fields:
+        email:
+          flag: --member
+          short: -m
+          required: true
+          help: Email address of the user or service principal to add.
+        role:
+          flag: --role
+          required: true
+          help: Role to grant the member.
+    output:
+      columns:
+        Email: email
+        Role: role
+
+  - command: group member delete
+    summary: Remove one member from one group.
+    op: { method: delete, path: "/groups/{group_email}/members/{member_email}" }
+    params:
+      group_email:  { flag: --group, short: -g, required: true, help: Group email address. }
+      member_email: { flag: --member, short: -m, required: true, help: Member email address to remove. }
+    output:
+      message: Member removed from group
+
+  - command: group member count
+    summary: Count the members of a group.
+    op: { method: get, path: "/groups/{group_email}/membersCount" }
+    params:
+      group_email: { flag: --group, short: -g, required: true, help: Group email address. }
+      role:        { flag: --role, help: Count only members with this role. }
+    output: raw
+
+  # The other end of the same edge. `group member list --group X` asks "who is in X?";
+  # `member group list --member Y` asks "what is Y in?". Both endpoints exist upstream and
+  # neither is derivable from the other.
+  - command: member group list
+    summary: List the groups a member belongs to.
+    op: { method: get, path: "/members/{member_email}/groups" }
+    params:
+      member_email: { flag: --member, short: -m, required: true, help: Member email address. }
+      type:         { flag: --type, help: "Filter by group type: DATA, SERVICE or USER." }
+      appid:        { flag: --appid, help: Filter to groups granted to this application id. }
+      roleRequired: { flag: --role-required, type: bool, help: Include the member's role in each group. }
+    output:
+      root: groups
+      columns:
+        Email: email
+        Name: name
+        Role: role
+
+  - command: member delete
+    summary: Remove a member from every group in the partition.
+    op: { method: delete, path: "/members/{member_email}" }
+    params:
+      member_email: { flag: --member, short: -m, required: true, help: Member email address to remove. }
+    output:
+      message: Member removed from all groups
+
+exclude:
+  - op: { method: patch, path: "/groups/{group_email}" }
+    reason: >
+      Bulk membership patch with an operation list in the body. `group member add` and
+      `group member delete` cover the single-edge cases a CLI user performs; the patch form
+      is for programmatic reconciliation.
+  - op: { method: get, path: /groups/all }
+    reason: >
+      Partition-wide group listing, paged with a cursor. Belongs as `group list --all`, which
+      needs one command to dispatch across two endpoints — COMMAND-GRAMMAR.md §3.2. Left out
+      rather than given a second command name that describes the endpoint instead of the task.
+  - op: { method: post, path: /tenant-provisioning }
+    reason: Provisions a new data partition. Platform operations, and irreversible.
+  - op: { method: get, path: /_ah/readiness_check }
+    reason: Infrastructure probe, covered by `osdu status`.
+  - op: { method: get, path: /_ah/liveness_check }
+    reason: Infrastructure probe, covered by `osdu status`.
+
+handwritten:
+  - command: status
+    op: { method: get, path: /info }
+    reason: >
+      Reported by `osdu status`, which probes every service's /info in one command rather
+      than giving each service its own. See cli-manifest/storage.yaml for the rationale.

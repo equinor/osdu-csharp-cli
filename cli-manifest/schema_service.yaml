@@ -1,0 +1,80 @@
+# CLI manifest for the OSDU Schema service.
+#
+# Schemas are what make `--kind` strings meaningful, so `osdu schema list` is the closest
+# thing the CLI has to a discovery command: it is how a user finds out what kinds exist
+# before searching for records of one.
+
+service: schema_service
+spec: schema_service
+client: SchemaService
+description: Schema service — the definitions behind every record kind.
+
+groups:
+  schema: Work with schemas — the definitions behind every record kind.
+
+commands:
+  - command: schema list
+    summary: List schemas, optionally filtered by authority, source or entity type.
+    op: { method: get, path: /schema }
+    params:
+      authority:  { flag: --authority,  help: Filter by authority, e.g. osdu. }
+      source:     { flag: --source,     help: Filter by source, e.g. wks. }
+      entityType: { flag: --entity-type, short: -e, help: Filter by entity type, e.g. master-data--Well. }
+      status:     { flag: --status,     help: "Filter by lifecycle status: PUBLISHED, DEVELOPMENT or OBSOLETE." }
+      scope:      { flag: --scope,      help: "Filter by scope: SHARED or INTERNAL." }
+      latestVersion: { flag: --latest, type: bool, help: Return only the newest version of each schema. }
+      limit:      { flag: --limit,      help: Maximum number of schemas to return. }
+      offset:     { flag: --offset,     help: Number of schemas to skip. }
+    output:
+      root: schemaInfos
+      columns:
+        Id: schemaIdentity.id
+        Status: status
+        Scope: scope
+
+  - command: schema get
+    summary: Get a schema by id.
+    op: { method: get, path: "/schema/{id}" }
+    params:
+      id: { flag: --id, short: -id, required: true, help: "Schema id, e.g. osdu:wks:master-data--Well:1.0.0." }
+    output: raw
+
+  - command: schema add
+    summary: Create a schema from a JSON file.
+    op: { method: post, path: /schema }
+    body:
+      flag: --file
+      short: -f
+      help: JSON file containing the schema request (schemaInfo and schema).
+    output:
+      columns:
+        Id: schemaIdentity.id
+        Status: status
+
+  - command: schema update
+    summary: Create or replace a schema from a JSON file.
+    op: { method: put, path: /schema }
+    body:
+      flag: --file
+      short: -f
+      help: JSON file containing the schema request (schemaInfo and schema).
+    output:
+      columns:
+        Id: schemaIdentity.id
+        Status: status
+
+exclude:
+  - op: { method: put, path: /schemas/system }
+    reason: >
+      System schemas are partition-independent and managed by platform operators, not by
+      data users. Exposing it beside `schema update` would make it easy to write a
+      system-wide schema while meaning to write a partition one.
+  - op: { method: get, path: /liveness_check }
+    reason: Infrastructure probe, covered by `osdu status`.
+
+handwritten:
+  - command: status
+    op: { method: get, path: /info }
+    reason: >
+      Reported by `osdu status`, which probes every service's /info in one command rather
+      than giving each service its own. See cli-manifest/storage.yaml for the rationale.

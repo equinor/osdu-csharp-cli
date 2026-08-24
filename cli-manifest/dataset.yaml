@@ -1,0 +1,103 @@
+# CLI manifest for the OSDU Dataset service.
+#
+# Dataset is the generic registry: it tracks dataset records of any kind and issues the
+# storage and retrieval instructions that tell a client where the bytes live. See file.yaml
+# for the boundary between the two, and COMMAND-GRAMMAR.md §3.4 for the open question.
+
+service: dataset
+spec: dataset
+client: Dataset
+description: Dataset service — dataset registries and access instructions.
+
+groups:
+  dataset: Work with datasets — registry records and the instructions to read or write their bytes.
+
+commands:
+  - command: dataset get
+    summary: Get a dataset registry record by id.
+    op: { method: get, path: /getDatasetRegistry }
+    params:
+      id: { flag: --id, short: -id, required: true, help: Dataset registry record id. }
+    output:
+      root: datasetRegistries
+      columns:
+        Id: id
+        Kind: kind
+
+  - command: dataset add
+    summary: Create or update dataset registry records from a JSON file.
+    op: { method: put, path: /registerDataset }
+    body:
+      flag: --file
+      short: -f
+      help: JSON file containing the dataset registry records.
+    output:
+      root: datasetRegistries
+      columns:
+        Id: id
+        Kind: kind
+
+  - command: dataset delete
+    summary: Soft-delete a dataset metadata record.
+    op: { method: post, path: "/metadataRecord/{id}/softDelete" }
+    params:
+      id: { flag: --id, short: -id, required: true, help: Dataset metadata record id. }
+    output:
+      message: Dataset metadata record soft-deleted
+
+  - command: dataset undelete
+    summary: Restore a soft-deleted dataset metadata record.
+    op: { method: post, path: "/metadataRecord/{id}/undelete" }
+    params:
+      id: { flag: --id, short: -id, required: true, help: Dataset metadata record id to restore. }
+    output:
+      message: Dataset metadata record restored
+
+  - command: dataset upload-url
+    summary: Get instructions for writing a new dataset's bytes.
+    op: { method: post, path: /storageInstructions }
+    params:
+      kindSubType: { flag: --kind-subtype, help: "Dataset sub-type, e.g. dataset--File.Generic." }
+      expiryTime:  { flag: --expiry, help: "How long the instructions stay valid, e.g. 5M or 2H." }
+    output: raw
+
+  - command: dataset download-url
+    summary: Get instructions for reading a dataset's bytes.
+    op: { method: get, path: /retrievalInstructions }
+    params:
+      id:         { flag: --id, short: -id, required: true, help: Dataset registry record id. }
+      expiryTime: { flag: --expiry, help: "How long the instructions stay valid, e.g. 5M or 2H." }
+    output: raw
+
+  - command: dataset revoke-url
+    summary: Revoke previously issued dataset URLs.
+    op: { method: post, path: /revokeURL }
+    params:
+      kindSubType: { flag: --kind-subtype, required: true, help: "Dataset sub-type whose URLs should be revoked." }
+    body:
+      flag: --file
+      short: -f
+      help: JSON file naming the resource whose URLs should be revoked.
+      # Inline body schema — see the same note in cli-manifest/file.yaml.
+      model: Equinor.OsduCsharpClient.Dataset.RevokeURL.RevokeURLPostRequestBody
+    output:
+      message: Dataset URLs revoked
+
+exclude:
+  - op: { method: post, path: /getDatasetRegistry }
+    reason: >
+      Batch form of `dataset get`, taking a list of ids in a body rather than one in a query
+      string — the spec even names them getDatasetRegistry and getDatasetRegistry_1. One of
+      the 12 GET/POST twins in COMMAND-GRAMMAR.md §3.1; the GET is the CLI-shaped one.
+  - op: { method: post, path: /retrievalInstructions }
+    reason: >
+      Batch form of `dataset download-url`, same GET/POST twin pattern as above.
+  - op: { method: get, path: /liveness_check }
+    reason: Infrastructure probe, covered by `osdu status`.
+
+handwritten:
+  - command: status
+    op: { method: get, path: /info }
+    reason: >
+      Reported by `osdu status`, which probes every service's /info in one command rather
+      than giving each service its own. See cli-manifest/storage.yaml for the rationale.

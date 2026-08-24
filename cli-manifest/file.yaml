@@ -1,0 +1,85 @@
+# CLI manifest for the OSDU File service.
+#
+# File and Dataset overlap at the platform level: both hand out signed URLs and both track
+# metadata records. The split used here is the one the services themselves make — File deals
+# with a single file's bytes and its metadata record, Dataset deals with registries and
+# multi-dataset instructions. COMMAND-GRAMMAR.md §3.4 records that this needs confirming
+# against Equinor's actual ingestion path before either grows further.
+
+service: file
+spec: file
+client: File
+# The Kiota namespace is not the facade property: `File` would collide with System.IO.File.
+models: FileNamespace
+description: File service — upload, download and file metadata.
+
+groups:
+  file: Work with files — upload and download bytes, and the metadata that describes them.
+
+commands:
+  - command: file get
+    summary: Get the metadata record for a file.
+    op: { method: get, path: "/v2/files/{id}/metadata" }
+    params:
+      id: { flag: --id, short: -id, required: true, help: File metadata record id. }
+    output: raw
+
+  - command: file add
+    summary: Register metadata for a file already uploaded to the landing zone.
+    op: { method: post, path: /v2/files/metadata }
+    body:
+      flag: --file
+      short: -f
+      help: JSON file containing the file metadata record.
+    output:
+      columns:
+        Id: id
+
+  - command: file delete
+    summary: Delete a file and its metadata record.
+    op: { method: delete, path: "/v2/files/{id}/metadata" }
+    params:
+      id: { flag: --id, short: -id, required: true, help: File metadata record id to delete. }
+    output:
+      message: File and metadata deleted
+
+  - command: file upload-url
+    summary: Get a signed URL and landing-zone location to upload a file to.
+    op: { method: get, path: /v2/files/uploadURL }
+    params:
+      expiryTime: { flag: --expiry, help: "How long the URL stays valid, e.g. 5M for five minutes or 2H for two hours." }
+    output: raw
+
+  - command: file download-url
+    summary: Get a signed URL to download a file from.
+    op: { method: get, path: "/v2/files/{id}/downloadURL" }
+    params:
+      id:         { flag: --id, short: -id, required: true, help: File metadata record id. }
+      expiryTime: { flag: --expiry, help: "How long the URL stays valid, e.g. 5M for five minutes or 2H for two hours." }
+    output: raw
+
+  - command: file revoke-url
+    summary: Revoke previously issued signed URLs.
+    op: { method: post, path: /v2/files/revokeURL }
+    body:
+      flag: --file
+      short: -f
+      help: JSON file naming the resource whose URLs should be revoked.
+      # The spec declares this body inline rather than as a $ref, so Kiota synthesises a
+      # type inside the request builder's own namespace instead of under .Models.
+      model: Equinor.OsduCsharpClient.FileNamespace.V2.Files.RevokeURL.RevokeURLPostRequestBody
+    output:
+      message: Signed URLs revoked
+
+exclude:
+  - op: { method: get, path: /v2/readiness_check }
+    reason: Infrastructure probe, covered by `osdu status`.
+  - op: { method: get, path: /v2/liveness_check }
+    reason: Infrastructure probe, covered by `osdu status`.
+
+handwritten:
+  - command: status
+    op: { method: get, path: /v2/info }
+    reason: >
+      Reported by `osdu status`, which probes every service's /info in one command rather
+      than giving each service its own. See cli-manifest/storage.yaml for the rationale.

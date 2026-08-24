@@ -1,0 +1,62 @@
+# CLI manifest for the OSDU CRS Catalog service.
+#
+# `osdu crs` is contributed by TWO services: this one supplies the lookups (which coordinate
+# reference systems and transformations exist), and crs_conversion.yaml supplies the
+# conversions (apply one to actual coordinates). A user asking "how do I reproject this?"
+# should not have to know that OSDU splits those across two deployments.
+#
+# This is why R2 in COMMAND-GRAMMAR.md is "noun + verb resolves to exactly one operation"
+# rather than "one noun, one service".
+
+service: crs_catalog
+spec: crs_catalog
+client: CrsCatalog
+description: CRS Catalog service — coordinate reference system and transformation lookups.
+
+groups:
+  crs: Work with coordinate reference systems — look them up and convert between them.
+
+commands:
+  - command: crs get
+    summary: Get a coordinate reference system by record or data id.
+    # Kiota strips the hyphens: /v3/coordinate-reference-system is V3.CoordinateReferenceSystem.
+    op: { method: get, path: /v3/coordinate-reference-system }
+    builder: V3.CoordinateReferenceSystem
+    params:
+      recordId: { flag: --record-id, help: CRS record id. }
+      dataId:   { flag: --data-id,   help: CRS data id. Give this or --record-id. }
+    output: raw
+
+  - command: crs transform
+    summary: Get a coordinate transformation by record or data id.
+    op: { method: get, path: /v3/coordinate-transformation }
+    builder: V3.CoordinateTransformation
+    params:
+      recordId: { flag: --record-id, help: Transformation record id. }
+      dataId:   { flag: --data-id,   help: Transformation data id. Give this or --record-id. }
+    output: raw
+
+  - command: crs area-of-use
+    summary: Check which transformations are valid for a set of points.
+    op: { method: post, path: /v3/points-in-aou }
+    builder: V3.PointsInAou
+    body:
+      flag: --file
+      short: -f
+      help: JSON file containing the points and the transformations to test.
+    output: raw
+
+exclude:
+  - op: { method: post, path: /v3/coordinate-reference-system }
+    reason: >
+      Batch form of `crs get`, taking several ids in a body — the spec names the pair
+      getCoordinateReferenceSystem and getCoordinateReferenceSystems. COMMAND-GRAMMAR.md §3.1.
+  - op: { method: post, path: /v3/coordinate-transformation }
+    reason: Batch form of `crs transform`, same GET/POST twin pattern as above.
+
+handwritten:
+  - command: status
+    op: { method: get, path: /v3/info }
+    reason: >
+      Reported by `osdu status`, which probes every service's /info in one command rather
+      than giving each service its own. See cli-manifest/storage.yaml for the rationale.
