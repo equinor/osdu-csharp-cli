@@ -31,8 +31,10 @@ jobs:
     name: Publish ${{ matrix.rid }}
     needs: [release-please, test]
     # needs.test must have succeeded — never publish a binary whose tests did not pass.
-    if: ${{ always() && needs.test.result == 'success' && needs.release-please.outputs.releases_created == 'true' }}
+    if: ${{ always() && needs.test.result == 'success' && (github.event_name == 'workflow_dispatch' || needs.release-please.outputs.releases_created == 'true') }}
     strategy:
+      # One platform failing should not hide whether the others built.
+      fail-fast: false
       matrix:
         include:
           - { os: ubuntu-latest, rid: linux-x64, archive: tar.gz }
@@ -84,8 +86,27 @@ jobs:
         run: Compress-Archive -Path src/OsduCli/publish/osducs.exe -DestinationPath osducs-${{ matrix.rid }}.zip
         shell: pwsh
 
+      # equinor/ops-actions exposes `path_tag_names` — a JSON object of path -> tag — and
+      # no plain `tag_name`. Reading the wrong key gave an empty tag and a "release not
+      # found" upload against a release that had just been created successfully.
+      # Falls back to the latest release so a manual re-run can attach assets too.
+      - name: Resolve the release tag
+        id: release
+        shell: bash
+        env:
+          PATH_TAG_NAMES: ${{ needs.release-please.outputs.path_tag_names }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          tag=$(printf '%s' "${PATH_TAG_NAMES:-}" | jq -r '.["."] // empty' 2>/dev/null || true)
+          if [ -z "$tag" ]; then
+            tag=$(gh release view --repo "$GITHUB_REPOSITORY" --json tagName --jq .tagName)
+          fi
+          echo "Attaching to $tag"
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
+
       - name: Attach to release
+        shell: bash
         run: gh release upload "${TAG}" osducs-${{ matrix.rid }}.${{ matrix.archive }} --clobber
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          TAG: ${{ needs.release-please.outputs.tag_name }}
+          TAG: ${{ steps.release.outputs.tag }}
