@@ -506,10 +506,44 @@ count how many compile. Storage needed only the pom fix.
    `{envValue: envValue}` rather than `{configKey: envValue}`, so `OSDU_SERVER` and its
    siblings had never worked — including the fallback the "no configuration found" error
    message tells users to reach for. Fixed.
-5. **No NativeAOT publish.** CI uses self-contained single-file across three platforms.
-   NativeAOT cannot cross-compile, which is why that job is a matrix.
+5. **NativeAOT does not build.** Attempted 2026-08-24 on osx-arm64; three blockers, all in
+   osdu-csharp-client's facade rather than the CLI. Details in §8.7. CI stays on
+   self-contained single-file, which does publish cleanly.
 6. **Shell completion has no registration scripts.** Completion resolves correctly; nothing
    installs it into a shell.
+
+### NativeAOT: what actually blocks it
+
+Measured on osx-arm64. The prize is real — **8.3 MB and ~0ms startup, against 82 MB for the
+self-contained single-file build that CI produces today** — but it does not currently work,
+and every blocker is in `Equinor.OsduCsharpClient`, not in the CLI.
+
+The chain, each one found only after clearing the one before it:
+
+1. **`OsduConfig`'s `required` members break the source-generated config binder.** Under AOT
+   the binding generator is switched on automatically, and it emits `new OsduConfig()`
+   without an object initializer — five `CS9035` errors, a hard build failure.
+2. **With `required` removed, `init`-only setters bind nothing.** The build succeeds and the
+   binary runs, but every property comes back empty and MSAL receives a null authority. A
+   silent failure, which is worse than the first. Changing them to `set` fixes it.
+3. **`OsduClient.Client<T>()` uses `Activator.CreateInstance`** (warned as `IL2087`), so the
+   trimmer removes each generated client's constructor:
+   `MissingMethodException: No parameterless constructor defined for type StorageClient`.
+   Needs `[DynamicallyAccessedMembers]` on the type parameter, or a factory delegate per
+   service.
+
+Two more are visible in the warnings but not yet reached at runtime:
+
+- **`UntypedNodeJsonExtensions` uses reflection-based `JsonSerializer`** (`IL2026`/`IL3050`),
+  which needs a `JsonSerializerContext`.
+- **`Validator.ValidateObject` is not trim-safe** (`IL2026`). Under AOT it appears to
+  validate nothing, so a config missing required values passes validation and fails later
+  and less clearly. That is a correctness problem for trimmed builds generally, not only for
+  AOT.
+
+Fixing 1 and 2 means changing `OsduConfig`'s public shape in a published library. That is a
+decision for the client's owners, not something to slip into a CLI branch — which is why this
+was measured and reverted rather than fixed here.
 
 ### Known divergences from the Python CLI
 
@@ -559,9 +593,9 @@ the thing works and can be shipped safely.
 4. **Decide the Mac distribution channel before building a notarization pipeline.** If Macs
    are Jamf-managed, MDM-installed binaries skip quarantine entirely and the fiddliest part
    of macOS distribution disappears.
-5. ~~Add a test project for the runtime layer~~ — **done**, see §8.4. **Try a NativeAOT
-   publish** — still not attempted; it cannot cross-compile, which is why that CI job is a
-   matrix.
+5. ~~Add a test project for the runtime layer~~ — **done**, see §8.4. ~~Try a NativeAOT
+   publish~~ — **attempted, and it does not work today**; see §8.7 for the blocker chain.
+   CI stays on self-contained single-file until the client library is AOT-clean.
 6. **Write shell completion registration scripts.** Completion itself works; nothing
    registers it. Windows PowerShell execution policy may block the profile approach — worth
    checking with the Windows team alongside the WDAC question.
