@@ -14,7 +14,7 @@ public class CliHelpTests
     /// <summary>Builds a root with the global options, so "Common Options" has content.</summary>
     private static (RootCommand Root, Command Leaf) Tree(Command leaf)
     {
-        var root = new RootCommand("osdu — command line for the OSDU platform.");
+        var root = new RootCommand("osducs — command line for the OSDU platform.");
         GlobalOptions.AddTo(root);
         root.Subcommands.Add(leaf);
         return (root, leaf);

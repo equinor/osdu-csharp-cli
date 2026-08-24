@@ -3,8 +3,8 @@ using System.CommandLine;
 namespace Equinor.OsduCli.Commands;
 
 /// <summary>
-/// <c>osdu completion &lt;shell&gt;</c> prints a registration script; the hidden
-/// <c>osdu complete</c> is what that script calls on every Tab.
+/// <c>osducs completion &lt;shell&gt;</c> prints a registration script; the hidden
+/// <c>osducs complete</c> is what that script calls on every Tab.
 /// </summary>
 /// <remarks>
 /// System.CommandLine can already answer "what could come next here" through
@@ -14,7 +14,7 @@ namespace Equinor.OsduCli.Commands;
 /// enterprise rollout, and on Windows it adds another executable for WDAC to allow.
 ///
 /// So the CLI answers for itself: the shell hands the words typed so far to
-/// <c>osdu complete</c>, which parses them and prints one candidate per line. That contract
+/// <c>osducs complete</c>, which parses them and prints one candidate per line. That contract
 /// is simple enough to express in all four shells and depends on nothing but this binary.
 /// Completion needs no configuration, no network and no token — Tab must never authenticate.
 /// </remarks>
@@ -113,14 +113,14 @@ public static class CompletionCommand
             .Where(subcommand => !subcommand.Hidden)
             .Select(subcommand => subcommand.Name));
 
-        // Positional arguments with their own sources — `osdu status <service>`.
+        // Positional arguments with their own sources — `osducs status <service>`.
         foreach (var argument in command.Arguments.Where(argument => !argument.Hidden))
             candidates.AddRange(argument.GetCompletions(context).Select(item => item.Label));
 
         // Options are the fallback, not the headline. Offered once the user commits to one
         // by typing `-`, or when nothing better exists at this position. Otherwise
-        // `osdu <Tab>` leads with eleven spellings of --help and buries the nouns, and
-        // `osdu status <Tab>` hides the service names among them.
+        // `osducs <Tab>` leads with eleven spellings of --help and buries the nouns, and
+        // `osducs status <Tab>` hides the service names among them.
         if (partial.StartsWith('-') || candidates.Count == 0)
         {
             foreach (var option in VisibleOptions(command))
@@ -161,93 +161,93 @@ public static class CompletionCommand
         _ => throw new ArgumentOutOfRangeException(nameof(shell), shell, "Unsupported shell."),
     };
 
-    // COMP_WORDS carries the program name in [0]; `osdu complete` wants only what follows.
+    // COMP_WORDS carries the program name in [0]; `osducs complete` wants only what follows.
     // `-o default` lets bash fall back to filenames when we return nothing, so completing a
     // path for --file still works.
     private const string Bash = """
-        # osdu completion for bash
-        #   eval "$(osdu completion bash)"
+        # osducs completion for bash
+        #   eval "$(osducs completion bash)"
         # or, to load it once per session rather than on every shell start:
-        #   osdu completion bash > /usr/local/etc/bash_completion.d/osdu
+        #   osducs completion bash > /usr/local/etc/bash_completion.d/osducs
 
-        _osdu_complete()
+        _osducs_complete()
         {
             # Capture first, split second. Setting IFS before expanding
             # "${COMP_WORDS[@]:1}" makes bash collapse the slice into a single joined
             # argument, so the CLI sees `record ` instead of `record` plus an empty word
             # and returns nothing.
             local candidates
-            candidates=$(osdu complete -- "${COMP_WORDS[@]:1}" 2>/dev/null) || return 0
+            candidates=$(osducs complete -- "${COMP_WORDS[@]:1}" 2>/dev/null) || return 0
 
             local IFS=$'\n'
             COMPREPLY=( $candidates )
             return 0
         }
 
-        complete -o default -F _osdu_complete osdu
+        complete -o default -F _osducs_complete osducs
 
         """;
 
     // zsh's own completion system would mean shipping a #compdef file; bashcompinit is a
     // smaller ask and behaves identically for a candidate list this simple.
     private const string Zsh = """
-        # osdu completion for zsh
-        #   eval "$(osdu completion zsh)"
+        # osducs completion for zsh
+        #   eval "$(osducs completion zsh)"
         # Add that to ~/.zshrc to make it permanent.
 
         autoload -U +X bashcompinit && bashcompinit
 
-        _osdu_complete()
+        _osducs_complete()
         {
             # Capture first, split second. Setting IFS before expanding
             # "${COMP_WORDS[@]:1}" makes bash collapse the slice into a single joined
             # argument, so the CLI sees `record ` instead of `record` plus an empty word
             # and returns nothing.
             local candidates
-            candidates=$(osdu complete -- "${COMP_WORDS[@]:1}" 2>/dev/null) || return 0
+            candidates=$(osducs complete -- "${COMP_WORDS[@]:1}" 2>/dev/null) || return 0
 
             local IFS=$'\n'
             COMPREPLY=( $candidates )
             return 0
         }
 
-        complete -o default -F _osdu_complete osdu
+        complete -o default -F _osducs_complete osducs
 
         """;
 
     // commandline -opc gives the tokens before the cursor; -ct gives the partial word the
     // cursor is on. Passing both reproduces the trailing-empty-word convention.
     private const string Fish = """
-        # osdu completion for fish
-        #   osdu completion fish > ~/.config/fish/completions/osdu.fish
+        # osducs completion for fish
+        #   osducs completion fish > ~/.config/fish/completions/osducs.fish
 
-        function __osdu_complete
+        function __osducs_complete
             set -l tokens (commandline -opc)
             set -e tokens[1]
-            osdu complete -- $tokens (commandline -ct) 2>/dev/null
+            osducs complete -- $tokens (commandline -ct) 2>/dev/null
         end
 
-        complete -c osdu -f -a '(__osdu_complete)'
+        complete -c osducs -f -a '(__osducs_complete)'
 
         """;
 
     // $wordToComplete is already the final element of $commandAst, so it is not appended
     // again; an empty one still arrives as a trailing empty element.
     private const string PowerShell = """
-        # osdu completion for PowerShell
-        #   osdu completion powershell | Out-String | Invoke-Expression
+        # osducs completion for PowerShell
+        #   osducs completion powershell | Out-String | Invoke-Expression
         # To make it permanent, append that line to $PROFILE.
         #
         # If running it is blocked, the execution policy is the cause, not this script:
         #   Set-ExecutionPolicy -Scope CurrentUser RemoteSigned
 
-        Register-ArgumentCompleter -Native -CommandName osdu -ScriptBlock {
+        Register-ArgumentCompleter -Native -CommandName osducs -ScriptBlock {
             param($wordToComplete, $commandAst, $cursorPosition)
 
             $words = @($commandAst.CommandElements | Select-Object -Skip 1 | ForEach-Object { "$_" })
             if ($wordToComplete -eq '') { $words += '' }
 
-            osdu complete -- @words 2>$null | ForEach-Object {
+            osducs complete -- @words 2>$null | ForEach-Object {
                 [System.Management.Automation.CompletionResult]::new(
                     $_, $_, 'ParameterValue', $_)
             }

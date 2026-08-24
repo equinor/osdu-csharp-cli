@@ -14,7 +14,7 @@ public class CompletionTests
 {
     private static RootCommand BuildRoot()
     {
-        var root = new RootCommand("osdu — command line for the OSDU platform.");
+        var root = new RootCommand("osducs — command line for the OSDU platform.");
         GlobalOptions.AddTo(root);
         foreach (var command in GeneratedCommands.All())
             root.Subcommands.Add(command);
@@ -102,7 +102,7 @@ public class CompletionTests
     [Fact]
     public void ArgumentCompletionSourcesAreUsed()
     {
-        // `osdu status <service>` has a hand-written completion source.
+        // `osducs status <service>` has a hand-written completion source.
         var candidates = Complete("status", "");
 
         Assert.Contains("storage", candidates);
@@ -133,8 +133,8 @@ public class CompletionTests
     {
         var script = CompletionCommand.ScriptFor(shell);
 
-        Assert.Contains("osdu complete", script);
-        Assert.Contains("osdu completion " + shell, script);
+        Assert.Contains("osducs complete", script);
+        Assert.Contains("osducs completion " + shell, script);
     }
 
     [Fact]
@@ -145,7 +145,7 @@ public class CompletionTests
         // first level. Capture first, split second.
         var script = CompletionCommand.ScriptFor("bash");
 
-        var capture = script.IndexOf("candidates=$(osdu complete", StringComparison.Ordinal);
+        var capture = script.IndexOf("candidates=$(osducs complete", StringComparison.Ordinal);
         var setIfs = script.IndexOf("local IFS=", StringComparison.Ordinal);
 
         Assert.True(capture > 0 && setIfs > capture,

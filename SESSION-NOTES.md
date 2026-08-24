@@ -609,6 +609,17 @@ Fixing 1 and 2 means changing `OsduConfig`'s public shape in a published library
 decision for the client's owners, not something to slip into a CLI branch — which is why this
 was measured and reverted rather than fixed here.
 
+### The binary is `osducs`, not `osdu`
+
+Decided 2026-08-25. The Python CLI installs an `osdu` executable and shadowed this build
+during completion testing; peers evaluating the new tool will mostly still have `osducli`
+installed and need both on PATH at once. `osducs` keeps them separable, and the name is
+baked into the completion scripts and install instructions, so it had to be settled before
+packaging rather than after.
+
+The config directories are unchanged: `~/.osdu/` is shared with the client's token cache,
+and `~/.osducli/` is where the Python profiles live and is read, not written.
+
 ### Known divergences from the Python CLI
 
 All three are deliberate and documented in the manifests or COMMAND-GRAMMAR.md.

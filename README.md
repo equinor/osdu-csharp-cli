@@ -51,9 +51,9 @@ automatically, and mapping one to a command is an error. OSDU retires endpoints 
 all 28 Unit v2 operations at once — and that many exclusions all reading "deprecated" would
 bury the editorial ones.
 
-**Naming and hierarchy.** `osdu record version get` does not follow from
+**Naming and hierarchy.** `osducs record version get` does not follow from
 `GET /records/{id}/{version}`. Commands are named for the resource, not the OSDU service
-that hosts it — the Storage manifest builds `osdu record`, not `osdu storage`. See
+that hosts it — the Storage manifest builds `osducs record`, not `osducs storage`. See
 [COMMAND-GRAMMAR.md](COMMAND-GRAMMAR.md).
 
 **What a human wants to see.** The Python CLI encodes this as JMESPath
@@ -110,7 +110,7 @@ be customised through the library. Positional arguments get their own section an
 line brackets the optional ones, which the default formatter does not distinguish.
 
 Tab completion needs no code: System.CommandLine's `[suggest]` directive completes
-subcommands and options at every level, and `osdu status` adds value completion for its
+subcommands and options at every level, and `osducs status` adds value completion for its
 service argument. Shell registration scripts are not written yet. Two rules for any future
 value completion: never authenticate on TAB, and never block on the network.
 
@@ -130,7 +130,7 @@ Expects `osdu-csharp-client` checked out as a sibling directory.
 ## Status
 
 Proof of concept, now covering every core service the Python CLI covers except Wellbore
-DDMS: **79 generated commands across 12 services**, plus the hand-written `osdu status`.
+DDMS: **79 generated commands across 12 services**, plus the hand-written `osducs status`.
 
 | Noun | Fed by |
 | --- | --- |
@@ -166,7 +166,7 @@ One deliberate divergence from the Python CLI: its `storage get` accepts either 
 `--id` and calls a different endpoint for each, which duplicates `storage list`. Here
 `record get` is id-only. See the comment in `cli-manifest/storage.yaml`.
 
-`osdu status` is the other divergence. The Python CLI gives every service its own `info`
+`osducs status` is the other divergence. The Python CLI gives every service its own `info`
 command, ten of which call one shared helper; here one command probes every configured
 service and reports them together, so an unreachable service shows as a row rather than
 aborting the run. It exits non-zero if any service fails to answer.
@@ -174,7 +174,7 @@ aborting the run. It exits non-zero if any service fails to answer.
 ## Shell completion
 
 ```bash
-osdu completion bash > /usr/local/etc/bash_completion.d/osdu
+osducs completion bash > /usr/local/etc/bash_completion.d/osducs
 ```
 
 `zsh`, `fish` and `powershell` are also supported; each script carries its own install line

@@ -8,7 +8,7 @@ using Equinor.OsduCsharpClient.Facade;
 namespace Equinor.OsduCli.Commands;
 
 /// <summary>
-/// <c>osdu status</c> — reports version and reachability for the OSDU services this CLI
+/// <c>osducs status</c> — reports version and reachability for the OSDU services this CLI
 /// talks to.
 /// </summary>
 /// <remarks>

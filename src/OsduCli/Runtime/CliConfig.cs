@@ -15,7 +15,7 @@ namespace Equinor.OsduCli.Runtime;
 /// </list>
 ///
 /// <para><c>--config</c> takes either. A value with no directory separator is treated as a
-/// profile name and looked up in both locations, so <c>osdu -c dev</c> finds
+/// profile name and looked up in both locations, so <c>osducs -c dev</c> finds
 /// <c>~/.osducli/dev</c> the way the Python CLI does. A value that is a path is used as
 /// given, and its format is detected from its content rather than its extension — the
 /// Python profiles have no extension at all.</para>

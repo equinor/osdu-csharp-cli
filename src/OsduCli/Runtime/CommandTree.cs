@@ -10,10 +10,10 @@ namespace Equinor.OsduCli.Runtime;
 /// (see COMMAND-GRAMMAR.md), and those two things do not line up one-to-one:
 ///
 /// <list type="bullet">
-/// <item>One service can own several nouns — Entitlements supplies both <c>osdu group</c>
+/// <item>One service can own several nouns — Entitlements supplies both <c>osducs group</c>
 /// and <c>osdu member</c>, which are the same relation viewed from either end.</item>
 /// <item>Several services can share one noun — <c>osdu crs</c> is CRS Catalog and CRS
-/// Conversion together, and <c>osdu record search</c> is the Search service sitting beside
+/// Conversion together, and <c>osducs record search</c> is the Search service sitting beside
 /// Storage's <c>record list</c>.</item>
 /// </list>
 ///

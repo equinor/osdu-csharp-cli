@@ -15,7 +15,7 @@ public class GeneratedCommandTreeTests
 {
     private static RootCommand BuildRoot()
     {
-        var root = new RootCommand("osdu — command line for the OSDU platform.");
+        var root = new RootCommand("osducs — command line for the OSDU platform.");
         GlobalOptions.AddTo(root);
         CliHelp.Install(root);
         foreach (var command in GeneratedCommands.All())
@@ -120,7 +120,7 @@ public class GeneratedCommandTreeTests
     [Fact]
     public void HelpOnACommandWithMissingRequiredOptionsStillShowsHelp()
     {
-        // `osdu record get --help` must show help, not complain about --id.
+        // `osducs record get --help` must show help, not complain about --id.
         var root = BuildRoot();
 
         var result = root.Parse("record get --help");
@@ -142,7 +142,7 @@ public class GeneratedCommandTreeTests
     [Fact]
     public void NounsAreNamedForResourcesNotServices()
     {
-        // The grammar decision: `osdu record get`, not `osdu storage get`. A service name
+        // The grammar decision: `osducs record get`, not `osducs storage get`. A service name
         // reappearing as a top-level noun means a manifest regressed.
         var roots = BuildRoot().Subcommands.Select(c => c.Name).ToHashSet(StringComparer.Ordinal);
 

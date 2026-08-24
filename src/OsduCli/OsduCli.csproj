@@ -2,7 +2,7 @@
 
   <PropertyGroup>
     <OutputType>Exe</OutputType>
-    <AssemblyName>osdu</AssemblyName>
+    <AssemblyName>osducs</AssemblyName>
     <RootNamespace>Equinor.OsduCli</RootNamespace>
     <InvariantGlobalization>true</InvariantGlobalization>
   </PropertyGroup>
