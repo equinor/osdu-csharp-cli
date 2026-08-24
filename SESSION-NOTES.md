@@ -489,7 +489,9 @@ count how many compile. Storage needed only the pom fix.
    by the old version is detected (MSAL v3 blobs are JSON, so they start with `{`) and
    deleted, so the fix does not ship while the plaintext token stays readable. 50/50 client
    tests pass, 4 of them new.
-2. **Nothing has run against a live OSDU instance.** Auth, real responses and HTTP error
+2. ~~**Nothing has run against a live OSDU instance.**~~ **First live run, 2026-08-24** —
+   see §8.9. Only two read-only calls; the 80-command surface is still almost entirely
+   unexercised. Auth, real responses and HTTP error
    mapping are all unproven — and the surface that is unproven is now 80 commands across 12
    services, not 11 across two.
 3. ~~**The repo is not `git init`'d.**~~ **Done** (2026-08-24) — 44 files committed as
@@ -511,6 +513,32 @@ count how many compile. Storage needed only the pom fix.
    self-contained single-file, which does publish cleanly.
 6. ~~**Shell completion has no registration scripts.**~~ **Done** (2026-08-24), and the
    claim it was replacing turned out to be wrong — see §8.8.
+
+### Reusing the Python CLI's profiles, and first contact
+
+Existing users have profiles in `~/.osducli/` — INI files, one per environment, 13 on this
+machine. All five values `OsduConfig` needs are in them (`server`, `data_partition_id`,
+`authority`, `client_id`, `scopes`), so the CLI now reads them directly. No migration step,
+no second copy to keep in sync, both tools usable side by side. `--config` takes either a
+path or a bare profile name, matching the Python CLI, and `OSDUCLI_CONFIG_DIR` relocates the
+directory as it does there.
+
+**The `*_url` keys are deliberately ignored.** A profile says
+`storage_url = /api/storage/v2/` and `unit_url = /api/unit/v3/`, but this CLI derives each
+base path from the service's own spec `servers` entry and appends spec paths verbatim.
+Honouring the profile would give `/api/unit/v3/v3/unit` — the doubling osdu-python-client
+documents in its own registry. The specs are also fresher: profiles here still name
+`crs/catalog/v2` while the vendored spec is v3.
+
+**This produced the first live run against a real OSDU instance.** With the `dev` profile,
+`osdu status` reported all ten services reachable with versions and build dates, and a
+deliberately malformed `record get` returned a real `400` rendered as one line by
+`CliRunner`. That validates, against a live service rather than a stub: MSAL authentication,
+**the spec-derived base URIs for all ten services** — the part with the most room to be
+wrong — output table rendering, and HTTP error mapping.
+
+Two read-only calls is not coverage. But the class of unknown that made "point it at a real
+instance" the biggest remaining risk is now much smaller.
 
 ### Shell completion: the earlier claim was wrong
 
@@ -623,7 +651,10 @@ the thing works and can be shipped safely.
 1. ~~Swap the token cache to `MsalCacheHelper`~~ — **done**, see §8.1. Needs review and a
    push; the branch exists only locally.
 2. ~~`git init` the repo~~ — **done**, see §8.3. Still needs a remote before CI can run.
-3. **Point the CLI at a real OSDU instance** and run the 80 commands. This is now the single
+3. **Exercise the rest of the command surface against a real instance.** First contact is
+   made (§8.9) — auth, base URIs and output rendering all work — but only `status` and one
+   `record get` have actually run.
+   ~~Point the CLI at a real OSDU instance~~ and run the 80 commands. This is now the single
    biggest source of unknowns: auth, real response shapes, HTTP error mapping and the output
    projections in 12 manifests are all unverified against a live service.
 4. **Decide the Mac distribution channel before building a notarization pipeline.** If Macs
