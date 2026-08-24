@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.2.1](https://github.com/equinor/osdu-csharp-cli/compare/v0.2.0...v0.2.1) (2026-08-24)
+
+
+### Bug Fixes
+
+* force bash for the NuGet auth step so it works on Windows runners ([52cef35](https://github.com/equinor/osdu-csharp-cli/commit/52cef35888dd7890201652b4e681baf941957103))
+* resolve the release tag from path_tag_names so assets attach ([90b4c1f](https://github.com/equinor/osdu-csharp-cli/commit/90b4c1f30c0888cea7409fdc6d9ee99bbbdd9699))
+
 ## [0.2.0](https://github.com/equinor/osdu-csharp-cli/compare/v0.1.0...v0.2.0) (2026-08-24)
 
 
