@@ -481,8 +481,10 @@ count how many compile. Storage needed only the pom fix.
 
 ### Not done, in priority order
 
-1. ~~**The MSAL token cache is still plaintext.**~~ **Done** (2026-08-24), in
-   osdu-csharp-client on branch `fix/encrypt-msal-token-cache`, not yet pushed or merged.
+1. ~~**The MSAL token cache is still plaintext.**~~ **Fixed and submitted** —
+   [osdu-csharp-client#98](https://github.com/equinor/osdu-csharp-client/pull/98), open for
+   review 2026-08-25. Merging releases 1.1.7 via release-please, which this CLI then
+   consumes in place of its ProjectReference.
    `TokenCacheStorage` registers `MsalCacheHelper` — DPAPI on Windows, Keychain on macOS,
    libsecret on Linux — for both the interactive and device-flow providers. Where no secure
    store exists it falls back to **in-memory only**, never to a plaintext file. A cache left
