@@ -29,10 +29,15 @@ public static class CliConfig
     {
         var path = configPath ?? DefaultConfigPath;
 
+        // Maps OSDU_SERVER -> "Osdu:Server". The tuple elements are named because the
+        // obvious shorthand silently produced {envValue: envValue}, which built a
+        // configuration full of nonsense keys and made these aliases do nothing.
         var aliased = EnvAliases
-            .Select(pair => (pair.Value, Value: Environment.GetEnvironmentVariable(pair.Key)))
-            .Where(pair => !string.IsNullOrEmpty(pair.Value))
-            .ToDictionary(pair => pair.Value!, pair => pair.Item2!);
+            .Select(alias => (
+                ConfigKey: alias.Value,
+                Value: Environment.GetEnvironmentVariable(alias.Key)))
+            .Where(entry => !string.IsNullOrEmpty(entry.Value))
+            .ToDictionary(entry => entry.ConfigKey, entry => entry.Value!);
 
         var configuration = new ConfigurationBuilder()
             .AddJsonFile(path, optional: true)

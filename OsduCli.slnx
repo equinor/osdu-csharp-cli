@@ -1,0 +1,8 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/OsduCli/OsduCli.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/OsduCli.Tests/OsduCli.Tests.csproj" />
+  </Folder>
+</Solution>

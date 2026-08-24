@@ -254,6 +254,13 @@ endpoint was triaged into `exclude`.
 
 Better evidence for the design than the three synthetic drift tests.
 
+### CI, once there is a remote
+
+The workflow now generates the client before building: osdu-csharp-client gitignores its
+Kiota output, so a fresh CI checkout has none and every build referencing it would have
+failed on the first run. It also runs `dotnet test`. None of this has executed yet — there
+is still no remote.
+
 ### Verified again after the expansion
 
 Re-run at the end of the session against all 12 services:
@@ -488,8 +495,17 @@ count how many compile. Storage needed only the pom fix.
 3. ~~**The repo is not `git init`'d.**~~ **Done** (2026-08-24) — 44 files committed as
    `Steinar Hjellvik <steh@equinor.com>`. **CI has still never run**, since there is no
    remote: the manifest gate, staleness check and three-platform build remain hand-executed.
-4. **No test project.** The runtime layer deserves one; it was verified with a throwaway
-   harness that has since been deleted.
+4. ~~**No test project.**~~ **Done** (2026-08-24) — `tests/OsduCli.Tests`, 49 tests,
+   xunit.v3 on Microsoft.Testing.Platform to match osdu-csharp-client. Covers `CommandTree`
+   assembly and verb ordering, `OutputWriter` projection, the hand-written help renderer,
+   config resolution, and a walk of the real generated tree that asserts every node has a
+   description, no path is duplicated, every leaf has an action and every node renders help
+   — the checks §5 previously performed by hand at the end of a session.
+   Added `OsduCli.slnx`, without which `dotnet test` had no project to find.
+   **It found a real bug:** `CliConfig`'s flat environment aliases built a dictionary of
+   `{envValue: envValue}` rather than `{configKey: envValue}`, so `OSDU_SERVER` and its
+   siblings had never worked — including the fallback the "no configuration found" error
+   message tells users to reach for. Fixed.
 5. **No NativeAOT publish.** CI uses self-contained single-file across three platforms.
    NativeAOT cannot cross-compile, which is why that job is a matrix.
 6. **Shell completion has no registration scripts.** Completion resolves correctly; nothing
@@ -543,8 +559,9 @@ the thing works and can be shipped safely.
 4. **Decide the Mac distribution channel before building a notarization pipeline.** If Macs
    are Jamf-managed, MDM-installed binaries skip quarantine entirely and the fiddliest part
    of macOS distribution disappears.
-5. **Add a test project** for the runtime layer, and **try a NativeAOT publish** — neither
-   exists, and NativeAOT cannot cross-compile, which is why that CI job is a matrix.
+5. ~~Add a test project for the runtime layer~~ — **done**, see §8.4. **Try a NativeAOT
+   publish** — still not attempted; it cannot cross-compile, which is why that CI job is a
+   matrix.
 6. **Write shell completion registration scripts.** Completion itself works; nothing
    registers it. Windows PowerShell execution policy may block the profile approach — worth
    checking with the Windows team alongside the WDAC question.

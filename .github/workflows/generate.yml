@@ -45,6 +45,21 @@ jobs:
         with: { repository: equinor/osdu-csharp-client, path: osdu-csharp-client }
       - uses: actions/setup-dotnet@v4
         with: { dotnet-version: '10.0.x' }
+      - uses: actions/setup-python@v5
+        with: { python-version: '3.13' }
+
+      # osdu-csharp-client gitignores its generated Kiota code, so a fresh checkout has
+      # none and anything referencing the client fails to compile. Generate it first.
+      - name: Generate the client
+        working-directory: osdu-csharp-client
+        run: |
+          dotnet tool install --global Microsoft.OpenApi.Kiota
+          pip install pyyaml
+          python3 generate_all.py
+
+      - name: Test
+        working-directory: osdu-csharp-cli
+        run: dotnet test
 
       # NativeAOT cannot cross-compile, which is why this is a matrix and not one job.
       - name: Publish
