@@ -72,7 +72,11 @@ jobs:
           dotnet-version: "10.x"
 
       # GitHub Packages requires authentication even for public packages.
+      # shell: bash matters — the default on Windows runners is pwsh, where ${GITHUB_TOKEN}
+      # is PowerShell variable syntax and expands to nothing, giving a blank password and a
+      # 401 that looks like a permissions problem rather than a shell one.
       - name: Authenticate to GitHub Packages
+        shell: bash
         run: >
           dotnet nuget update source equinor-github
           --username ${{ github.actor }}
