@@ -496,9 +496,10 @@ count how many compile. Storage needed only the pom fix.
    unexercised. Auth, real responses and HTTP error
    mapping are all unproven — and the surface that is unproven is now 80 commands across 12
    services, not 11 across two.
-3. ~~**The repo is not `git init`'d.**~~ **Done** (2026-08-24) — 44 files committed as
-   `Steinar Hjellvik <steh@equinor.com>`. **CI has still never run**, since there is no
-   remote: the manifest gate, staleness check and three-platform build remain hand-executed.
+3. ~~**The repo is not `git init`'d.**~~ **Done.** Pushed 2026-08-25 to
+   [equinor/osdu-csharp-cli](https://github.com/equinor/osdu-csharp-cli) (internal
+   visibility). CI is green: the manifest gate, the staleness check and the three-platform
+   build all run. `v0.2.0` is released with binaries attached. See §8.10.
 4. ~~**No test project.**~~ **Done** (2026-08-24) — `tests/OsduCli.Tests`, 49 tests,
    xunit.v3 on Microsoft.Testing.Platform to match osdu-csharp-client. Covers `CommandTree`
    assembly and verb ordering, `OutputWriter` projection, the hand-written help renderer,
@@ -610,6 +611,28 @@ Two more are visible in the warnings but not yet reached at runtime:
 Fixing 1 and 2 means changing `OsduConfig`'s public shape in a published library. That is a
 decision for the client's owners, not something to slip into a CLI branch — which is why this
 was measured and reverted rather than fixed here.
+
+### Shipping it: two CI bugs worth remembering
+
+The pipeline is release-please plus a three-platform matrix that publishes self-contained
+single-file binaries and attaches them to the release. **84 MB raw, ~30 MB compressed** —
+that is what a peer actually downloads, and there is no runtime to install.
+
+Two failures, neither visible without running it:
+
+1. **`needs.release-please.outputs.tag_name` does not exist.** `equinor/ops-actions` exposes
+   `releases_created`, `paths_released` and `path_tag_names` — a JSON map of path to tag. The
+   wrong key gave an empty `TAG`, so `gh release upload` reported *"release not found"*
+   against a release that had just been created successfully. Read it with
+   `jq -r '.["."]'`, with a fallback to the latest release so a manual re-run can attach
+   assets too.
+2. **The NuGet auth step failed only on Windows.** `${GITHUB_TOKEN}` is bash syntax; the
+   default shell on a Windows runner is pwsh, where it expands to nothing. The blank password
+   produced a `401` that reads like a permissions problem. `shell: bash` fixes it — the same
+   class of bug as the missing `shell: bash` in the completion scripts.
+
+Also added `fail-fast: false`, without which the first platform to fail cancels the other
+two and hides whether they would have worked.
 
 ### The binary is `osducs`, not `osdu`
 
