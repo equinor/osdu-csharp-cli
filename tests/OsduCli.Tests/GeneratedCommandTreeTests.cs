@@ -221,4 +221,14 @@ public class GeneratedCommandTreeTests
             "a read verb must not sort below a destructive one: " + string.Join(", ", names));
         Assert.True(names.IndexOf("aggregate") < names.IndexOf("delete"));
     }
+
+    [Fact]
+    public void SearchAcceptsProjectedFields()
+    {
+        var root = BuildRoot();
+
+        Assert.Empty(root.Parse("record search --kind k -f id -f data.FacilityName").Errors);
+        // Still optional — the fixed columns remain the default.
+        Assert.Empty(root.Parse("record search --kind k").Errors);
+    }
 }

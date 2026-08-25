@@ -381,6 +381,7 @@ class Command:
     returns: bool
     root: str | None
     columns: list[tuple[str, str]]
+    columns_from: str | None
     message: str | None
 
     @property
@@ -655,6 +656,14 @@ def build_command(entry: dict, operation: dict, where: str, models_root: str,
     if not isinstance(output, dict):
         raise ManifestError(f"{where}: `output:` must be a mapping or the literal `raw`")
 
+    columns_from = output.get("columns-from")
+    if columns_from:
+        body_field_names = {name for name in ((entry.get("body") or {}).get("fields") or {})}
+        if columns_from not in body_field_names:
+            raise ManifestError(
+                f"{where}: columns-from names {columns_from!r}, which is not one of this "
+                f"command's body fields: {sorted(body_field_names)}")
+
     return Command(
         path=path,
         summary=entry.get("summary", ""),
@@ -667,6 +676,7 @@ def build_command(entry: dict, operation: dict, where: str, models_root: str,
         returns=returns_value(operation),
         root=output.get("root"),
         columns=list((output.get("columns") or {}).items()),
+        columns_from=columns_from,
         message=output.get("message"),
     )
 
@@ -732,6 +742,23 @@ def option_declaration(flag: str, short: str | None, cs_type: str, help_text: st
 
 
 def output_expression(command: Command) -> str:
+    """The OutputSpec expression for a command, as C# source.
+
+    With ``columns-from`` the spec is chosen at run time: the fields the caller projected
+    become the columns, because otherwise the manifest's fixed columns would be rendered and
+    the projected fields — fetched, at the user's request — would not appear.
+    """
+    if command.columns_from:
+        field = next(f for f in command.body.fields if f.name == command.columns_from)
+        default = _static_output_expression(command)
+        root = csharp_string(command.root) if command.root else "null"
+        return (f"{field.var} is {{ Length: > 0 }}\n"
+                f"                    ? OutputSpec.FromFields({root}, {field.var})\n"
+                f"                    : {default}")
+    return _static_output_expression(command)
+
+
+def _static_output_expression(command: Command) -> str:
     root = csharp_string(command.root) if command.root else "null"
     if command.columns:
         columns = ", ".join(f"({csharp_string(h)}, {csharp_string(p)})" for h, p in command.columns)

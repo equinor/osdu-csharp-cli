@@ -146,4 +146,36 @@ public class OutputWriterTests
         new OutputWriter(OutputFormat.Json, json).WriteMessage("1 record deleted");
         Assert.Equal("", json.ToString());
     }
+
+    [Fact]
+    public void ProjectedFieldsBecomeColumns()
+    {
+        // `record search --returned-fields` — asking for a field has to show it, or the
+        // flag fetches data and then hides it.
+        var spec = OutputSpec.FromFields("results", ["id", "data.FacilityName"]);
+
+        var output = Render("""{"results":[{"id":"a","data":{"FacilityName":"FR SOULTZ"}}]}""", spec);
+
+        Assert.Contains("FacilityName", output);
+        Assert.Contains("FR SOULTZ", output);
+    }
+
+    [Fact]
+    public void ColumnHeadersAreTheLastDottedSegment()
+    {
+        var spec = OutputSpec.FromFields(null, ["data.acl.owners"]);
+
+        Assert.Equal("Owners", Assert.Single(spec.Columns).Header);
+        Assert.Equal("data.acl.owners", Assert.Single(spec.Columns).Path);
+    }
+
+    [Fact]
+    public void ANullProjectedValueRendersEmptyRatherThanTheWordNull()
+    {
+        var spec = OutputSpec.FromFields(null, ["data.Classification"]);
+
+        var output = Render("""{"data":{"Classification":null}}""", spec);
+
+        Assert.DoesNotContain("null", output);
+    }
 }

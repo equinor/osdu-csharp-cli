@@ -40,8 +40,18 @@ commands:
           flag: --offset
           type: int
           help: Number of results to skip. Use --cursor-based paging beyond 10000.
+        returnedFields:
+          flag: --returned-fields
+          short: -f
+          type: string[]
+          help: >
+            Fields to project, e.g. id, data.FacilityName. Repeat the flag or comma-separate.
+            These become the table columns, so asking for a field shows it.
     output:
       root: results
+      # Projected fields become the columns; without this the fixed Id/Kind pair would be
+      # rendered and the fields the user asked for would be fetched and then hidden.
+      columns-from: returnedFields
       columns:
         Id: id
         Kind: kind

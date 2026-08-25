@@ -451,3 +451,26 @@ service accepts both and a stricter rule here would reject valid input.
 
 The generator rejects a rule naming a param the command does not have, and rejects a
 one-element list — a single mandatory param is `required: true`.
+
+## `columns-from`
+
+Where a command lets the caller project the response, the projected fields become the table
+columns:
+
+```yaml
+output:
+  root: results
+  columns-from: returnedFields
+  columns:
+    Id: id
+    Kind: kind
+```
+
+`record search --returned-fields id,data.FacilityName` renders `Id` and `FacilityName`;
+without the flag the fixed `columns` still apply.
+
+The alternative — keeping fixed columns — means a projected field is fetched at the user's
+request and then not shown, which is worse than not offering the flag. The header is the
+last dotted segment, capitalised, so `data.acl.owners` becomes `Owners`.
+
+The generator rejects a `columns-from` that does not name one of the command's body fields.

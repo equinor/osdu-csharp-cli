@@ -27,4 +27,25 @@ public sealed record OutputSpec(string? Root, IReadOnlyList<(string Header, stri
     /// <summary>Unwrap <paramref name="root"/> (nullable), then project the given columns.</summary>
     public static OutputSpec Table(string? root, params (string Header, string Path)[] columns) =>
         new(root, columns);
+
+    /// <summary>
+    /// Builds a table whose columns are the fields the caller asked for.
+    /// </summary>
+    /// <remarks>
+    /// Used where a command lets the user project the response — <c>record search
+    /// --returned-fields</c>. Without this the manifest's fixed columns would still be
+    /// rendered, so asking for <c>data.FacilityName</c> would return it over the wire and
+    /// then not show it, which is worse than not offering the flag.
+    ///
+    /// The header is the last dotted segment, capitalised: <c>data.FacilityName</c> becomes
+    /// <c>FacilityName</c>. Two requested fields ending in the same segment therefore share
+    /// a header; the full path is what disambiguates them, and showing it would make the
+    /// table unreadable for the common case.
+    /// </remarks>
+    public static OutputSpec FromFields(string? root, IReadOnlyList<string> fields) =>
+        new(root, fields.Select(field =>
+        {
+            var leaf = field.Split('.')[^1];
+            return (leaf.Length > 0 ? char.ToUpperInvariant(leaf[0]) + leaf[1..] : field, field);
+        }).ToList());
 }

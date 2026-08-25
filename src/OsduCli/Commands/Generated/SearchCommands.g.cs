@@ -54,12 +54,18 @@ public static partial class SearchCommands
         {
             Description = "Number of results to skip. Use --cursor-based paging beyond 10000.",
         };
+        var returnedfieldsBodyOption = new Option<string[]>("--returned-fields", "-f")
+        {
+            Description = "Fields to project, e.g. id, data.FacilityName. Repeat the flag or comma-separate. These become the table columns, so asking for a field shows it.",
+            AllowMultipleArgumentsPerToken = true,
+        };
 
         var command = new Command("search", "Search records with a Lucene query.");
         command.Options.Add(kindBodyOption);
         command.Options.Add(queryBodyOption);
         command.Options.Add(limitBodyOption);
         command.Options.Add(offsetBodyOption);
+        command.Options.Add(returnedfieldsBodyOption);
 
         command.SetAction((parseResult, cancellationToken) =>
             CliRunner.RunAsync(parseResult, async (context, cancellationToken) =>
@@ -76,6 +82,9 @@ public static partial class SearchCommands
             var offsetValue = parseResult.GetValue(offsetBodyOption);
             if (offsetValue is not null)
                 bodyNode["offset"] = JsonValue.Create(offsetValue);
+            var returnedfieldsValue = parseResult.GetValue(returnedfieldsBodyOption);
+            if (returnedfieldsValue is { Length: > 0 })
+                bodyNode["returnedFields"] = new JsonArray(returnedfieldsValue.Select(item => (JsonNode)JsonValue.Create(item)!).ToArray());
             var bodyJson = bodyNode.ToJsonString();
             var body = await KiotaJsonSerializer.DeserializeAsync<QueryRequest>(
                 bodyJson, QueryRequest.CreateFromDiscriminatorValue, cancellationToken);
@@ -84,7 +93,9 @@ public static partial class SearchCommands
 
             return context.Output.Write(
                 await OsduJson.ToJsonAsync(result),
-                OutputSpec.Table("results", ("Id", "id"), ("Kind", "kind")));
+                returnedfieldsValue is { Length: > 0 }
+                    ? OutputSpec.FromFields("results", returnedfieldsValue)
+                    : OutputSpec.Table("results", ("Id", "id"), ("Kind", "kind")));
         }, cancellationToken));
 
         return command;
