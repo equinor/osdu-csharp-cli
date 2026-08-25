@@ -23,6 +23,16 @@ already enforces (one command, one `op:`). It is weaker than "one noun, one serv
 legitimately spans two services behind one noun — but it is the property that keeps the tree
 unambiguous.
 
+R2 constrains commands, not operations: it does not say an operation may back only one
+command. **`POST /query` is the single place where two do** — `record search` and
+`record aggregate`. Reviewed and kept, 2026-08-25, on the grounds that `aggregateBy` makes
+most of search's flags meaningless: `--limit`, `--offset`, `--sort-by`, `--sort-order`,
+`--returned-fields` and `--track-total-count` all describe results, and an aggregation
+returns none. Folded into one command, those would parse happily and be silently ignored,
+which is a worse failure than a second command to discover. Everywhere else, one operation
+serving two purposes gets one command and an exclusion with a reason — this is the exception,
+not a precedent.
+
 **R3 — nouns are domain things, not services.** `record`, not `storage`. Six of the ten core
 services already satisfy this (`workflow`, `schema`, `legal`→`legaltag`, `unit`, `file`,
 `dataset`), so R3 only changes `storage`, `entitlements` and `search`. Note this is a naming
