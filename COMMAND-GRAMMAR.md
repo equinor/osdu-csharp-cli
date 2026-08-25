@@ -563,3 +563,29 @@ commas and a failed numeric conversion *throws* instead of reporting. The parser
 concerns: a wrong count and a non-number are parse errors with readable messages, and the
 number is read with `InvariantCulture` so a Norwegian decimal comma cannot change what a
 coordinate means.
+
+## Unknown keys are rejected
+
+Every level of a manifest has a fixed set of allowed keys, and anything else fails the gate:
+
+```
+search.yaml: record search: unknown command key(s) 'mutually-exclusive-2'.
+Allowed: body, builder, command, examples, mutually-exclusive, op, output, params,
+require-one-of, summary.
+```
+
+Without it an invented or mistyped key is silently ignored, and the rule it was meant to
+express simply does not happen. That is not hypothetical: `mutually-exclusive-2` was written
+by hand while adding the spatial filters, and would have disabled the
+`--returned-fields`/`--excluded-fields` check added an hour earlier without a word.
+
+It also catches a YAML trap. In a flow mapping,
+
+```yaml
+authority: { flag: --authority, help: Filter by authority, e.g. osdu. }
+```
+
+the comma ends the help value and `e.g. osdu.` becomes a key of its own, so the example
+disappears from the help text and nothing complains. Three parameters in
+`schema_service.yaml` had lost their examples this way. The error names the cause when an
+unknown key contains a space, since prose-turned-into-a-key is the giveaway.

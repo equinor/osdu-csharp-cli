@@ -17,9 +17,9 @@ commands:
     summary: List schemas, optionally filtered by authority, source or entity type.
     op: { method: get, path: /schema }
     params:
-      authority:  { flag: --authority,  help: Filter by authority, e.g. osdu. }
-      source:     { flag: --source,     help: Filter by source, e.g. wks. }
-      entityType: { flag: --entity-type, short: -e, help: Filter by entity type, e.g. master-data--Well. }
+      authority:  { flag: --authority,  help: "Filter by authority, e.g. osdu." }
+      source:     { flag: --source,     help: "Filter by source, e.g. wks." }
+      entityType: { flag: --entity-type, short: -e, help: "Filter by entity type, e.g. master-data--Well." }
       status:     { flag: --status,     help: "Filter by lifecycle status: PUBLISHED, DEVELOPMENT or OBSOLETE." }
       scope:      { flag: --scope,      help: "Filter by scope: SHARED or INTERNAL." }
       latestVersion: { flag: --latest, type: bool, help: Return only the newest version of each schema. }

@@ -467,6 +467,47 @@ class Coverage:
 # Manifest -> model
 # --------------------------------------------------------------------------------------
 
+# Every key each level of a manifest may carry. An unrecognised key is a hard error rather
+# than a shrug: a mistyped or invented key is silently ignored otherwise, and the rule it was
+# meant to express simply does not happen. `mutually-exclusive-2` was written by hand once
+# and would have disabled an existing rule without a word. It also catches YAML accidents —
+# `help: Filter by authority, e.g. osdu.` inside a flow mapping ends the help at the comma
+# and turns `e.g. osdu.` into a key, quietly losing the example.
+MANIFEST_KEYS = {
+    "top": {"service", "spec", "client", "models", "description", "groups", "scope",
+            "commands", "handwritten", "exclude"},
+    "command": {"command", "summary", "op", "builder", "params", "body", "output",
+                "examples", "require-one-of", "mutually-exclusive"},
+    "op": {"method", "path"},
+    "param": {"flag", "short", "required", "help", "type"},
+    "body": {"flag", "short", "required", "help", "model", "collection", "wrap-single",
+             "fields"},
+    "body field": {"flag", "short", "required", "help", "type", "parts"},
+    "output": {"root", "columns", "columns-from", "total-from", "message"},
+    "example": {"args", "skip"},
+    "handwritten": {"command", "op", "reason"},
+    "exclude": {"op", "reason"},
+}
+
+
+def check_keys(level: str, mapping: object, where: str) -> None:
+    """Raise if ``mapping`` carries a key this level does not define."""
+    if not isinstance(mapping, dict):
+        return
+    unknown = sorted(set(mapping) - MANIFEST_KEYS[level])
+    if not unknown:
+        return
+
+    # A key containing a space is almost never a typo — it is prose that YAML turned into a
+    # key, which happens when a help string in a flow mapping contains an unquoted comma.
+    # Say so only then; on a plain misspelling the hint is noise.
+    hint = (" An unquoted comma in a help string does this — quote the string."
+            if any(" " in key for key in unknown) else "")
+    raise ManifestError(
+        f"{where}: unknown {level} key(s) {', '.join(repr(k) for k in unknown)}. "
+        f"Allowed: {', '.join(sorted(MANIFEST_KEYS[level]))}.{hint}")
+
+
 def op_key(entry: dict, where: str) -> tuple[str, str]:
     op = entry.get("op")
     if not op or "method" not in op or "path" not in op:
@@ -476,6 +517,7 @@ def op_key(entry: dict, where: str) -> tuple[str, str]:
 
 def build_service(manifest_path: Path) -> Service:
     manifest = yaml.safe_load(manifest_path.read_text(encoding="utf-8"))
+    check_keys("top", manifest, manifest_path.name)
     name = manifest["service"]
     spec_path = resolve_spec(manifest["spec"])
     spec = load_spec(spec_path)
@@ -510,6 +552,8 @@ def build_service(manifest_path: Path) -> Service:
 
     for entry in manifest.get("handwritten") or []:
         where = f"{manifest_path.name}: handwritten {entry.get('command', '?')}"
+        check_keys("handwritten", entry, where)
+        check_keys("op", entry.get("op"), where)
         key = op_key(entry, where)
         if key not in operations:
             raise ManifestError(f"{where}: {key[0].upper()} {key[1]} is not in {spec_label}")
@@ -517,6 +561,8 @@ def build_service(manifest_path: Path) -> Service:
         claimed.add(key)
 
     for entry in manifest.get("exclude") or []:
+        check_keys("exclude", entry, f"{manifest_path.name}: exclude")
+        check_keys("op", entry.get("op"), f"{manifest_path.name}: exclude")
         key = op_key(entry, f"{manifest_path.name}: exclude")
         if key not in operations:
             raise ManifestError(
@@ -564,6 +610,18 @@ def build_service(manifest_path: Path) -> Service:
 
 def build_command(entry: dict, operation: dict, where: str, models_root: str,
                   spec: dict) -> Command:
+    check_keys("command", entry, where)
+    check_keys("op", entry.get("op"), where)
+    check_keys("output", entry.get("output"), where)
+    for param_name, param_cfg in (entry.get("params") or {}).items():
+        check_keys("param", param_cfg, f"{where}: param {param_name}")
+    body_config = entry.get("body") or {}
+    check_keys("body", body_config, f"{where}: body")
+    for field_name, field_config in (body_config.get("fields") or {}).items():
+        check_keys("body field", field_config, f"{where}: body field {field_name}")
+    for example in (entry.get("examples") or []):
+        check_keys("example", example, f"{where}: example")
+
     path = entry["command"].split()
     spec_params = {p["name"]: p for p in (operation.get("parameters") or [])}
 

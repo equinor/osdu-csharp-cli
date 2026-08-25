@@ -40,15 +40,15 @@ public static partial class SchemaServiceCommands
     {
         var authorityOption = new Option<string>("--authority")
         {
-            Description = "Filter by authority",
+            Description = "Filter by authority, e.g. osdu.",
         };
         var sourceOption = new Option<string>("--source")
         {
-            Description = "Filter by source",
+            Description = "Filter by source, e.g. wks.",
         };
         var entitytypeOption = new Option<string>("--entity-type", "-e")
         {
-            Description = "Filter by entity type",
+            Description = "Filter by entity type, e.g. master-data--Well.",
         };
         var statusOption = new Option<string>("--status")
         {
