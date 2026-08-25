@@ -149,4 +149,43 @@ public class GeneratedCommandTreeTests
         foreach (var service in new[] { "storage", "entitlements", "search", "unit_v3", "legal" })
             Assert.DoesNotContain(service, roots);
     }
+
+    [Fact]
+    public void RequireOneOfIsCheckedAtParseTime()
+    {
+        // `crs get` takes --record-id or --data-id, each optional in the spec because each
+        // is individually optional. Supplying neither is rejected by the service; the CLI
+        // should say so first, without loading config or acquiring a token.
+        var result = BuildRoot().Parse("crs get");
+
+        var error = Assert.Single(result.Errors);
+        Assert.Contains("--record-id", error.Message);
+        Assert.Contains("--data-id", error.Message);
+    }
+
+    [Theory]
+    [InlineData("crs get --record-id x")]
+    [InlineData("crs get --data-id x")]
+    [InlineData("crs transform --record-id x")]
+    [InlineData("crs transform --data-id x")]
+    public void SupplyingEitherSatisfiesRequireOneOf(string commandLine)
+    {
+        Assert.Empty(BuildRoot().Parse(commandLine).Errors);
+    }
+
+    [Fact]
+    public void SupplyingBothIsAllowed()
+    {
+        // The rule is "at least one", not "exactly one" — the service accepts both and
+        // prefers one, and inventing a stricter rule here would reject valid input.
+        Assert.Empty(BuildRoot().Parse("crs get --record-id x --data-id y").Errors);
+    }
+
+    [Fact]
+    public void CommandsWithoutTheRuleAreUnaffected()
+    {
+        // Paging params are genuinely optional; none of these should have gained a rule.
+        Assert.Empty(BuildRoot().Parse("schema list").Errors);
+        Assert.Empty(BuildRoot().Parse("unit list").Errors);
+    }
 }

@@ -377,6 +377,7 @@ class Command:
     params: list[Param]
     body: Body | None
     spec_path: str
+    require_one_of: list[str]
     returns: bool
     root: str | None
     columns: list[tuple[str, str]]
@@ -631,6 +632,21 @@ def build_command(entry: dict, operation: dict, where: str, models_root: str,
             fields=fields,
         )
 
+    # `require-one-of` names params of which at least one must be supplied. The spec cannot
+    # express this — it marks each optional, because each is individually optional — so the
+    # service answers a request with neither by rejecting it. Checking at parse time means a
+    # missing argument costs nothing: no config load, no token, no round trip.
+    require_one_of = [str(name) for name in (entry.get("require-one-of") or [])]
+    for name in require_one_of:
+        if name not in (entry.get("params") or {}):
+            raise ManifestError(
+                f"{where}: require-one-of names {name!r}, which is not one of this "
+                f"command's params: {sorted((entry.get('params') or {}))}")
+    if len(require_one_of) == 1:
+        raise ManifestError(
+            f"{where}: require-one-of needs at least two params; a single mandatory param "
+            f"should be marked `required: true` instead")
+
     builder = entry.get("builder") or derive_builder(entry["op"]["path"])
 
     output = entry.get("output") or {}
@@ -647,6 +663,7 @@ def build_command(entry: dict, operation: dict, where: str, models_root: str,
         params=params,
         body=body,
         spec_path=entry["op"]["path"],
+        require_one_of=require_one_of,
         returns=returns_value(operation),
         root=output.get("root"),
         columns=list((output.get("columns") or {}).items()),
@@ -762,6 +779,21 @@ def emit_command(service: Service, command: Command) -> list[str]:
         else:
             lines.append(f"        command.Options.Add({command.body.var});")
 
+    if command.require_one_of:
+        by_name = {param.name: param for param in command.params}
+        chosen = [by_name[name] for name in command.require_one_of]
+        flags = " or ".join(param.flag for param in chosen)
+        checks = " && ".join(f"result.GetResult({param.option_var}) is null" for param in chosen)
+        lines.append("")
+        lines.append("        // A parse-time validator, so this costs no config load, no")
+        lines.append("        // token and no round trip. The service rejects the request")
+        lines.append("        // anyway; it should not have to.")
+        lines.append("        command.Validators.Add(result =>")
+        lines.append("        {")
+        lines.append(f"            if ({checks})")
+        lines.append(f"                result.AddError({csharp_string('One of ' + flags + ' is required.')});")
+        lines.append("        });")
+
     lines.append("")
     lines.append("        command.SetAction((parseResult, cancellationToken) =>")
     lines.append("            CliRunner.RunAsync(parseResult, async (context, cancellationToken) =>")
@@ -871,6 +903,8 @@ def emit_service(service: Service, manifest_name: str) -> str:
 
     lines = [HEADER.format(spec=service.spec_file, manifest=manifest_name)]
     lines.append("using System.CommandLine;")
+    if any(c.require_one_of for c in service.commands):
+        lines.append("using System.CommandLine.Parsing;")
     if needs_json_nodes:
         lines.append("using System.Text.Json.Nodes;")
     if needs_models:

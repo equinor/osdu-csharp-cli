@@ -25,6 +25,7 @@ commands:
     params:
       recordId: { flag: --record-id, help: CRS record id. }
       dataId:   { flag: --data-id,   help: CRS data id. Give this or --record-id. }
+    require-one-of: [recordId, dataId]
     output: raw
 
   - command: crs transform
@@ -34,6 +35,7 @@ commands:
     params:
       recordId: { flag: --record-id, help: Transformation record id. }
       dataId:   { flag: --data-id,   help: Transformation data id. Give this or --record-id. }
+    require-one-of: [recordId, dataId]
     output: raw
 
   - command: crs area-of-use

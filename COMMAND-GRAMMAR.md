@@ -426,3 +426,28 @@ Two gaps worth closing as the surface grows:
   completions, so `--kind <TAB>` could be backed by a cached kind list. Nothing in the Python
   CLI does this, and it would be the single largest usability gain available.
 
+## `require-one-of`
+
+Some operations take several parameters that the spec marks optional — because each *is*
+individually optional — while the service requires at least one of them. CRS is the case in
+this estate: `crs get` accepts `--record-id` or `--data-id`, and answers a request with
+neither with `400 Must supply either recordId or dataId`.
+
+The manifest states the rule the spec cannot:
+
+```yaml
+- command: crs get
+  params:
+    recordId: { flag: --record-id, help: CRS record id. }
+    dataId:   { flag: --data-id,   help: CRS data id. Give this or --record-id. }
+  require-one-of: [recordId, dataId]
+```
+
+It becomes a **parse-time** validator, so a missing argument costs no config load, no token
+and no round trip — the same principle as validating enum values locally.
+
+The rule is *at least one*, not *exactly one*: supplying both is accepted, because the
+service accepts both and a stricter rule here would reject valid input.
+
+The generator rejects a rule naming a param the command does not have, and rejects a
+one-element list — a single mandatory param is `required: true`.

@@ -8,6 +8,7 @@
 // it cannot belongs in a partial class under Commands/Handwritten/ via the Customize hook.
 
 using System.CommandLine;
+using System.CommandLine.Parsing;
 using Microsoft.Kiota.Abstractions.Serialization;
 using Equinor.OsduCli.Runtime;
 using Equinor.OsduCsharpClient.CrsCatalog.Models;
@@ -50,6 +51,15 @@ public static partial class CrsCatalogCommands
         command.Options.Add(recordidOption);
         command.Options.Add(dataidOption);
 
+        // A parse-time validator, so this costs no config load, no
+        // token and no round trip. The service rejects the request
+        // anyway; it should not have to.
+        command.Validators.Add(result =>
+        {
+            if (result.GetResult(recordidOption) is null && result.GetResult(dataidOption) is null)
+                result.AddError("One of --record-id or --data-id is required.");
+        });
+
         command.SetAction((parseResult, cancellationToken) =>
             CliRunner.RunAsync(parseResult, async (context, cancellationToken) =>
         {
@@ -86,6 +96,15 @@ public static partial class CrsCatalogCommands
         var command = new Command("transform", "Get a coordinate transformation by record or data id.");
         command.Options.Add(recordidOption);
         command.Options.Add(dataidOption);
+
+        // A parse-time validator, so this costs no config load, no
+        // token and no round trip. The service rejects the request
+        // anyway; it should not have to.
+        command.Validators.Add(result =>
+        {
+            if (result.GetResult(recordidOption) is null && result.GetResult(dataidOption) is null)
+                result.AddError("One of --record-id or --data-id is required.");
+        });
 
         command.SetAction((parseResult, cancellationToken) =>
             CliRunner.RunAsync(parseResult, async (context, cancellationToken) =>
