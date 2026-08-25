@@ -39,12 +39,12 @@ public static partial class SearchCommands
     {
         var kindBodyOption = new Option<string>("--kind", "-k")
         {
-            Description = "Kind to search, e.g. \"osdu:wks:master-data--Well:1.0.0\". Wildcards allowed per segment.",
+            Description = "Kind to search. Wildcards are allowed per segment, so \"osdu:wks:master-data--Well:*\" covers every schema version — pinning one silently misses records written against the others.",
             Required = true,
         };
         var queryBodyOption = new Option<string>("--query", "-q")
         {
-            Description = "Lucene query string, e.g. data.Country:\"Norway\". Omit to match everything of this kind.",
+            Description = "Lucene query string, e.g. data.FacilityName:GB* for a prefix, or data.FacilityName:\"GB 211/23-A8\" for an exact phrase. Omit to match everything of this kind.",
         };
         var limitBodyOption = new Option<int?>("--limit")
         {
@@ -146,7 +146,7 @@ public static partial class SearchCommands
         };
         var queryBodyOption = new Option<string>("--query", "-q")
         {
-            Description = "Lucene query to narrow what is counted, e.g. data.Country:\"Norway\".",
+            Description = "Lucene query to narrow what is counted, e.g. data.FacilityName:GB*.",
         };
 
         var command = new Command("aggregate", "Count distinct values of a field across matching records.");
