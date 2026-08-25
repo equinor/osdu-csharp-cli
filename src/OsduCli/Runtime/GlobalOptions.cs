@@ -27,7 +27,7 @@ public static class GlobalOptions
 
     public static readonly Option<bool> Debug = new("--debug")
     {
-        Description = "Show full exception detail on error.",
+        Description = "Show HTTP request/response detail and full exceptions.",
         Recursive = true,
     };
 

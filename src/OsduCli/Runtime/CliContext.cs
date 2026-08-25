@@ -1,6 +1,7 @@
 using System.CommandLine;
 using Microsoft.Kiota.Abstractions;
 using Microsoft.Kiota.Serialization.Json;
+using Microsoft.Extensions.Logging;
 using Equinor.OsduCsharpClient.Facade;
 
 namespace Equinor.OsduCli.Runtime;
@@ -42,7 +43,19 @@ public sealed class CliContext : IDisposable
             ? OutputFormat.Json
             : OutputFormat.Table;
 
-        return new CliContext(new OsduClient(config), new OutputWriter(format, Console.Out), config);
+        // --debug turns on the client's own request/response logging. Exploratory testing
+        // against a live service is mostly a question of "what did we actually send", and
+        // without this the answer is a status code and nothing else.
+        var loggerFactory = parseResult.GetValue(GlobalOptions.Debug)
+            ? LoggerFactory.Create(builder => builder
+                .AddFilter("Equinor.OsduCsharpClient", LogLevel.Debug)
+                .AddConsole(options => options.LogToStandardErrorThreshold = LogLevel.Trace))
+            : null;
+
+        return new CliContext(
+            new OsduClient(config, loggerFactory: loggerFactory),
+            new OutputWriter(format, Console.Out),
+            config);
     }
 
     /// <summary>Reads and returns the contents of a JSON file passed via a command option.</summary>

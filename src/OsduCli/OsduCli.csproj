@@ -15,17 +15,18 @@
   </ItemGroup>
 
   <ItemGroup>
-    <PackageReference Include="System.CommandLine" Version="2.0.11"/>
-    <PackageReference Include="Microsoft.Extensions.Configuration" Version="10.0.11"/>
-    <PackageReference Include="Microsoft.Extensions.Configuration.Json" Version="10.0.11"/>
-    <PackageReference Include="Microsoft.Extensions.Configuration.EnvironmentVariables" Version="10.0.11"/>
+    <PackageReference Include="Microsoft.Extensions.Logging.Console" Version="10.0.11" />
+    <PackageReference Include="System.CommandLine" Version="2.0.11" />
+    <PackageReference Include="Microsoft.Extensions.Configuration" Version="10.0.11" />
+    <PackageReference Include="Microsoft.Extensions.Configuration.Json" Version="10.0.11" />
+    <PackageReference Include="Microsoft.Extensions.Configuration.EnvironmentVariables" Version="10.0.11" />
   </ItemGroup>
 
   <!-- The client is consumed as a package, not a sibling checkout, so this repo builds on
        its own. 1.1.7 is the first release with an OS-encrypted MSAL token cache
        (equinor/osdu-csharp-client#98); do not go below it. -->
   <ItemGroup>
-    <PackageReference Include="Equinor.OsduCsharpClient" Version="1.1.7"/>
+    <PackageReference Include="Equinor.OsduCsharpClient" Version="1.1.7" />
   </ItemGroup>
 
 </Project>
