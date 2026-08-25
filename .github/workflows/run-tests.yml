@@ -54,6 +54,11 @@ jobs:
         working-directory: osdu-csharp-cli
         run: python3 tools/generate_cli.py --check
 
+      # The command reference is generated from the manifests too, so it cannot drift.
+      - name: Check the command reference is up to date
+        working-directory: osdu-csharp-cli
+        run: python3 tools/generate_docs.py --check
+
       # Fails when the committed generated commands are stale.
       - name: Check generated code is up to date
         working-directory: osdu-csharp-cli

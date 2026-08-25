@@ -31,6 +31,15 @@ rather than replacing it.
 
 [releases]: https://github.com/equinor/osdu-csharp-cli/releases/latest
 
+## Documentation
+
+| | |
+|---|---|
+| [docs/USAGE.md](docs/USAGE.md) | configuration, output, finding records — the everyday guide |
+| [docs/COMMANDS.md](docs/COMMANDS.md) | every command and flag, generated from the manifests |
+| [docs/TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md) | failure modes seen against a live instance, and which are not the CLI's fault |
+| [COMMAND-GRAMMAR.md](COMMAND-GRAMMAR.md) | why commands are named as they are, and the manifest reference |
+
 ## First run
 
 **If you already use the Python CLI, there is nothing to configure.** `osducs` reads the
