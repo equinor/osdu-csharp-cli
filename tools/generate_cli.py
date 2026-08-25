@@ -241,6 +241,22 @@ def csharp_type(schema: dict) -> str:
     return "string"
 
 
+def resolve_field_schema(properties: dict, dotted_name: str, spec: dict) -> dict:
+    """Resolve a possibly-dotted body field name to its schema.
+
+    ``sort.order`` has to reach the enum on Search's ``SortQuery``; looking only at the
+    top-level properties would find nothing and silently drop the allowed values.
+    """
+    schemas = (spec.get("components") or {}).get("schemas") or {}
+    current, schema = properties, {}
+    for segment in dotted_name.split("."):
+        schema = current.get(segment) or {}
+        if ref := schema.get("$ref"):
+            schema = schemas.get(ref.rsplit("/", 1)[-1]) or {}
+        current = schema.get("properties") or {}
+    return schema
+
+
 def body_schema_properties(operation: dict, spec: dict) -> dict:
     """
     Return the property schemas of an operation's JSON request body, resolving one level
@@ -335,11 +351,13 @@ class BodyField:
 
     @property
     def var(self) -> str:
-        return camel(self.name) + "Value"
+        # `sort.order` -> sortOrderValue: dots cannot appear in an identifier, and two
+        # fields under different parents must not collide.
+        return camel(self.name.replace(".", "_")) + "Value"
 
     @property
     def option_var(self) -> str:
-        return camel(self.name) + "BodyOption"
+        return camel(self.name.replace(".", "_")) + "BodyOption"
 
     @property
     def is_value_type(self) -> bool:
@@ -382,6 +400,7 @@ class Command:
     root: str | None
     columns: list[tuple[str, str]]
     columns_from: str | None
+    total_from: str | None
     message: str | None
 
     @property
@@ -605,7 +624,7 @@ def build_command(entry: dict, operation: dict, where: str, models_root: str,
         for field_name, field_cfg in fields_cfg.items():
             if "flag" not in field_cfg:
                 raise ManifestError(f"{where}: body field {field_name!r} needs a `flag:`")
-            field_schema = field_schemas.get(field_name) or {}
+            field_schema = resolve_field_schema(field_schemas, field_name, spec)
             fields.append(BodyField(
                 name=field_name,
                 flag=field_cfg["flag"],
@@ -677,6 +696,7 @@ def build_command(entry: dict, operation: dict, where: str, models_root: str,
         root=output.get("root"),
         columns=list((output.get("columns") or {}).items()),
         columns_from=columns_from,
+        total_from=output.get("total-from"),
         message=output.get("message"),
     )
 
@@ -845,9 +865,17 @@ def emit_command(service: Service, command: Command) -> list[str]:
                               f".Select(item => (JsonNode)JsonValue.Create(item)!).ToArray())")
                 else:
                     assign = f"JsonValue.Create({bodyfield.var})"
+                if "." in bodyfield.name:
+                    *parents, leaf = bodyfield.name.split(".")
+                    target = "bodyNode"
+                    for parent in parents:
+                        target = f"CliContext.Child({target}, {csharp_string(parent)})"
+                    slot = f"{target}[{csharp_string(leaf)}]"
+                else:
+                    slot = f"bodyNode[{csharp_string(bodyfield.name)}]"
+
                 if bodyfield.required:
-                    lines.append(f"            bodyNode[{csharp_string(bodyfield.name)}] = "
-                                 f"{assign};")
+                    lines.append(f"            {slot} = {assign};")
                 else:
                     # Omitted rather than null: OSDU services treat an explicit null as a
                     # value and reject it where they would happily accept a missing key.
@@ -859,8 +887,7 @@ def emit_command(service: Service, command: Command) -> list[str]:
                              if bodyfield.is_collection
                              else f"{bodyfield.var} is not null")
                     lines.append(f"            if ({guard})")
-                    lines.append(f"                bodyNode[{csharp_string(bodyfield.name)}] = "
-                                 f"{assign};")
+                    lines.append(f"                {slot} = {assign};")
             lines.append("            var bodyJson = bodyNode.ToJsonString();")
         else:
             read = (f"await CliContext.ReadBodyFileAsync("
@@ -910,8 +937,17 @@ def emit_command(service: Service, command: Command) -> list[str]:
 
     lines.append("")
     if command.returns:
-        lines.append("            return context.Output.Write(")
-        lines.append("                await OsduJson.ToJsonAsync(result),")
+        if command.total_from:
+            # Materialised, because the count and the table are read from the same response
+            # and serialising twice would be wasteful and could disagree.
+            lines.append("            var json = await OsduJson.ToJsonAsync(result);")
+            lines.append(f"            context.Output.WriteTotal(json, "
+                         f"{csharp_string(command.total_from)});")
+            lines.append("            return context.Output.Write(")
+            lines.append("                json,")
+        else:
+            lines.append("            return context.Output.Write(")
+            lines.append("                await OsduJson.ToJsonAsync(result),")
         lines.append(f"                {output_expression(command)});")
     else:
         message = command.message or "Done."

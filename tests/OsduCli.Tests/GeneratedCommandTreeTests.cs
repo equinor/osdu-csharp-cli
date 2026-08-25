@@ -231,4 +231,22 @@ public class GeneratedCommandTreeTests
         // Still optional — the fixed columns remain the default.
         Assert.Empty(root.Parse("record search --kind k").Errors);
     }
+
+    [Fact]
+    public void SearchAcceptsSortAndTotalCount()
+    {
+        var root = BuildRoot();
+
+        Assert.Empty(root.Parse(
+            "record search --kind k --sort-by id --sort-order DESC --track-total-count").Errors);
+        // --track-total-count is a flag, not a value.
+        Assert.Empty(root.Parse("record search --kind k --track-total-count").Errors);
+    }
+
+    [Fact]
+    public void SortOrderIsConstrainedToTheSpecsEnum()
+    {
+        // The enum lives on SortQuery.order.items, two levels below the request body.
+        Assert.NotEmpty(BuildRoot().Parse("record search --kind k --sort-order SIDEWAYS").Errors);
+    }
 }

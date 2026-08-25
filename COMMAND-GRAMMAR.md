@@ -474,3 +474,38 @@ request and then not shown, which is worse than not offering the flag. The heade
 last dotted segment, capitalised, so `data.acl.owners` becomes `Owners`.
 
 The generator rejects a `columns-from` that does not name one of the command's body fields.
+
+## `total-from`
+
+A response can carry metadata beside the projected results — Search reports `totalCount`
+next to `results`. With the projection rooted at `results`, that count is fetched and
+discarded, which would leave `--track-total-count` with nothing to show for itself.
+
+```yaml
+output:
+  root: results
+  total-from: totalCount
+```
+
+Printed above the table, table mode only: in JSON mode the field is already in the document
+being piped, and a prose line would corrupt it.
+
+Search caps the reported count at exactly 10000 unless `trackTotalCount` is set, so a bare
+`10,000` is printed as `10,000+ … (use --track-total-count for the exact figure)`. Reporting
+10,000 where the truth is 141,286 is worse than reporting nothing.
+
+## Nested body fields
+
+A dotted body field name builds a nested object, with the parent created only if one of its
+children is set:
+
+```yaml
+body:
+  fields:
+    sort.field:  { flag: --sort-by,    type: string[] }
+    sort.order:  { flag: --sort-order, type: string[] }
+```
+
+produces `{"sort":{"field":["id"],"order":["DESC"]}}`. The schema is resolved through the
+dots too, so `sort.order` still inherits its `ASC`/`DESC` enum from `SortQuery` two levels
+down and the CLI rejects anything else locally.

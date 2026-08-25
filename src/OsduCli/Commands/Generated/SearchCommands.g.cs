@@ -54,6 +54,21 @@ public static partial class SearchCommands
         {
             Description = "Number of results to skip. Use --cursor-based paging beyond 10000.",
         };
+        var sortFieldBodyOption = new Option<string[]>("--sort-by")
+        {
+            Description = "Fields to sort by, e.g. id or data.FacilityName. Pair positionally with --sort-order.",
+            AllowMultipleArgumentsPerToken = true,
+        };
+        var sortOrderBodyOption = new Option<string[]>("--sort-order")
+        {
+            Description = "Sort direction per --sort-by field. Defaults to ASC upstream when omitted. One of: ASC, DESC.",
+            AllowMultipleArgumentsPerToken = true,
+        };
+        sortOrderBodyOption.AcceptOnlyFromAmong("ASC", "DESC");
+        var tracktotalcountBodyOption = new Option<bool?>("--track-total-count")
+        {
+            Description = "Report the true match count. Without it the count is capped at 10000, which silently understates any large kind.",
+        };
         var returnedfieldsBodyOption = new Option<string[]>("--returned-fields", "-f")
         {
             Description = "Fields to project, e.g. id, data.FacilityName. Repeat the flag or comma-separate. These become the table columns, so asking for a field shows it.",
@@ -65,6 +80,9 @@ public static partial class SearchCommands
         command.Options.Add(queryBodyOption);
         command.Options.Add(limitBodyOption);
         command.Options.Add(offsetBodyOption);
+        command.Options.Add(sortFieldBodyOption);
+        command.Options.Add(sortOrderBodyOption);
+        command.Options.Add(tracktotalcountBodyOption);
         command.Options.Add(returnedfieldsBodyOption);
 
         command.SetAction((parseResult, cancellationToken) =>
@@ -82,6 +100,15 @@ public static partial class SearchCommands
             var offsetValue = parseResult.GetValue(offsetBodyOption);
             if (offsetValue is not null)
                 bodyNode["offset"] = JsonValue.Create(offsetValue);
+            var sortFieldValue = parseResult.GetValue(sortFieldBodyOption);
+            if (sortFieldValue is { Length: > 0 })
+                CliContext.Child(bodyNode, "sort")["field"] = new JsonArray(sortFieldValue.Select(item => (JsonNode)JsonValue.Create(item)!).ToArray());
+            var sortOrderValue = parseResult.GetValue(sortOrderBodyOption);
+            if (sortOrderValue is { Length: > 0 })
+                CliContext.Child(bodyNode, "sort")["order"] = new JsonArray(sortOrderValue.Select(item => (JsonNode)JsonValue.Create(item)!).ToArray());
+            var tracktotalcountValue = parseResult.GetValue(tracktotalcountBodyOption);
+            if (tracktotalcountValue is not null)
+                bodyNode["trackTotalCount"] = JsonValue.Create(tracktotalcountValue);
             var returnedfieldsValue = parseResult.GetValue(returnedfieldsBodyOption);
             if (returnedfieldsValue is { Length: > 0 })
                 bodyNode["returnedFields"] = new JsonArray(returnedfieldsValue.Select(item => (JsonNode)JsonValue.Create(item)!).ToArray());
@@ -91,8 +118,10 @@ public static partial class SearchCommands
 
             var result = await context.Client.Search.Query.PostAsync(body, cancellationToken: cancellationToken);
 
+            var json = await OsduJson.ToJsonAsync(result);
+            context.Output.WriteTotal(json, "totalCount");
             return context.Output.Write(
-                await OsduJson.ToJsonAsync(result),
+                json,
                 returnedfieldsValue is { Length: > 0 }
                     ? OutputSpec.FromFields("results", returnedfieldsValue)
                     : OutputSpec.Table("results", ("Id", "id"), ("Kind", "kind")));

@@ -1,4 +1,5 @@
 using System.CommandLine;
+using System.Text.Json.Nodes;
 using Microsoft.Kiota.Abstractions;
 using Microsoft.Kiota.Serialization.Json;
 using Microsoft.Extensions.Logging;
@@ -78,4 +79,16 @@ public sealed class CliContext : IDisposable
     }
 
     public void Dispose() => Client.Dispose();
+
+    /// <summary>
+    /// Returns the named child object of <paramref name="parent"/>, creating it on first use.
+    /// </summary>
+    /// <remarks>
+    /// Lets a body assembled from flags carry nested objects — Search's <c>sort</c> holds
+    /// parallel <c>field</c> and <c>order</c> arrays. Created on demand so a request that
+    /// sets none of a group's flags does not send an empty <c>"sort":{}</c>, which some OSDU
+    /// services treat as a value rather than an omission.
+    /// </remarks>
+    public static JsonObject Child(JsonObject parent, string name) =>
+        (JsonObject)(parent[name] ??= new JsonObject());
 }

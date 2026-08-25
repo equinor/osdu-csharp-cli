@@ -178,4 +178,43 @@ public class OutputWriterTests
 
         Assert.DoesNotContain("null", output);
     }
+
+    private static string RenderTotal(string json, OutputFormat format = OutputFormat.Table)
+    {
+        var buffer = new StringWriter();
+        new OutputWriter(format, buffer).WriteTotal(json, "totalCount");
+        return buffer.ToString();
+    }
+
+    [Fact]
+    public void TotalIsReportedAlongsideTheResults()
+    {
+        // totalCount sits outside the projection root, so without this the count is fetched
+        // and discarded.
+        Assert.Contains("1,117 matching records", RenderTotal("""{"totalCount":1117,"results":[]}"""));
+    }
+
+    [Fact]
+    public void TheCappedCountIsMarkedAsACap()
+    {
+        // Search reports exactly 10000 when the true figure is higher. Printing a bare
+        // "10,000" where the truth is 141,286 is worse than printing nothing.
+        var output = RenderTotal("""{"totalCount":10000,"results":[]}""");
+
+        Assert.Contains("10,000+", output);
+        Assert.Contains("--track-total-count", output);
+    }
+
+    [Fact]
+    public void TotalIsSuppressedInJsonMode()
+    {
+        // The field is already in the document being piped; a prose line would corrupt it.
+        Assert.Equal("", RenderTotal("""{"totalCount":42,"results":[]}""", OutputFormat.Json));
+    }
+
+    [Fact]
+    public void AResponseWithNoTotalPrintsNothing()
+    {
+        Assert.Equal("", RenderTotal("""{"results":[]}"""));
+    }
 }

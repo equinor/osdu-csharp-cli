@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Text;
 using System.Text.Json;
 
@@ -16,6 +17,9 @@ public enum OutputFormat
 public sealed class OutputWriter(OutputFormat format, TextWriter output)
 {
     private static readonly JsonSerializerOptions Indented = new() { WriteIndented = true };
+
+    /// <summary>Search reports at most this many matches without trackTotalCount.</summary>
+    private const long SearchCountCap = 10_000;
 
     /// <summary>
     /// Writes <paramref name="json"/> and returns the process exit code (always 0 — a failed
@@ -119,5 +123,36 @@ public sealed class OutputWriter(OutputFormat format, TextWriter output)
             JsonValueKind.Number or JsonValueKind.True or JsonValueKind.False => current.ToString(),
             _ => JsonSerializer.Serialize(current),
         };
+    }
+
+    /// <summary>
+    /// Writes the match count carried alongside the results, when the response has one.
+    /// </summary>
+    /// <remarks>
+    /// Search reports <c>totalCount</c> next to <c>results</c>, outside the projection root,
+    /// so it would otherwise be discarded — leaving <c>--track-total-count</c> with nothing
+    /// to show for itself. Table mode only: in JSON mode the field is already in the
+    /// document the caller is piping.
+    /// </remarks>
+    public void WriteTotal(string? json, string path)
+    {
+        if (format != OutputFormat.Table || string.IsNullOrWhiteSpace(json)) return;
+
+        using var document = JsonDocument.Parse(json);
+        if (document.RootElement.ValueKind != JsonValueKind.Object) return;
+        if (!document.RootElement.TryGetProperty(path, out var total)) return;
+        if (total.ValueKind != JsonValueKind.Number) return;
+
+        // Search caps the reported count at exactly 10000 unless trackTotalCount is set.
+        // Printing a bare "10,000" where the truth is 141,286 is worse than printing
+        // nothing, so the cap is marked and the way past it named.
+        // Invariant, not current culture: a thousands separator that changes with the
+        // machine's locale makes output that scripts grep and humans compare unstable. The
+        // project sets InvariantGlobalization today, but this should not depend on that
+        // staying true.
+        var count = total.GetInt64().ToString("N0", CultureInfo.InvariantCulture);
+        output.WriteLine(total.GetInt64() == SearchCountCap
+            ? $"{count}+ matching records (use --track-total-count for the exact figure)"
+            : $"{count} matching records");
     }
 }

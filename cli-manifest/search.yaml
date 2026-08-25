@@ -40,6 +40,22 @@ commands:
           flag: --offset
           type: int
           help: Number of results to skip. Use --cursor-based paging beyond 10000.
+        sort.field:
+          flag: --sort-by
+          type: string[]
+          help: >
+            Fields to sort by, e.g. id or data.FacilityName. Pair positionally with
+            --sort-order.
+        sort.order:
+          flag: --sort-order
+          type: string[]
+          help: Sort direction per --sort-by field. Defaults to ASC upstream when omitted.
+        trackTotalCount:
+          flag: --track-total-count
+          type: bool
+          help: >
+            Report the true match count. Without it the count is capped at 10000, which
+            silently understates any large kind.
         returnedFields:
           flag: --returned-fields
           short: -f
@@ -49,6 +65,9 @@ commands:
             These become the table columns, so asking for a field shows it.
     output:
       root: results
+      # totalCount sits beside results, outside the projection root, so it would otherwise
+      # be discarded — leaving --track-total-count with nothing to show.
+      total-from: totalCount
       # Projected fields become the columns; without this the fixed Id/Kind pair would be
       # rendered and the fields the user asked for would be fetched and then hidden.
       columns-from: returnedFields
