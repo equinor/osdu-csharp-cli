@@ -31,6 +31,11 @@ commands:
       kind:   { flag: --kind,   short: -k, required: true, help: Kind of records to list. }
       limit:  { flag: --limit,             help: Maximum number of records to return. }
       cursor: { flag: --cursor,            help: Cursor returned by a previous page. }
+    examples:
+      - args: --kind "osdu:wks:master-data--Well:1.2.0" --limit 5
+        skip: >
+          Storage's kind-scoped query needs entitlements many users lack; `record search`
+          answers the same question through the Search service.
     output:
       root: results
       columns:
@@ -47,6 +52,11 @@ commands:
     params:
       id:        { flag: --id, short: -id, required: true, help: Record id. }
       attribute: { flag: --attributes, short: -a, help: Restrict the returned fields of the record. }
+    examples:
+      - args: --id "opendes:master-data--Wellbore:1000"
+        skip: >
+          Record ids are scoped to a data partition, so any literal id is wrong on another
+          instance. Take one from `record search`.
     output:
       columns:
         Id: id
@@ -78,6 +88,10 @@ commands:
           short: -a
           type: string[]
           help: Header fields to return. Omit for all of them; 'id' is always included.
+    examples:
+      - args: --id "opendes:master-data--Wellbore:1000" -a kind -a acl
+        skip: >
+          Partition-scoped id, and the endpoint arrives with M27 — see the note above.
     output:
       root: records
       columns:

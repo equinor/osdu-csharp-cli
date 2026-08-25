@@ -17,6 +17,8 @@ commands:
     op: { method: get, path: /legaltags }
     params:
       valid: { flag: --valid, type: bool, help: "Return only valid tags (true) or only invalid ones (false). Omit for all." }
+    examples:
+      - ""
     output:
       root: legalTags
       columns:
@@ -28,6 +30,8 @@ commands:
     op: { method: get, path: "/legaltags/{name}" }
     params:
       name: { flag: --name, short: -n, required: true, help: LegalTag name. }
+    examples:
+      - --name "dev-equinor-osdu-reference-default"
     output: raw
 
   - command: legaltag add

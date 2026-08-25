@@ -161,6 +161,27 @@ value completion: never authenticate on TAB, and never block on the network.
 `--debug` prints the full exception instead of the one-line summary — for diagnosing an auth
 or transport failure rather than a user error.
 
+## Smoke-testing the examples
+
+Help examples are untested documentation and rot silently — `data.Country:"Norway"` sat in
+`record search --help` matching nothing, because that field exists on no OSDU kind. CI cannot
+catch it: it needs a live service and a token.
+
+```bash
+python3 tools/smoke_test.py            # every example, default profile
+python3 tools/smoke_test.py -c dev     # a named profile
+python3 tools/smoke_test.py record     # only `record …` commands
+```
+
+The examples live in the manifests beside the command they document, so the string shown in
+help and the string executed here are the same string. An example that cannot run anywhere —
+a record id is scoped to a data partition — carries a `skip:` reason and is reported as
+skipped rather than failed.
+
+An empty result counts as a failure: a command that renders nothing has "worked" and told the
+user nothing, which is exactly how the stale examples went unnoticed. Non-zero exit if
+anything fails, so it can gate a release.
+
 ## Running it
 
 ```bash

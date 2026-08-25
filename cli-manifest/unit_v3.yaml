@@ -32,6 +32,8 @@ commands:
     params:
       offset: { flag: --offset, type: int, help: Number of units to skip. }
       limit:  { flag: --limit,  type: int, help: Maximum number of units to return. }
+    examples:
+      - --limit 5
     output:
       root: units
       columns:
@@ -72,6 +74,8 @@ commands:
     op: { method: get, path: /v3/unit/symbols }
     params:
       symbol: { flag: --symbol, short: -s, required: true, help: "Unit symbol, e.g. m." }
+    examples:
+      - --symbol ft
     output:
       root: units
       columns:

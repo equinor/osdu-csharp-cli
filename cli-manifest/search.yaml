@@ -69,6 +69,13 @@ commands:
           help: >
             Fields to project, e.g. id, data.FacilityName. Repeat the flag or comma-separate.
             These become the table columns, so asking for a field shows it.
+    examples:
+      - --kind "osdu:wks:master-data--Well:*" --limit 5
+      - --kind "osdu:wks:master-data--Well:*" --query 'data.FacilityName:GB*' --limit 5
+      - --kind "osdu:wks:master-data--Well:*" --query 'data.FacilityName:"GB 211/23-A8"'
+      - --kind "osdu:wks:master-data--Well:*" --limit 5 -f id -f data.FacilityName
+      - --kind "osdu:wks:master-data--Well:*" --limit 5 --sort-by id --sort-order DESC
+      - --kind "osdu:wks:master-data--Well:*" --limit 1 --track-total-count
     output:
       root: results
       # totalCount sits beside results, outside the projection root, so it would otherwise
@@ -108,6 +115,9 @@ commands:
           flag: --query
           short: -q
           help: 'Lucene query to narrow what is counted, e.g. data.FacilityName:GB*.'
+    examples:
+      - --kind "osdu:wks:master-data--*:*" --by kind
+      - --kind "osdu:wks:master-data--Well:*" --by kind --query 'data.FacilityName:GB*'
     output:
       root: aggregations
       columns:

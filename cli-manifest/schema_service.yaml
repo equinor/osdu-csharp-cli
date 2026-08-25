@@ -25,6 +25,8 @@ commands:
       latestVersion: { flag: --latest, type: bool, help: Return only the newest version of each schema. }
       limit:      { flag: --limit,      help: Maximum number of schemas to return. }
       offset:     { flag: --offset,     help: Number of schemas to skip. }
+    examples:
+      - --limit 5
     output:
       root: schemaInfos
       columns:
@@ -37,6 +39,8 @@ commands:
     op: { method: get, path: "/schema/{id}" }
     params:
       id: { flag: --id, short: -id, required: true, help: "Schema id, e.g. osdu:wks:master-data--Well:1.0.0." }
+    examples:
+      - --id "osdu:wks:master-data--Well:1.0.0"
     output: raw
 
   - command: schema add

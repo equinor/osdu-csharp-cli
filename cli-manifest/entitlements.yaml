@@ -26,6 +26,8 @@ commands:
     op: { method: get, path: /groups }
     params:
       roleRequired: { flag: --role-required, type: bool, help: Include the caller's role in each group. }
+    examples:
+      - ""
     output:
       root: groups
       columns:
