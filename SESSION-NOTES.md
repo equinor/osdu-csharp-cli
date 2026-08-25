@@ -645,6 +645,26 @@ packaging rather than after.
 The config directories are unchanged: `~/.osdu/` is shared with the client's token cache,
 and `~/.osducli/` is where the Python profiles live and is read, not written.
 
+### The specs run ahead of ADME
+
+The vendored specs track OSDU upstream; Equinor runs ADME, which lags. So a command can be
+generated correctly, send a well-formed request, and still fail — because the endpoint is not
+deployed yet. Two hit so far:
+
+| Command | Response | Reality |
+|---|---|---|
+| `record headers` | `404 No static resource query/records/headers` | Correct; arrives with **M27** |
+| `GET /records` (tried as a `record list` workaround) | `500 IRecordsMetadataRepository.getRecords not implemented` | Not implemented in ADME |
+
+Both look like CLI bugs and are not. Before chasing a 404 or a "not implemented" 500, check
+the deployed version with `osducs status` — dev was on storage `0.29.4-SNAPSHOT` built
+2026-08-05, behind the spec that generated the command.
+
+This is a standing property of the design, not a transient state: generating from upstream
+specs means the CLI will always be able to express slightly more than the platform can
+answer. Worth saying plainly in the peer test instructions, or the first 404 will be reported
+as a defect.
+
 ### Known divergences from the Python CLI
 
 All three are deliberate and documented in the manifests or COMMAND-GRAMMAR.md.

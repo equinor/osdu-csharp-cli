@@ -58,6 +58,10 @@ commands:
   # Added upstream 2026-08. Worth exposing where POST /query/records is not: it answers a
   # question `record get` cannot — "what are these 500 records, without downloading them" —
   # by omitting the data payload entirely. Reached for after `record search` hands back ids.
+  #
+  # NOT YET IN ADME. Returns 404 "No static resource query/records/headers" until M27 is
+  # deployed. The command is correct — verified request URL and body — so this is a platform
+  # lag, not a defect. Do not go looking for a bug here.
   - command: record headers
     summary: Fetch record headers by id, without the data payload.
     op: { method: post, path: /query/records/headers }
