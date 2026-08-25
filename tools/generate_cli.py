@@ -396,6 +396,7 @@ class Command:
     body: Body | None
     spec_path: str
     require_one_of: list[str]
+    mutually_exclusive: list[str]
     returns: bool
     root: str | None
     columns: list[tuple[str, str]]
@@ -667,6 +668,22 @@ def build_command(entry: dict, operation: dict, where: str, models_root: str,
             f"{where}: require-one-of needs at least two params; a single mandatory param "
             f"should be marked `required: true` instead")
 
+    # `mutually-exclusive` names options that contradict each other. Search's
+    # returnedFields and excludedFields are the case: one says "only these", the other
+    # "everything but these", and the service does not document what it does with both.
+    # Rejecting at parse time beats finding out.
+    mutually_exclusive = [str(name) for name in (entry.get("mutually-exclusive") or [])]
+    selectable = set(entry.get("params") or {}) | set(
+        ((entry.get("body") or {}).get("fields") or {}))
+    for name in mutually_exclusive:
+        if name not in selectable:
+            raise ManifestError(
+                f"{where}: mutually-exclusive names {name!r}, which is neither a param nor "
+                f"a body field of this command: {sorted(selectable)}")
+    if len(mutually_exclusive) == 1:
+        raise ManifestError(
+            f"{where}: mutually-exclusive needs at least two names to conflict")
+
     builder = entry.get("builder") or derive_builder(entry["op"]["path"])
 
     output = entry.get("output") or {}
@@ -692,6 +709,7 @@ def build_command(entry: dict, operation: dict, where: str, models_root: str,
         body=body,
         spec_path=entry["op"]["path"],
         require_one_of=require_one_of,
+        mutually_exclusive=mutually_exclusive,
         returns=returns_value(operation),
         root=output.get("root"),
         columns=list((output.get("columns") or {}).items()),
@@ -841,6 +859,21 @@ def emit_command(service: Service, command: Command) -> list[str]:
         lines.append(f"                result.AddError({csharp_string('One of ' + flags + ' is required.')});")
         lines.append("        });")
 
+    if command.mutually_exclusive:
+        by_name = {param.name: param for param in command.params}
+        by_name.update({field.name: field for field in (command.body.fields if command.body else [])})
+        chosen = [by_name[name] for name in command.mutually_exclusive]
+        flags = " and ".join(item.flag for item in chosen)
+        checks = " && ".join(f"result.GetResult({item.option_var}) is not null" for item in chosen)
+        lines.append("")
+        lines.append("        // Contradictory options, rejected before the service has to")
+        lines.append("        // decide which one it believes.")
+        lines.append("        command.Validators.Add(result =>")
+        lines.append("        {")
+        lines.append(f"            if ({checks})")
+        lines.append(f"                result.AddError({csharp_string(flags + ' cannot be used together.')});")
+        lines.append("        });")
+
     lines.append("")
     lines.append("        command.SetAction((parseResult, cancellationToken) =>")
     lines.append("            CliRunner.RunAsync(parseResult, async (context, cancellationToken) =>")
@@ -966,7 +999,7 @@ def emit_service(service: Service, manifest_name: str) -> str:
 
     lines = [HEADER.format(spec=service.spec_file, manifest=manifest_name)]
     lines.append("using System.CommandLine;")
-    if any(c.require_one_of for c in service.commands):
+    if any(c.require_one_of or c.mutually_exclusive for c in service.commands):
         lines.append("using System.CommandLine.Parsing;")
     if needs_json_nodes:
         lines.append("using System.Text.Json.Nodes;")

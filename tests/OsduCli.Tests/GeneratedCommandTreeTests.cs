@@ -249,4 +249,25 @@ public class GeneratedCommandTreeTests
         // The enum lives on SortQuery.order.items, two levels below the request body.
         Assert.NotEmpty(BuildRoot().Parse("record search --kind k --sort-order SIDEWAYS").Errors);
     }
+
+    [Fact]
+    public void ContradictoryFieldOptionsAreRejectedAtParseTime()
+    {
+        // "only these" and "everything but these" cannot both hold, and the service does not
+        // document which it believes. Better to say so before sending it.
+        var result = BuildRoot().Parse("record search --kind k -f id -x data.GeoContexts");
+
+        var error = Assert.Single(result.Errors);
+        Assert.Contains("--returned-fields", error.Message);
+        Assert.Contains("--excluded-fields", error.Message);
+    }
+
+    [Theory]
+    [InlineData("record search --kind k -f id")]
+    [InlineData("record search --kind k -x data.GeoContexts")]
+    [InlineData("record search --kind k")]
+    public void EitherFieldOptionAloneIsFine(string commandLine)
+    {
+        Assert.Empty(BuildRoot().Parse(commandLine).Errors);
+    }
 }

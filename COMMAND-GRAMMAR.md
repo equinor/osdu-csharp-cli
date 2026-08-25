@@ -519,3 +519,20 @@ body:
 produces `{"sort":{"field":["id"],"order":["DESC"]}}`. The schema is resolved through the
 dots too, so `sort.order` still inherits its `ASC`/`DESC` enum from `SortQuery` two levels
 down and the CLI rejects anything else locally.
+
+## `mutually-exclusive`
+
+Options that contradict each other, rejected at parse time:
+
+```yaml
+mutually-exclusive: [returnedFields, excludedFields]
+```
+
+`record search -f id -x data.GeoContexts` answers
+`--returned-fields and --excluded-fields cannot be used together.` and exits 1, without
+sending anything. One says "only these", the other "everything but these"; the service does
+not document what it does when given both, and finding out empirically is not a good use of
+a user's afternoon.
+
+Names may be params or body fields. The generator rejects a name that is neither, and a
+one-element list — nothing conflicts with itself.

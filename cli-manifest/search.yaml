@@ -68,9 +68,21 @@ commands:
           type: string[]
           help: >
             Fields to project, e.g. id, data.FacilityName. Repeat the flag or comma-separate.
-            These become the table columns, so asking for a field shows it.
+            These become the table columns, so asking for a field shows it. Server-side, so
+            it also cuts what crosses the wire.
+        excludedFields:
+          flag: --excluded-fields
+          short: -x
+          type: string[]
+          help: >
+            Fields to omit, e.g. data.rawData — everything else is returned. The inverse of
+            --returned-fields and cannot be combined with it. Columns stay Id and Kind
+            unless --returned-fields names others, since an exclusion says nothing about
+            what to show.
+    mutually-exclusive: [returnedFields, excludedFields]
     examples:
       - --kind "osdu:wks:master-data--Well:*" --limit 5
+      - --kind "osdu:wks:master-data--Well:*" --limit 3 -x data.GeoContexts -x data.NameAliases
       - --kind "osdu:wks:master-data--Well:*" --query 'data.FacilityName:GB*' --limit 5
       - --kind "osdu:wks:master-data--Well:*" --query 'data.FacilityName:"GB 211/23-A8"'
       - --kind "osdu:wks:master-data--Well:*" --limit 5 -f id -f data.FacilityName

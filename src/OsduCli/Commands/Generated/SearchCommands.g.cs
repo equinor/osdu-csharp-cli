@@ -8,6 +8,7 @@
 // it cannot belongs in a partial class under Commands/Handwritten/ via the Customize hook.
 
 using System.CommandLine;
+using System.CommandLine.Parsing;
 using System.Text.Json.Nodes;
 using Microsoft.Kiota.Abstractions.Serialization;
 using Equinor.OsduCli.Runtime;
@@ -71,7 +72,12 @@ public static partial class SearchCommands
         };
         var returnedfieldsBodyOption = new Option<string[]>("--returned-fields", "-f")
         {
-            Description = "Fields to project, e.g. id, data.FacilityName. Repeat the flag or comma-separate. These become the table columns, so asking for a field shows it.",
+            Description = "Fields to project, e.g. id, data.FacilityName. Repeat the flag or comma-separate. These become the table columns, so asking for a field shows it. Server-side, so it also cuts what crosses the wire.",
+            AllowMultipleArgumentsPerToken = true,
+        };
+        var excludedfieldsBodyOption = new Option<string[]>("--excluded-fields", "-x")
+        {
+            Description = "Fields to omit, e.g. data.rawData — everything else is returned. The inverse of --returned-fields and cannot be combined with it. Columns stay Id and Kind unless --returned-fields names others, since an exclusion says nothing about what to show.",
             AllowMultipleArgumentsPerToken = true,
         };
 
@@ -84,6 +90,15 @@ public static partial class SearchCommands
         command.Options.Add(sortOrderBodyOption);
         command.Options.Add(tracktotalcountBodyOption);
         command.Options.Add(returnedfieldsBodyOption);
+        command.Options.Add(excludedfieldsBodyOption);
+
+        // Contradictory options, rejected before the service has to
+        // decide which one it believes.
+        command.Validators.Add(result =>
+        {
+            if (result.GetResult(returnedfieldsBodyOption) is not null && result.GetResult(excludedfieldsBodyOption) is not null)
+                result.AddError("--returned-fields and --excluded-fields cannot be used together.");
+        });
 
         command.SetAction((parseResult, cancellationToken) =>
             CliRunner.RunAsync(parseResult, async (context, cancellationToken) =>
@@ -112,6 +127,9 @@ public static partial class SearchCommands
             var returnedfieldsValue = parseResult.GetValue(returnedfieldsBodyOption);
             if (returnedfieldsValue is { Length: > 0 })
                 bodyNode["returnedFields"] = new JsonArray(returnedfieldsValue.Select(item => (JsonNode)JsonValue.Create(item)!).ToArray());
+            var excludedfieldsValue = parseResult.GetValue(excludedfieldsBodyOption);
+            if (excludedfieldsValue is { Length: > 0 })
+                bodyNode["excludedFields"] = new JsonArray(excludedfieldsValue.Select(item => (JsonNode)JsonValue.Create(item)!).ToArray());
             var bodyJson = bodyNode.ToJsonString();
             var body = await KiotaJsonSerializer.DeserializeAsync<QueryRequest>(
                 bodyJson, QueryRequest.CreateFromDiscriminatorValue, cancellationToken);
