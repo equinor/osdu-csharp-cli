@@ -188,4 +188,37 @@ public class GeneratedCommandTreeTests
         Assert.Empty(BuildRoot().Parse("schema list").Errors);
         Assert.Empty(BuildRoot().Parse("unit list").Errors);
     }
+
+    [Fact]
+    public void AggregateIsASeparateCommandFromSearch()
+    {
+        // Both are POST /query, but they answer different questions and return different
+        // shapes. Setting aggregateBy on `search` would show the records and discard the
+        // counts the user asked for.
+        var root = BuildRoot();
+
+        Assert.Empty(root.Parse("record aggregate --kind k --by kind").Errors);
+        Assert.Empty(root.Parse("record search --kind k").Errors);
+    }
+
+    [Fact]
+    public void AggregateRequiresBothKindAndField()
+    {
+        Assert.NotEmpty(BuildRoot().Parse("record aggregate --kind k").Errors);
+        Assert.NotEmpty(BuildRoot().Parse("record aggregate --by kind").Errors);
+    }
+
+    [Fact]
+    public void ReadVerbsSortAheadOfDestructiveOnes()
+    {
+        // A group's verbs arrive in manifest order; the tree reorders so that reading comes
+        // before changing and destroying sits at the bottom, where it is hard to hit by
+        // accident. `headers` was landing after `delete` because it was not in the order.
+        var record = Assert.Single(BuildRoot().Subcommands, c => c.Name == "record");
+        var names = record.Subcommands.Select(c => c.Name).ToList();
+
+        Assert.True(names.IndexOf("headers") < names.IndexOf("delete"),
+            "a read verb must not sort below a destructive one: " + string.Join(", ", names));
+        Assert.True(names.IndexOf("aggregate") < names.IndexOf("delete"));
+    }
 }

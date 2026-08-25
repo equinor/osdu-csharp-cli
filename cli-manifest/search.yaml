@@ -46,6 +46,39 @@ commands:
         Id: id
         Kind: kind
 
+  # Same POST /query as `record search`, but a different question and a different answer
+  # shape: "how many of each" rather than "which ones". Setting aggregateBy on `search`
+  # would have been worse than a separate command — the service returns records *and*
+  # aggregations, so the table would show the records and quietly discard the counts the
+  # user asked for.
+  - command: record aggregate
+    summary: Count distinct values of a field across matching records.
+    op: { method: post, path: /query }
+    body:
+      fields:
+        kind:
+          flag: --kind
+          short: -k
+          required: true
+          help: Kind to aggregate over. Wildcards allowed per segment.
+        aggregateBy:
+          flag: --by
+          short: -b
+          required: true
+          help: >
+            Field to count distinct values of, e.g. kind. Only fields indexed as
+            keywords can be aggregated; others answer "Aggregations are not supported
+            for one or more of the specified fields".
+        query:
+          flag: --query
+          short: -q
+          help: 'Lucene query to narrow what is counted, e.g. data.Country:"Norway".'
+    output:
+      root: aggregations
+      columns:
+        Value: key
+        Count: count
+
 exclude:
   - op: { method: post, path: /query_with_cursor }
     reason: >

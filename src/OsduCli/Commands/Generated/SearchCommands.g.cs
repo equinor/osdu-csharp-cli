@@ -22,6 +22,7 @@ public static partial class SearchCommands
     public static void Attach(CommandTree tree)
     {
         tree.Node("record").Subcommands.Add(BuildRecordSearch());
+        tree.Node("record").Subcommands.Add(BuildRecordAggregate());
 
         Customize(tree);
     }
@@ -84,6 +85,55 @@ public static partial class SearchCommands
             return context.Output.Write(
                 await OsduJson.ToJsonAsync(result),
                 OutputSpec.Table("results", ("Id", "id"), ("Kind", "kind")));
+        }, cancellationToken));
+
+        return command;
+    }
+
+    /// <summary>Count distinct values of a field across matching records.</summary>
+    /// <remarks>POST /query on the Search service.</remarks>
+    private static Command BuildRecordAggregate()
+    {
+        var kindBodyOption = new Option<string>("--kind", "-k")
+        {
+            Description = "Kind to aggregate over. Wildcards allowed per segment.",
+            Required = true,
+        };
+        var aggregatebyBodyOption = new Option<string>("--by", "-b")
+        {
+            Description = "Field to count distinct values of, e.g. kind. Only fields indexed as keywords can be aggregated; others answer \"Aggregations are not supported for one or more of the specified fields\".",
+            Required = true,
+        };
+        var queryBodyOption = new Option<string>("--query", "-q")
+        {
+            Description = "Lucene query to narrow what is counted, e.g. data.Country:\"Norway\".",
+        };
+
+        var command = new Command("aggregate", "Count distinct values of a field across matching records.");
+        command.Options.Add(kindBodyOption);
+        command.Options.Add(aggregatebyBodyOption);
+        command.Options.Add(queryBodyOption);
+
+        command.SetAction((parseResult, cancellationToken) =>
+            CliRunner.RunAsync(parseResult, async (context, cancellationToken) =>
+        {
+            var bodyNode = new JsonObject();
+            var kindValue = parseResult.GetValue(kindBodyOption)!;
+            bodyNode["kind"] = JsonValue.Create(kindValue);
+            var aggregatebyValue = parseResult.GetValue(aggregatebyBodyOption)!;
+            bodyNode["aggregateBy"] = JsonValue.Create(aggregatebyValue);
+            var queryValue = parseResult.GetValue(queryBodyOption);
+            if (queryValue is not null)
+                bodyNode["query"] = JsonValue.Create(queryValue);
+            var bodyJson = bodyNode.ToJsonString();
+            var body = await KiotaJsonSerializer.DeserializeAsync<QueryRequest>(
+                bodyJson, QueryRequest.CreateFromDiscriminatorValue, cancellationToken);
+
+            var result = await context.Client.Search.Query.PostAsync(body, cancellationToken: cancellationToken);
+
+            return context.Output.Write(
+                await OsduJson.ToJsonAsync(result),
+                OutputSpec.Table("aggregations", ("Value", "key"), ("Count", "count")));
         }, cancellationToken));
 
         return command;

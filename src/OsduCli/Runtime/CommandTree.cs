@@ -75,7 +75,7 @@ public sealed class CommandTree
     /// </summary>
     private static readonly string[] VerbOrder =
     [
-        "list", "get", "search", "query", "info",
+        "list", "get", "search", "aggregate", "headers", "query", "info",
         "add", "create", "update", "patch", "upload", "download",
         "trigger", "run", "convert", "validate",
         "delete", "purge", "revoke",
