@@ -91,9 +91,16 @@ public static class CliConfig
     /// </summary>
     internal static IReadOnlyList<string> Resolve(string? config)
     {
-        // No --config: the default profile of either tool, ours winning.
+        // No --config: fall back through the defaults, then honour whatever profile the
+        // Python CLI currently has selected. That selection is an explicit act by the user,
+        // so it outranks either tool's unselected default file.
         if (string.IsNullOrWhiteSpace(config))
-            return [Path.Combine(ProfileDirectory, "config"), DefaultConfigPath];
+        {
+            List<string> candidates = [Path.Combine(ProfileDirectory, "config"), DefaultConfigPath];
+            if (SelectedProfile() is { } selected)
+                candidates.Add(selected);
+            return candidates;
+        }
 
         // A path is used as given.
         if (LooksLikePath(config))
@@ -101,6 +108,42 @@ public static class CliConfig
 
         // A bare name is a profile, looked up in both conventions.
         return [Path.Combine(ProfileDirectory, config), InOsduDirectory(config + ".json")];
+    }
+
+
+    /// <summary>
+    /// The profile the Python CLI currently has selected, or null.
+    /// </summary>
+    /// <remarks>
+    /// <c>osdu config update</c> records the choice in <c>~/.osducli/state</c>:
+    /// <code>
+    /// [core]
+    /// default_config = /Users/someone/.osducli/dev
+    /// </code>
+    /// Reading it means <c>osducs</c> follows the environment already selected instead of
+    /// asking for <c>-c dev</c> on every command, and instead of inventing a second,
+    /// competing notion of "current environment" that could silently disagree.
+    ///
+    /// The value is an absolute path, so a profile selected from outside
+    /// <see cref="ProfileDirectory"/> still resolves.
+    /// </remarks>
+    internal static string? SelectedProfile()
+    {
+        var statePath = Path.Combine(ProfileDirectory, "state");
+        if (!File.Exists(statePath)) return null;
+
+        try
+        {
+            foreach (var (key, value) in
+                     OsduCliIniConfigurationProvider.Parse(File.ReadAllLines(statePath)))
+                if (key.Equals("default_config", StringComparison.OrdinalIgnoreCase))
+                    return value;
+        }
+        catch (IOException)
+        {
+            // An unreadable state file is not a reason to fail; the other candidates stand.
+        }
+        return null;
     }
 
     private static bool LooksLikePath(string value) =>
@@ -147,7 +190,11 @@ public static class CliConfig
 
         var profiles = Directory.EnumerateFiles(ProfileDirectory)
             .Select(Path.GetFileName)
-            .Where(name => name is not null && !name.EndsWith(".bin", StringComparison.OrdinalIgnoreCase))
+            // `state` records which profile is selected; `.bin` files are token caches.
+            // Neither is something you can pass to --config.
+            .Where(name => name is not null
+                && !name.EndsWith(".bin", StringComparison.OrdinalIgnoreCase)
+                && !name.Equals("state", StringComparison.OrdinalIgnoreCase))
             .OrderBy(name => name, StringComparer.Ordinal)
             .ToList();
 

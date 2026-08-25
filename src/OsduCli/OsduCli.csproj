@@ -22,10 +22,10 @@
   </ItemGroup>
 
   <!-- The client is consumed as a package, not a sibling checkout, so this repo builds on
-       its own. NOTE: 1.1.6 still writes an unencrypted MSAL token cache; equinor/osdu-csharp-client#98
-       fixes that and releases 1.1.7. Bump to 1.1.7 before distributing any binary. -->
+       its own. 1.1.7 is the first release with an OS-encrypted MSAL token cache
+       (equinor/osdu-csharp-client#98); do not go below it. -->
   <ItemGroup>
-    <PackageReference Include="Equinor.OsduCsharpClient" Version="1.1.6"/>
+    <PackageReference Include="Equinor.OsduCsharpClient" Version="1.1.7"/>
   </ItemGroup>
 
 </Project>

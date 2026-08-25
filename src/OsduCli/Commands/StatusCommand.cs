@@ -110,6 +110,12 @@ public static class StatusCommand
                 rows.Add(row);
             }
 
+            // Which environment this is has to be visible. `status` is the command whose
+            // whole job is "what am I connected to", and with a default profile in play the
+            // answer is no longer on the command line.
+            context.Output.WriteMessage(
+                $"{context.Config.Server}  partition {context.Config.DataPartitionId}");
+
             context.Output.Write(rows.ToJsonString(), OutputSpec.Table(
                 null,
                 ("Service", "service"),

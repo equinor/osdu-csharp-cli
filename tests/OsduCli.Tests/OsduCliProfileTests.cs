@@ -171,4 +171,45 @@ public class OsduCliProfileTests : IDisposable
         Assert.Equal("scopes", key);
         Assert.Equal("https://energy.azure.com/.default openid", value);
     }
+
+    [Fact]
+    public void FollowsTheProfileThePythonCliHasSelected()
+    {
+        // `osdu config update` writes the choice here; honouring it means no -c on every
+        // command, and no second notion of "current environment" to disagree with it.
+        WriteProfile("dev", "https://selected.example.com");
+        File.WriteAllText(Path.Combine(_directory, "state"),
+            $"[core]\ndefault_config = {Path.Combine(_directory, "dev")}\n");
+
+        Assert.Equal("https://selected.example.com", CliConfig.Load(null).Server);
+    }
+
+    [Fact]
+    public void AnExplicitConfigStillWinsOverTheSelectedProfile()
+    {
+        WriteProfile("dev", "https://selected.example.com");
+        WriteProfile("prod", "https://explicit.example.com");
+        File.WriteAllText(Path.Combine(_directory, "state"),
+            $"[core]\ndefault_config = {Path.Combine(_directory, "dev")}\n");
+
+        Assert.Equal("https://explicit.example.com", CliConfig.Load("prod").Server);
+    }
+
+    [Fact]
+    public void NoStateFileIsNotAnError()
+    {
+        Assert.Null(CliConfig.SelectedProfile());
+    }
+
+    [Fact]
+    public void StateIsNotOfferedAsAProfile()
+    {
+        WriteProfile("dev");
+        File.WriteAllText(Path.Combine(_directory, "state"), "[core]\n");
+
+        var exception = Assert.Throws<OsduException>(() => CliConfig.Load("nosuch"));
+
+        Assert.Contains("dev", exception.Message);
+        Assert.DoesNotContain(" state", exception.Message);
+    }
 }

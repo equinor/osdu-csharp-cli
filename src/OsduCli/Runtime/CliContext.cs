@@ -14,10 +14,14 @@ public sealed class CliContext : IDisposable
     public OsduClient Client { get; }
     public OutputWriter Output { get; }
 
-    private CliContext(OsduClient client, OutputWriter output)
+    /// <summary>The configuration this invocation resolved, for commands that report it.</summary>
+    public OsduConfig Config { get; }
+
+    private CliContext(OsduClient client, OutputWriter output, OsduConfig config)
     {
         Client = client;
         Output = output;
+        Config = config;
     }
 
     /// <summary>
@@ -38,7 +42,7 @@ public sealed class CliContext : IDisposable
             ? OutputFormat.Json
             : OutputFormat.Table;
 
-        return new CliContext(new OsduClient(config), new OutputWriter(format, Console.Out));
+        return new CliContext(new OsduClient(config), new OutputWriter(format, Console.Out), config);
     }
 
     /// <summary>Reads and returns the contents of a JSON file passed via a command option.</summary>
