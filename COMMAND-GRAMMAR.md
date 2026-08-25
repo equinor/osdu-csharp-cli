@@ -536,3 +536,30 @@ a user's afternoon.
 
 Names may be params or body fields. The generator rejects a name that is neither, and a
 one-element list — nothing conflicts with itself.
+
+A command may have several such groups; `[a, b]` and `[[a, b], [c, d]]` are both accepted.
+`record search` has two: the field projection pair, and the two spatial shapes.
+
+## `parts`
+
+One flag whose comma-separated values are spread across several JSON paths:
+
+```yaml
+spatialFilter.byBoundingBox:
+  flag: --bbox
+  type: double[]
+  parts:
+    - spatialFilter.byBoundingBox.topLeft.latitude
+    - spatialFilter.byBoundingBox.topLeft.longitude
+    - spatialFilter.byBoundingBox.bottomRight.latitude
+    - spatialFilter.byBoundingBox.bottomRight.longitude
+```
+
+`--bbox 49.1,7.7,48.8,8.0` becomes the nested `topLeft`/`bottomRight` pair. The alternative —
+four flags for one rectangle — is worse than the feature is worth.
+
+The generator emits a `CustomParser`, because System.CommandLine splits on spaces rather than
+commas and a failed numeric conversion *throws* instead of reporting. The parser owns both
+concerns: a wrong count and a non-number are parse errors with readable messages, and the
+number is read with `InvariantCulture` so a Norwegian decimal comma cannot change what a
+coordinate means.

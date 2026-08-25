@@ -8,6 +8,7 @@
 // it cannot belongs in a partial class under Commands/Handwritten/ via the Customize hook.
 
 using System.CommandLine;
+using System.Globalization;
 using System.CommandLine.Parsing;
 using System.Text.Json.Nodes;
 using Microsoft.Kiota.Abstractions.Serialization;
@@ -80,6 +81,62 @@ public static partial class SearchCommands
             Description = "Fields to omit, e.g. data.rawData — everything else is returned. The inverse of --returned-fields and cannot be combined with it. Columns stay Id and Kind unless --returned-fields names others, since an exclusion says nothing about what to show.",
             AllowMultipleArgumentsPerToken = true,
         };
+        var spatialfilterFieldBodyOption = new Option<string>("--spatial-field")
+        {
+            Description = "Geo-point field to filter on. Required with --bbox or --near; the OSDU convention is data.SpatialLocation.Wgs84Coordinates.",
+        };
+        var spatialfilterByBoundingBoxBodyOption = new Option<double[]>("--bbox")
+        {
+            Description = "Bounding box as TOPLAT,TOPLON,BOTTOMLAT,BOTTOMLON — note top-left first, so the latitudes descend. Example: 49.1,7.7,48.8,8.0.",
+            AllowMultipleArgumentsPerToken = true,
+            CustomParser = result =>
+            {
+                var raw = string.Join(",", result.Tokens.Select(token => token.Value));
+                var supplied = raw.Split(',', StringSplitOptions.RemoveEmptyEntries);
+                if (supplied.Length != 4)
+                {
+                    result.AddError("--bbox needs exactly 4 comma-separated numbers.");
+                    return [];
+                }
+                var values = new double[supplied.Length];
+                for (var index = 0; index < supplied.Length; index++)
+                    if (!double.TryParse(supplied[index], NumberStyles.Float,
+                            CultureInfo.InvariantCulture, out values[index]))
+                    {
+                        result.AddError($"'{supplied[index]}' is not a number.");
+                        return [];
+                    }
+                return values;
+            },
+        };
+        var spatialfilterByDistancePointBodyOption = new Option<double[]>("--near")
+        {
+            Description = "Centre point as LAT,LON, e.g. 48.935251,7.865344. Pair with --within.",
+            AllowMultipleArgumentsPerToken = true,
+            CustomParser = result =>
+            {
+                var raw = string.Join(",", result.Tokens.Select(token => token.Value));
+                var supplied = raw.Split(',', StringSplitOptions.RemoveEmptyEntries);
+                if (supplied.Length != 2)
+                {
+                    result.AddError("--near needs exactly 2 comma-separated numbers.");
+                    return [];
+                }
+                var values = new double[supplied.Length];
+                for (var index = 0; index < supplied.Length; index++)
+                    if (!double.TryParse(supplied[index], NumberStyles.Float,
+                            CultureInfo.InvariantCulture, out values[index]))
+                    {
+                        result.AddError($"'{supplied[index]}' is not a number.");
+                        return [];
+                    }
+                return values;
+            },
+        };
+        var spatialfilterByDistanceDistanceBodyOption = new Option<double?>("--within")
+        {
+            Description = "Radius in metres around --near.",
+        };
 
         var command = new Command("search", "Search records with a Lucene query.");
         command.Options.Add(kindBodyOption);
@@ -91,6 +148,10 @@ public static partial class SearchCommands
         command.Options.Add(tracktotalcountBodyOption);
         command.Options.Add(returnedfieldsBodyOption);
         command.Options.Add(excludedfieldsBodyOption);
+        command.Options.Add(spatialfilterFieldBodyOption);
+        command.Options.Add(spatialfilterByBoundingBoxBodyOption);
+        command.Options.Add(spatialfilterByDistancePointBodyOption);
+        command.Options.Add(spatialfilterByDistanceDistanceBodyOption);
 
         // Contradictory options, rejected before the service has to
         // decide which one it believes.
@@ -98,6 +159,14 @@ public static partial class SearchCommands
         {
             if (result.GetResult(returnedfieldsBodyOption) is not null && result.GetResult(excludedfieldsBodyOption) is not null)
                 result.AddError("--returned-fields and --excluded-fields cannot be used together.");
+        });
+
+        // Contradictory options, rejected before the service has to
+        // decide which one it believes.
+        command.Validators.Add(result =>
+        {
+            if (result.GetResult(spatialfilterByBoundingBoxBodyOption) is not null && result.GetResult(spatialfilterByDistancePointBodyOption) is not null)
+                result.AddError("--bbox and --near cannot be used together.");
         });
 
         command.SetAction((parseResult, cancellationToken) =>
@@ -130,6 +199,26 @@ public static partial class SearchCommands
             var excludedfieldsValue = parseResult.GetValue(excludedfieldsBodyOption);
             if (excludedfieldsValue is { Length: > 0 })
                 bodyNode["excludedFields"] = new JsonArray(excludedfieldsValue.Select(item => (JsonNode)JsonValue.Create(item)!).ToArray());
+            var spatialfilterFieldValue = parseResult.GetValue(spatialfilterFieldBodyOption);
+            if (spatialfilterFieldValue is not null)
+                CliContext.Child(bodyNode, "spatialFilter")["field"] = JsonValue.Create(spatialfilterFieldValue);
+            var spatialfilterByBoundingBoxValue = parseResult.GetValue(spatialfilterByBoundingBoxBodyOption);
+            if (spatialfilterByBoundingBoxValue is { Length: > 0 })
+            {
+                CliContext.Child(CliContext.Child(CliContext.Child(bodyNode, "spatialFilter"), "byBoundingBox"), "topLeft")["latitude"] = JsonValue.Create(spatialfilterByBoundingBoxValue[0]);
+                CliContext.Child(CliContext.Child(CliContext.Child(bodyNode, "spatialFilter"), "byBoundingBox"), "topLeft")["longitude"] = JsonValue.Create(spatialfilterByBoundingBoxValue[1]);
+                CliContext.Child(CliContext.Child(CliContext.Child(bodyNode, "spatialFilter"), "byBoundingBox"), "bottomRight")["latitude"] = JsonValue.Create(spatialfilterByBoundingBoxValue[2]);
+                CliContext.Child(CliContext.Child(CliContext.Child(bodyNode, "spatialFilter"), "byBoundingBox"), "bottomRight")["longitude"] = JsonValue.Create(spatialfilterByBoundingBoxValue[3]);
+            }
+            var spatialfilterByDistancePointValue = parseResult.GetValue(spatialfilterByDistancePointBodyOption);
+            if (spatialfilterByDistancePointValue is { Length: > 0 })
+            {
+                CliContext.Child(CliContext.Child(CliContext.Child(bodyNode, "spatialFilter"), "byDistance"), "point")["latitude"] = JsonValue.Create(spatialfilterByDistancePointValue[0]);
+                CliContext.Child(CliContext.Child(CliContext.Child(bodyNode, "spatialFilter"), "byDistance"), "point")["longitude"] = JsonValue.Create(spatialfilterByDistancePointValue[1]);
+            }
+            var spatialfilterByDistanceDistanceValue = parseResult.GetValue(spatialfilterByDistanceDistanceBodyOption);
+            if (spatialfilterByDistanceDistanceValue is not null)
+                CliContext.Child(CliContext.Child(bodyNode, "spatialFilter"), "byDistance")["distance"] = JsonValue.Create(spatialfilterByDistanceDistanceValue);
             var bodyJson = bodyNode.ToJsonString();
             var body = await KiotaJsonSerializer.DeserializeAsync<QueryRequest>(
                 bodyJson, QueryRequest.CreateFromDiscriminatorValue, cancellationToken);

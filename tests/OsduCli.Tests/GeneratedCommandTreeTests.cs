@@ -270,4 +270,44 @@ public class GeneratedCommandTreeTests
     {
         Assert.Empty(BuildRoot().Parse(commandLine).Errors);
     }
+
+    [Theory]
+    [InlineData("--bbox 49.1,7.7,48.8", "exactly 4")]
+    [InlineData("--bbox 49.1,7.7,48.8,8.0,1.0", "exactly 4")]
+    [InlineData("--near 48.9", "exactly 2")]
+    public void SpatialFlagsCheckTheirArity(string fragment, string expected)
+    {
+        // The values are spread across fixed JSON paths, so a wrong count would index past
+        // the end at send time. Caught while parsing instead.
+        var result = BuildRoot().Parse($"record search --kind k {fragment}");
+
+        Assert.Contains(expected, Assert.Single(result.Errors).Message);
+    }
+
+    [Fact]
+    public void SpatialFlagsRejectNonNumbers()
+    {
+        var result = BuildRoot().Parse("record search --kind k --bbox 49.1,7.7,abc,8.0");
+
+        Assert.Contains("not a number", Assert.Single(result.Errors).Message);
+    }
+
+    [Fact]
+    public void SpatialFlagsAcceptCommaSeparatedValues()
+    {
+        // System.CommandLine splits on spaces; commas are what the help documents.
+        Assert.Empty(BuildRoot().Parse(
+            "record search --kind k --bbox 49.1,7.7,48.8,8.0").Errors);
+        Assert.Empty(BuildRoot().Parse(
+            "record search --kind k --near 48.9,7.8 --within 50000").Errors);
+    }
+
+    [Fact]
+    public void TheTwoSpatialShapesAreMutuallyExclusive()
+    {
+        var result = BuildRoot().Parse(
+            "record search --kind k --bbox 49.1,7.7,48.8,8.0 --near 48.9,7.8");
+
+        Assert.Contains("cannot be used together", Assert.Single(result.Errors).Message);
+    }
 }

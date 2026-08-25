@@ -79,10 +79,46 @@ commands:
             --returned-fields and cannot be combined with it. Columns stay Id and Kind
             unless --returned-fields names others, since an exclusion says nothing about
             what to show.
-    mutually-exclusive: [returnedFields, excludedFields]
+        spatialFilter.field:
+          flag: --spatial-field
+          help: >
+            Geo-point field to filter on. Required with --bbox or --near; the OSDU
+            convention is data.SpatialLocation.Wgs84Coordinates.
+        spatialFilter.byBoundingBox:
+          flag: --bbox
+          type: double[]
+          parts:
+            - spatialFilter.byBoundingBox.topLeft.latitude
+            - spatialFilter.byBoundingBox.topLeft.longitude
+            - spatialFilter.byBoundingBox.bottomRight.latitude
+            - spatialFilter.byBoundingBox.bottomRight.longitude
+          help: >
+            Bounding box as TOPLAT,TOPLON,BOTTOMLAT,BOTTOMLON — note top-left first, so
+            the latitudes descend. Example: 49.1,7.7,48.8,8.0.
+        spatialFilter.byDistance.point:
+          flag: --near
+          type: double[]
+          parts:
+            - spatialFilter.byDistance.point.latitude
+            - spatialFilter.byDistance.point.longitude
+          help: 'Centre point as LAT,LON, e.g. 48.935251,7.865344. Pair with --within.'
+        spatialFilter.byDistance.distance:
+          flag: --within
+          type: double
+          help: Radius in metres around --near.
+    mutually-exclusive:
+      - [returnedFields, excludedFields]
+      - [spatialFilter.byBoundingBox, spatialFilter.byDistance.point]
     examples:
       - --kind "osdu:wks:master-data--Well:*" --limit 5
       - --kind "osdu:wks:master-data--Well:*" --limit 3 -x data.GeoContexts -x data.NameAliases
+      - args: --kind "osdu:wks:master-data--Well:*" --spatial-field data.SpatialLocation.Wgs84Coordinates --bbox 49.1,7.7,48.8,8.0 --limit 3 -f id -f data.FacilityName
+        skip: >
+          Geographic examples depend on where an instance holds data; this box covers
+          Alsace, which is populated on dev but need not be elsewhere.
+      - args: --kind "osdu:wks:master-data--Well:*" --spatial-field data.SpatialLocation.Wgs84Coordinates --near 48.935251,7.865344 --within 50000 --limit 3 -f id -f data.FacilityName
+        skip: >
+          As above — a radius around a point that has wells on dev.
       - --kind "osdu:wks:master-data--Well:*" --query 'data.FacilityName:GB*' --limit 5
       - --kind "osdu:wks:master-data--Well:*" --query 'data.FacilityName:"GB 211/23-A8"'
       - --kind "osdu:wks:master-data--Well:*" --limit 5 -f id -f data.FacilityName
