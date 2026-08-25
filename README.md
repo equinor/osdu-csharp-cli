@@ -186,6 +186,7 @@ anything fails, so it can gate a release.
 
 ```bash
 python3 -m pytest                        # test the generator
+UPDATE_GOLDEN=1 python3 -m pytest        # re-record emission goldens after a deliberate change
 python3 tools/generate_cli.py           # generate
 python3 tools/generate_cli.py --check   # CI gate: validate, write nothing
 cd src/OsduCli && dotnet build
