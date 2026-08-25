@@ -39,7 +39,14 @@ jobs:
         with:
           python-version: "3.13"
 
-      - run: pip install pyyaml
+      - run: pip install -r osdu-csharp-cli/requirements-dev.txt
+
+      # The generator enforces coverage, require-one-of, mutually-exclusive, parts arity and
+      # unknown manifest keys. All of that is Python, and none of it was covered by the C#
+      # suite that tests what it produces.
+      - name: Test the generator
+        working-directory: osdu-csharp-cli
+        run: python3 -m pytest
 
       # Fails when an upstream endpoint is neither mapped, hand-written nor excluded, so a
       # new OSDU endpoint surfaces here by name instead of silently going missing.

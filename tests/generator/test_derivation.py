@@ -1,0 +1,100 @@
+"""What the generator works out from the spec, rather than being told."""
+
+import pytest
+
+from generate_cli import (ManifestError, camel, csharp_type, derive_builder, pascal,
+                          resolve_field_schema, returns_value)
+
+
+class TestBuilderDerivation:
+    """Path to Kiota request-builder accessor."""
+
+    @pytest.mark.parametrize("path,expected", [
+        ("/info", "Info"),
+        ("/query/records", "Query.Records"),
+        ("/records/{id}", "Records[{id}]"),
+        ("/records/{id}/{version}", "Records[{id}][{version}]"),
+        ("/records/versions/{id}", "Records.Versions[{id}]"),
+        ("/ddms/v3/wellbores/{record_id}/versions", "Ddms.V3.Wellbores[{record_id}].Versions"),
+        ("/liveness_check", "Liveness_check"),
+    ])
+    def test_ordinary_paths_are_derived(self, path, expected):
+        assert derive_builder(path) == expected
+
+    def test_an_action_suffix_refuses_to_guess(self):
+        # Kiota renders `/records/{id}:delete` as a method, not an indexer. Guessing would
+        # emit something subtly wrong; the manifest states it with `builder:` instead.
+        with pytest.raises(ManifestError, match="builder"):
+            derive_builder("/records/{id}:delete")
+
+    def test_a_hyphenated_segment_refuses_to_guess(self):
+        with pytest.raises(ManifestError, match="cannot derive"):
+            derive_builder("/log-recognition")
+
+
+class TestTypeMapping:
+    """Kiota honours `format`, so the CLI has to as well."""
+
+    @pytest.mark.parametrize("schema,expected", [
+        ({"type": "string"}, "string"),
+        ({"type": "integer", "format": "int32"}, "int?"),
+        ({"type": "integer", "format": "int64"}, "long?"),
+        ({"type": "integer"}, "int?"),
+        ({"type": "boolean"}, "bool?"),
+        ({"type": "number", "format": "float"}, "float?"),
+        ({"type": "number"}, "double?"),
+        ({"type": "array", "items": {"type": "string"}}, "string[]"),
+    ])
+    def test_schema_maps_to_the_type_kiota_uses(self, schema, expected):
+        assert csharp_type(schema) == expected
+
+    def test_int64_is_not_int32(self):
+        # `/records/{id}/{version}` has an int64 version, and Kiota's indexer takes a long.
+        # Getting this wrong was a compile error, which is the point of generating C#.
+        assert csharp_type({"type": "integer", "format": "int64"}) == "long?"
+
+
+class TestResponseShape:
+    def test_a_2xx_with_content_returns_a_value(self):
+        assert returns_value({"responses": {"200": {"content": {"application/json": {}}}}})
+
+    def test_a_204_returns_nothing(self):
+        assert not returns_value({"responses": {"204": {"description": "No Content"}}})
+
+    def test_an_error_response_does_not_count(self):
+        assert not returns_value({"responses": {"400": {"content": {"application/json": {}}}}})
+
+
+class TestNestedFieldSchema:
+    """A dotted body field still has to find its schema, and its enum."""
+
+    SPEC = {"components": {"schemas": {
+        "SortQuery": {"properties": {
+            "order": {"type": "array", "items": {"enum": ["ASC", "DESC"]}}}}}}}
+    PROPERTIES = {"sort": {"$ref": "#/components/schemas/SortQuery"}}
+
+    def test_a_dotted_name_resolves_through_the_ref(self):
+        schema = resolve_field_schema(self.PROPERTIES, "sort.order", self.SPEC)
+        assert schema["items"]["enum"] == ["ASC", "DESC"]
+
+    def test_an_unknown_path_yields_nothing_rather_than_raising(self):
+        assert resolve_field_schema(self.PROPERTIES, "sort.nonsense", self.SPEC) == {}
+
+
+class TestIdentifierShaping:
+    @pytest.mark.parametrize("name,expected", [
+        ("record", "record"),
+        ("record_id", "recordId"),
+        ("unit-system", "unitSystem"),
+        ("sort order", "sortOrder"),
+    ])
+    def test_camel(self, name, expected):
+        assert camel(name) == expected
+
+    @pytest.mark.parametrize("name,expected", [
+        ("record", "Record"),
+        ("crs_catalog", "CrsCatalog"),
+        ("unit-system", "UnitSystem"),
+    ])
+    def test_pascal(self, name, expected):
+        assert pascal(name) == expected

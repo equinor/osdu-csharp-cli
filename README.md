@@ -185,6 +185,7 @@ anything fails, so it can gate a release.
 ## Running it
 
 ```bash
+python3 -m pytest                        # test the generator
 python3 tools/generate_cli.py           # generate
 python3 tools/generate_cli.py --check   # CI gate: validate, write nothing
 cd src/OsduCli && dotnet build
