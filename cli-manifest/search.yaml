@@ -12,7 +12,7 @@ client: Search
 description: Search service — full-text and structured queries across records.
 
 groups:
-  record: Work with records — the generic, kind-agnostic unit of OSDU data.
+  record: Work with records — the kind-agnostic unit of OSDU data. Search lives here.
 
 commands:
   # The one command most OSDU CLI users run. Its body is assembled from options rather than

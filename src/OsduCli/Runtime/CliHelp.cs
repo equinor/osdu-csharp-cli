@@ -211,11 +211,28 @@ public static class CliHelp
             .ThenBy(name => name, StringComparer.Ordinal));
     }
 
+    /// <summary>
+    /// Wraps to <paramref name="width"/>, honouring explicit line breaks in the text.
+    /// </summary>
+    /// <remarks>
+    /// Splitting on spaces alone leaves a <c>\n</c> embedded inside a "word", so it is
+    /// emitted mid-line and everything after it loses the caller's indent. Descriptions that
+    /// want a deliberate break — the root command explaining the noun-verb grammar — need
+    /// each line wrapped and indented separately.
+    /// </remarks>
     private static List<string> Wrap(string text, int width)
     {
         var lines = new List<string>();
         if (string.IsNullOrWhiteSpace(text))
             return lines;
+
+        var paragraphs = text.Split('\n');
+        if (paragraphs.Length > 1)
+        {
+            foreach (var paragraph in paragraphs)
+                lines.AddRange(Wrap(paragraph, width));
+            return lines;
+        }
 
         var line = new StringBuilder();
         foreach (var word in text.Split(' ', StringSplitOptions.RemoveEmptyEntries))

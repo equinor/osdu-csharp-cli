@@ -152,4 +152,17 @@ public class CliHelpTests
         Assert.True(CliHelp.WantsHelp(root.Parse("get -h")));
         Assert.False(CliHelp.WantsHelp(root.Parse("get")));
     }
+
+    [Fact]
+    public void ExplicitLineBreaksInADescriptionStayIndented()
+    {
+        // Wrapping on spaces alone left the \n inside a "word", so everything after it was
+        // emitted at column 0 and the Description block looked broken.
+        var command = new Command("get", "First line.\nSecond line.");
+
+        var lines = Render(command).Split(Environment.NewLine);
+        var second = lines.Single(l => l.Contains("Second line.", StringComparison.Ordinal));
+
+        Assert.StartsWith("  ", second);
+    }
 }

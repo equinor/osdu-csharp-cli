@@ -4,7 +4,10 @@ using Equinor.OsduCli.Commands.Generated;
 using Equinor.OsduCli.Runtime;
 using Equinor.OsduCsharpClient.Facade;
 
-var root = new RootCommand("osducs — command line for the OSDU platform.");
+var root = new RootCommand(
+    "osducs — command line for the OSDU platform.\n"
+    + "Commands are <resource> <verb>, so verbs live under the thing they act on: "
+    + "searching records is `osducs record search`. Run `osducs <resource> --help` to see them.");
 GlobalOptions.AddTo(root);
 CliHelp.Install(root);
 

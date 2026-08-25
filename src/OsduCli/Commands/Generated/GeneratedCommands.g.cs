@@ -25,7 +25,7 @@ public static class GeneratedCommands
         tree.Describe("file", "Work with files — upload and download bytes, and the metadata that describes them.");
         tree.Describe("legaltag", "Work with LegalTags — the compliance metadata attached to every record.");
         tree.Describe("schema", "Work with schemas — the definitions behind every record kind.");
-        tree.Describe("record", "Work with records — the generic, kind-agnostic unit of OSDU data.");
+        tree.Describe("record", "Work with records — the kind-agnostic unit of OSDU data. Search lives here.");
         tree.Describe("unit", "Work with units of measure — look them up and derive conversions between them.");
         tree.Describe("measurement", "Work with measurements — the quantities that units measure.");
         tree.Describe("unit-system", "Work with unit systems — named sets of preferred units.");
