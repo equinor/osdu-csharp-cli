@@ -611,7 +611,13 @@ def build_command(entry: dict, operation: dict, where: str, models_root: str,
                 required=bool(field_cfg.get("required", False)),
                 help=field_cfg.get("help", ""),
                 cs_type=field_cfg.get("type", "string"),
-                enum_values=[str(v) for v in (field_schema.get("enum") or [])],
+                # An array field carries its enum on `items`, not on the property. Missing
+                # that would silently drop the allowed values for exactly the fields most
+                # likely to have them — projections and filters are usually lists.
+                enum_values=[str(v) for v in (
+                    field_schema.get("enum")
+                    or (field_schema.get("items") or {}).get("enum")
+                    or [])],
             ))
 
         body = Body(
@@ -786,7 +792,14 @@ def emit_command(service: Service, command: Command) -> list[str]:
                 else:
                     # Omitted rather than null: OSDU services treat an explicit null as a
                     # value and reject it where they would happily accept a missing key.
-                    lines.append(f"            if ({bodyfield.var} is not null)")
+                    # An unsupplied array option arrives as an empty array rather than null,
+                    # so length is checked too — otherwise every request carried a spurious
+                    # `"attributes":[]`, which states "project nothing" as loudly as a real
+                    # projection would.
+                    guard = (f"{bodyfield.var} is {{ Length: > 0 }}"
+                             if bodyfield.is_collection
+                             else f"{bodyfield.var} is not null")
+                    lines.append(f"            if ({guard})")
                     lines.append(f"                bodyNode[{csharp_string(bodyfield.name)}] = "
                                  f"{assign};")
             lines.append("            var bodyJson = bodyNode.ToJsonString();")

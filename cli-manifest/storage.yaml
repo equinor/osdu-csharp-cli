@@ -55,6 +55,34 @@ commands:
         CreateUser: createUser
         CreateTime: createTime
 
+  # Added upstream 2026-08. Worth exposing where POST /query/records is not: it answers a
+  # question `record get` cannot — "what are these 500 records, without downloading them" —
+  # by omitting the data payload entirely. Reached for after `record search` hands back ids.
+  - command: record headers
+    summary: Fetch record headers by id, without the data payload.
+    op: { method: post, path: /query/records/headers }
+    body:
+      fields:
+        records:
+          flag: --id
+          short: -id
+          type: string[]
+          required: true
+          help: Record id. Repeat the flag for up to 1000 records.
+        attributes:
+          flag: --attributes
+          short: -a
+          type: string[]
+          help: Header fields to return. Omit for all of them; 'id' is always included.
+    output:
+      root: records
+      columns:
+        Id: id
+        Version: version
+        Kind: kind
+        CreateUser: createUser
+        CreateTime: createTime
+
   - command: record delete
     summary: Soft-delete a record by id.
     # `/records/{id}:delete` — Kiota renders a `:action` suffix as a method, not an indexer,
@@ -129,8 +157,3 @@ exclude:
     reason: Single-record merge patch; superseded by `record add` for CLI purposes.
   - op: { method: get, path: /liveness_check }
     reason: Infrastructure probe, covered by the `status` command across all services.
-  - op: { method: post, path: /query/records/headers }
-    reason: >
-      Body-based multi-id header fetch (added upstream 2026-08). Same family as
-      POST /query/records, which is excluded for the same reason: `record get` covers
-      the single-id case and the batch form has no CLI demand yet.

@@ -8,7 +8,10 @@
 // it cannot belongs in a partial class under Commands/Handwritten/ via the Customize hook.
 
 using System.CommandLine;
+using System.Text.Json.Nodes;
+using Microsoft.Kiota.Abstractions.Serialization;
 using Equinor.OsduCli.Runtime;
+using Equinor.OsduCsharpClient.Storage.Models;
 
 namespace Equinor.OsduCli.Commands.Generated;
 
@@ -20,6 +23,7 @@ public static partial class StorageCommands
     {
         tree.Node("record").Subcommands.Add(BuildRecordList());
         tree.Node("record").Subcommands.Add(BuildRecordGet());
+        tree.Node("record").Subcommands.Add(BuildRecordHeaders());
         tree.Node("record").Subcommands.Add(BuildRecordDelete());
         tree.Node("record version").Subcommands.Add(BuildRecordVersionList());
         tree.Node("record version").Subcommands.Add(BuildRecordVersionGet());
@@ -111,6 +115,50 @@ public static partial class StorageCommands
             return context.Output.Write(
                 await OsduJson.ToJsonAsync(result),
                 OutputSpec.Table(null, ("Id", "id"), ("Version", "version"), ("Kind", "kind"), ("CreateUser", "createUser"), ("CreateTime", "createTime")));
+        }, cancellationToken));
+
+        return command;
+    }
+
+    /// <summary>Fetch record headers by id, without the data payload.</summary>
+    /// <remarks>POST /query/records/headers on the Storage service.</remarks>
+    private static Command BuildRecordHeaders()
+    {
+        var recordsBodyOption = new Option<string[]>("--id", "-id")
+        {
+            Description = "Record id. Repeat the flag for up to 1000 records.",
+            Required = true,
+            AllowMultipleArgumentsPerToken = true,
+        };
+        var attributesBodyOption = new Option<string[]>("--attributes", "-a")
+        {
+            Description = "Header fields to return. Omit for all of them; 'id' is always included. One of: version, kind, acl, legal, ancestry, tags, createUser, createTime, modifyUser, modifyTime.",
+            AllowMultipleArgumentsPerToken = true,
+        };
+        attributesBodyOption.AcceptOnlyFromAmong("version", "kind", "acl", "legal", "ancestry", "tags", "createUser", "createTime", "modifyUser", "modifyTime");
+
+        var command = new Command("headers", "Fetch record headers by id, without the data payload.");
+        command.Options.Add(recordsBodyOption);
+        command.Options.Add(attributesBodyOption);
+
+        command.SetAction((parseResult, cancellationToken) =>
+            CliRunner.RunAsync(parseResult, async (context, cancellationToken) =>
+        {
+            var bodyNode = new JsonObject();
+            var recordsValue = parseResult.GetValue(recordsBodyOption)!;
+            bodyNode["records"] = new JsonArray(recordsValue.Select(item => (JsonNode)JsonValue.Create(item)!).ToArray());
+            var attributesValue = parseResult.GetValue(attributesBodyOption);
+            if (attributesValue is { Length: > 0 })
+                bodyNode["attributes"] = new JsonArray(attributesValue.Select(item => (JsonNode)JsonValue.Create(item)!).ToArray());
+            var bodyJson = bodyNode.ToJsonString();
+            var body = await KiotaJsonSerializer.DeserializeAsync<MultiRecordHeadersRequest>(
+                bodyJson, MultiRecordHeadersRequest.CreateFromDiscriminatorValue, cancellationToken);
+
+            var result = await context.Client.Storage.Query.Records.Headers.PostAsync(body, cancellationToken: cancellationToken);
+
+            return context.Output.Write(
+                await OsduJson.ToJsonAsync(result),
+                OutputSpec.Table("records", ("Id", "id"), ("Version", "version"), ("Kind", "kind"), ("CreateUser", "createUser"), ("CreateTime", "createTime")));
         }, cancellationToken));
 
         return command;
