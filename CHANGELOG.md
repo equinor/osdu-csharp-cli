@@ -1,5 +1,33 @@
 # Changelog
 
+## [0.3.0](https://github.com/equinor/osdu-csharp-cli/compare/v0.2.1...v0.3.0) (2026-08-26)
+
+
+### Features
+
+* add excluded-fields and reject it alongside returned-fields ([ff1ee46](https://github.com/equinor/osdu-csharp-cli/commit/ff1ee46b0da7e0a3b6e56a47363134e8de9f5b36))
+* add record aggregate for distinct-value counts from search ([8611406](https://github.com/equinor/osdu-csharp-cli/commit/861140648bf0f1d99574f806994c5f152ddc1bb3))
+* add record headers for the lightweight multi-id header fetch ([e3f33ab](https://github.com/equinor/osdu-csharp-cli/commit/e3f33abce2774867ffe8dc0b7ca2010e4b31ebb1))
+* add require-one-of so mutually-optional params fail before the network ([f0d5c6a](https://github.com/equinor/osdu-csharp-cli/commit/f0d5c6af1491b481e8d57b2e316a798602bf7bd9))
+* add sort and track-total-count to search, with nested body fields ([73b5fc7](https://github.com/equinor/osdu-csharp-cli/commit/73b5fc7a95567b5a62ecb7af3e8d8d9ecc28cc5c))
+* add spatial filtering to search with bbox and radius flags ([53891d1](https://github.com/equinor/osdu-csharp-cli/commit/53891d17fea9a2ec973c4ea794bffabc94e7903e))
+* default to the profile the Python CLI has selected ([9d88792](https://github.com/equinor/osdu-csharp-cli/commit/9d88792bf697e0510b466b940a6e008edec5a31f))
+* project search results with returned-fields and follow them as columns ([2ac19e0](https://github.com/equinor/osdu-csharp-cli/commit/2ac19e092c4586fd2d95e34a4c515b8b1996da39))
+* reject unknown manifest keys, and recover help text a YAML comma had eaten ([1eb7e0e](https://github.com/equinor/osdu-csharp-cli/commit/1eb7e0e7317dafe0e34e26d691569a8ee4076594))
+* show HTTP request and response detail under --debug ([6ce72a2](https://github.com/equinor/osdu-csharp-cli/commit/6ce72a2769f3288eb85b14eef06f8c8e74fd8109))
+
+
+### Bug Fixes
+
+* replace search examples that returned nothing against a real instance ([8831498](https://github.com/equinor/osdu-csharp-cli/commit/8831498da75cc6870ed70c2760030aaf11b54152))
+* signpost where search lives and keep line breaks indented in help ([b5f9edd](https://github.com/equinor/osdu-csharp-cli/commit/b5f9edd0814d969f32f175cfd79a8ea8a3661a56))
+
+
+### Dependencies
+
+* bump the client to 1.1.8 for the bodiless-request content type ([cbbe0b2](https://github.com/equinor/osdu-csharp-cli/commit/cbbe0b2dc3b9f91721b1f7d96fbc8ed6ca180b83))
+* bump the client to 1.1.9 so record reads return data ([885c66f](https://github.com/equinor/osdu-csharp-cli/commit/885c66f56524d808d6c9d2ef09385c7e3e5905d4))
+
 ## [0.2.1](https://github.com/equinor/osdu-csharp-cli/compare/v0.2.0...v0.2.1) (2026-08-24)
 
 
