@@ -669,6 +669,34 @@ specs means the CLI will always be able to express slightly more than the platfo
 answer. Worth saying plainly in the peer test instructions, or the first 404 will be reported
 as a defect.
 
+### `status` covered ten of twelve services
+
+The status table is hand-written — it fans out across services and must survive one of them
+being down, neither of which a manifest can express. But it was maintained by hand against a
+command surface that is generated, and it fell behind: manifests for **CRS Conversion** and
+**Wellbore DDMS** gained commands, no probes were added, and `status` went on reporting a
+clean estate while two reachable services were never checked. The failure mode is the bad one
+for this command — not a wrong answer, a confident one with a gap in it.
+
+Fixing it turned up three more things, none visible from reading the code:
+
+- **Wellbore DDMS has no `/info`.** It predates the convention and serves `/about`.
+- **CRS Conversion's spec declares only its three `convert` operations.** No `info` path, so
+  Kiota generates no builder for one. The running service answers it perfectly well — under
+  `v2/info` and `v3/info`, but **not** `v4/info`, even though every operation it exposes is
+  `v4`. The info endpoint is versioned independently of the API and lags it. This is the
+  seventh upstream spec defect; until it is fixed the probe goes through the request adapter
+  by hand, which is deliberately not offered as a general escape hatch.
+- **A service could rename itself in the output.** `ProbeAsync` merged the info payload over
+  the row, and Wellbore DDMS's `/about` carries its own `service` field holding a display
+  name. The table printed `Wellbore DDMS OSDU` — a row whose name `status <service>` would
+  then reject as unknown. A payload claiming `status: "ok"` would have been worse: a service
+  reporting its own health over ours. The row's own keys are now reserved.
+
+The durable fix is the test, not the two added lines: `tests/generator/test_status_coverage.py`
+asserts every manifest service is probed or explicitly exempted with a reason — the same
+bargain the manifest coverage gate strikes, applied to the one command that was outside it.
+
 ### Three client fixes, all found by running the thing
 
 None of these were visible from reading code; each needed a real request on a real service.
@@ -846,7 +874,8 @@ manifest.
 | Gates | pytest → manifests → generated-code staleness → command-reference staleness → build → tests → 3-platform publish |
 | Docs | usage, generated command reference, troubleshooting, command grammar |
 
-Upstream, six OSDU spec defects were filed from what this work turned up, and three client
+Upstream, six OSDU spec defects were filed (a seventh — CRS Conversion's missing `info`
+path — is pending) from what this work turned up, and three client
 fixes were contributed back.
 
 **The honest summary:** the design question — can a CLI's command surface be generated from

@@ -2,3 +2,7 @@ bin/
 obj/
 publish/
 .pytest_cache/
+
+# Python bytecode
+__pycache__/
+*.pyc

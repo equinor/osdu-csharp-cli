@@ -14,10 +14,13 @@ osducs status
 
 ```
 https://equinorswedev.energy.azure.com  partition dev
-Service       Status  Version          Build
-------------  ------  ---------------  ------------------------
-crs-catalog   ok      0.29.2-SNAPSHOT  2026-08-05T09:49:35.371Z
-storage       ok      0.29.4-SNAPSHOT  2026-08-05T19:04:12.267Z
+Service         Status  Version          Build
+--------------  ------  ---------------  ------------------------
+crs-catalog     ok      0.29.2-SNAPSHOT  2026-08-05T09:49:35.371Z
+crs-conversion  ok      0.29.2-SNAPSHOT  2026-08-05T09:49:28.770Z
+storage         ok      0.29.4-SNAPSHOT  2026-08-05T19:04:12.267Z
+wellbore-ddms   ok      0.29
+...            (12 services in all)
 ```
 
 That first line is deliberate: with a default profile in play, which environment you are
