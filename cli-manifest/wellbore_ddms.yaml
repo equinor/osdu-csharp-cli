@@ -1,27 +1,107 @@
 # CLI manifest for the Wellbore DDMS service.
 #
-# Wellbore DDMS is the largest spec in the estate (84 operations). Triaging all 84 at once is
-# not useful, so this manifest declares a `scope`: the generator enforces full coverage
-# inside it and reports everything outside it as untriaged rather than failing. Widening the
-# scope one prefix at a time is how a service gets adopted.
+# Scope: every typed record resource, none of the bulk data. The nine resource types share
+# one shape — create, get, soft-delete, list versions, get a version — so this manifest is
+# nine copies of five commands, and the regularity is the point: a user who learns
+# `welllog get` already knows `trajectory get`.
 #
-# Note on priority: Wellbore DDMS was a late addition to the Python CLI and is not part of
-# its core command set. This manifest exists to exercise the `scope:` mechanism. The core
-# services — entitlements, workflow, search, schema — come first.
+# What is deliberately outside the scope, and why:
+#
+#   * The 35 bulk data and session operations (`/data`, `/data/statistics`, `/sessions/*`).
+#     Bulk IO is what a DDMS is for, but it is a different piece of work, not more of this
+#     one: chunked upload is a multi-step session protocol, the payloads are columnar rather
+#     than JSON records, and `--output table` is meaningless for a log curve. They are listed
+#     individually under `exclude:` rather than left out of `scope:`, so that a new bulk
+#     endpoint upstream fails the build as `missing` instead of passing as untriaged.
+#
+#   * `/about` and `/version` — service identity, which R5 puts in `osducs status`.
+#
+#   * `/log-recognition/*` — a catalog admin surface, not a record resource.
+#
+# One parameter is knowingly not exposed: `DELETE` on the four bulk-carrying types
+# (welllogs, wellboretrajectories, ppfgdataset, wellpressuretestrawmeasurement) accepts a
+# `purge` query flag, default false, which the spec documents with an empty description. The
+# delete commands here are all soft deletes. Adding an irreversible flag whose exact effect
+# the spec does not state — and which no confirmation guard would cover, R6 not being
+# implemented yet — is not something to do by inference from its name.
 
 service: wellbore_ddms
 spec: wellbore_ddms
 client: WellboreDdms
 description: Wellbore DDMS — typed wellbore records.
 
+# Every typed resource under /ddms/v3. The bulk operations inside these prefixes are claimed
+# by `exclude:` below, not left unscoped.
+scope:
+  - "/ddms/v3/*"
+
 groups:
+  well: Manage Well records in the Wellbore DDMS.
+  well version: Inspect Well record version history.
   wellbore: Manage Wellbore records in the Wellbore DDMS.
   wellbore version: Inspect Wellbore record version history.
-
-scope:
-  - "/ddms/v3/wellbores*"
+  welllog: Manage WellLog records in the Wellbore DDMS.
+  welllog version: Inspect WellLog record version history.
+  trajectory: Manage WellboreTrajectory records in the Wellbore DDMS.
+  trajectory version: Inspect WellboreTrajectory record version history.
+  markerset: Manage WellboreMarkerSet records in the Wellbore DDMS.
+  markerset version: Inspect WellboreMarkerSet record version history.
+  intervalset: Manage WellboreIntervalSet records in the Wellbore DDMS.
+  intervalset version: Inspect WellboreIntervalSet record version history.
+  logacquisition: Manage WellLogAcquisition records in the Wellbore DDMS.
+  logacquisition version: Inspect WellLogAcquisition record version history.
+  ppfg: Manage PPFGDataset records in the Wellbore DDMS.
+  ppfg version: Inspect PPFGDataset record version history.
+  pressuretest: Manage WellPressureTestRawMeasurement records in the Wellbore DDMS.
+  pressuretest version: Inspect WellPressureTestRawMeasurement record version history.
 
 commands:
+
+  # ---- Well ----------------------------------------------------------------
+  - command: well get
+    summary: Get a Well record by id.
+    op: { method: get, path: "/ddms/v3/wells/{record_id}" }
+    params:
+      record_id: { flag: --id, short: -id, required: true, help: Well record id. }
+    output: raw
+
+  - command: well add
+    summary: Add a Well record from a JSON file.
+    op: { method: post, path: "/ddms/v3/wells" }
+    body:
+      flag: --file
+      short: -f
+      required: true
+      help: JSON file containing the Well record.
+      # The endpoint takes an array; users pass a single record file.
+      wrap-single: true
+    output:
+      root: recordIds
+
+  - command: well delete
+    summary: Soft-delete a Well record by id.
+    op: { method: delete, path: "/ddms/v3/wells/{record_id}" }
+    params:
+      record_id: { flag: --id, short: -id, required: true, help: Well record id to delete. }
+    output:
+      message: 1 record deleted
+
+  - command: well version list
+    summary: List all versions of a Well record.
+    op: { method: get, path: "/ddms/v3/wells/{record_id}/versions" }
+    params:
+      record_id: { flag: --id, short: -id, required: true, help: Well record id. }
+    output: raw
+
+  - command: well version get
+    summary: Get a specific version of a Well record.
+    op: { method: get, path: "/ddms/v3/wells/{record_id}/versions/{version}" }
+    params:
+      record_id: { flag: --id, short: -id, required: true, help: Well record id. }
+      version:   { flag: --version, short: -v, required: true, help: Well record version. }
+    output: raw
+
+  # ---- Wellbore ----------------------------------------------------------------
   - command: wellbore get
     summary: Get a Wellbore record by id.
     op: { method: get, path: "/ddms/v3/wellbores/{record_id}" }
@@ -37,8 +117,7 @@ commands:
       short: -f
       required: true
       help: JSON file containing the Wellbore record.
-      # The endpoint takes an array; users pass a single record file. The Python CLI wraps
-      # it the same way in `wellbore add`.
+      # The endpoint takes an array; users pass a single record file.
       wrap-single: true
     output:
       root: recordIds
@@ -66,6 +145,384 @@ commands:
       version:   { flag: --version, short: -v, required: true, help: Wellbore record version. }
     output: raw
 
+  # ---- WellLog ----------------------------------------------------------------
+  - command: welllog get
+    summary: Get a WellLog record by id.
+    op: { method: get, path: "/ddms/v3/welllogs/{record_id}" }
+    params:
+      record_id: { flag: --id, short: -id, required: true, help: WellLog record id. }
+    output: raw
+
+  - command: welllog add
+    summary: Add a WellLog record from a JSON file.
+    op: { method: post, path: "/ddms/v3/welllogs" }
+    body:
+      flag: --file
+      short: -f
+      required: true
+      help: JSON file containing the WellLog record.
+      # The endpoint takes an array; users pass a single record file.
+      wrap-single: true
+    output:
+      root: recordIds
+
+  - command: welllog delete
+    summary: Soft-delete a WellLog record by id.
+    op: { method: delete, path: "/ddms/v3/welllogs/{record_id}" }
+    params:
+      record_id: { flag: --id, short: -id, required: true, help: WellLog record id to delete. }
+    output:
+      message: 1 record deleted
+
+  - command: welllog version list
+    summary: List all versions of a WellLog record.
+    op: { method: get, path: "/ddms/v3/welllogs/{record_id}/versions" }
+    params:
+      record_id: { flag: --id, short: -id, required: true, help: WellLog record id. }
+    output: raw
+
+  - command: welllog version get
+    summary: Get a specific version of a WellLog record.
+    op: { method: get, path: "/ddms/v3/welllogs/{record_id}/versions/{version}" }
+    params:
+      record_id: { flag: --id, short: -id, required: true, help: WellLog record id. }
+      version:   { flag: --version, short: -v, required: true, help: WellLog record version. }
+    output: raw
+
+  # ---- WellboreTrajectory ----------------------------------------------------------------
+  - command: trajectory get
+    summary: Get a WellboreTrajectory record by id.
+    op: { method: get, path: "/ddms/v3/wellboretrajectories/{record_id}" }
+    params:
+      record_id: { flag: --id, short: -id, required: true, help: WellboreTrajectory record id. }
+    output: raw
+
+  - command: trajectory add
+    summary: Add a WellboreTrajectory record from a JSON file.
+    op: { method: post, path: "/ddms/v3/wellboretrajectories" }
+    body:
+      flag: --file
+      short: -f
+      required: true
+      help: JSON file containing the WellboreTrajectory record.
+      # The endpoint takes an array; users pass a single record file.
+      wrap-single: true
+    output:
+      root: recordIds
+
+  - command: trajectory delete
+    summary: Soft-delete a WellboreTrajectory record by id.
+    op: { method: delete, path: "/ddms/v3/wellboretrajectories/{record_id}" }
+    params:
+      record_id: { flag: --id, short: -id, required: true, help: WellboreTrajectory record id to delete. }
+    output:
+      message: 1 record deleted
+
+  - command: trajectory version list
+    summary: List all versions of a WellboreTrajectory record.
+    op: { method: get, path: "/ddms/v3/wellboretrajectories/{record_id}/versions" }
+    params:
+      record_id: { flag: --id, short: -id, required: true, help: WellboreTrajectory record id. }
+    output: raw
+
+  - command: trajectory version get
+    summary: Get a specific version of a WellboreTrajectory record.
+    op: { method: get, path: "/ddms/v3/wellboretrajectories/{record_id}/versions/{version}" }
+    params:
+      record_id: { flag: --id, short: -id, required: true, help: WellboreTrajectory record id. }
+      version:   { flag: --version, short: -v, required: true, help: WellboreTrajectory record version. }
+    output: raw
+
+  # ---- WellboreMarkerSet ----------------------------------------------------------------
+  - command: markerset get
+    summary: Get a WellboreMarkerSet record by id.
+    op: { method: get, path: "/ddms/v3/wellboremarkersets/{record_id}" }
+    params:
+      record_id: { flag: --id, short: -id, required: true, help: WellboreMarkerSet record id. }
+    output: raw
+
+  - command: markerset add
+    summary: Add a WellboreMarkerSet record from a JSON file.
+    op: { method: post, path: "/ddms/v3/wellboremarkersets" }
+    body:
+      flag: --file
+      short: -f
+      required: true
+      help: JSON file containing the WellboreMarkerSet record.
+      # The endpoint takes an array; users pass a single record file.
+      wrap-single: true
+    output:
+      root: recordIds
+
+  - command: markerset delete
+    summary: Soft-delete a WellboreMarkerSet record by id.
+    op: { method: delete, path: "/ddms/v3/wellboremarkersets/{record_id}" }
+    params:
+      record_id: { flag: --id, short: -id, required: true, help: WellboreMarkerSet record id to delete. }
+    output:
+      message: 1 record deleted
+
+  - command: markerset version list
+    summary: List all versions of a WellboreMarkerSet record.
+    op: { method: get, path: "/ddms/v3/wellboremarkersets/{record_id}/versions" }
+    params:
+      record_id: { flag: --id, short: -id, required: true, help: WellboreMarkerSet record id. }
+    output: raw
+
+  - command: markerset version get
+    summary: Get a specific version of a WellboreMarkerSet record.
+    op: { method: get, path: "/ddms/v3/wellboremarkersets/{record_id}/versions/{version}" }
+    params:
+      record_id: { flag: --id, short: -id, required: true, help: WellboreMarkerSet record id. }
+      version:   { flag: --version, short: -v, required: true, help: WellboreMarkerSet record version. }
+    output: raw
+
+  # ---- WellboreIntervalSet ----------------------------------------------------------------
+  - command: intervalset get
+    summary: Get a WellboreIntervalSet record by id.
+    op: { method: get, path: "/ddms/v3/wellboreintervalsets/{record_id}" }
+    params:
+      record_id: { flag: --id, short: -id, required: true, help: WellboreIntervalSet record id. }
+    output: raw
+
+  - command: intervalset add
+    summary: Add a WellboreIntervalSet record from a JSON file.
+    op: { method: post, path: "/ddms/v3/wellboreintervalsets" }
+    body:
+      flag: --file
+      short: -f
+      required: true
+      help: JSON file containing the WellboreIntervalSet record.
+      # The endpoint takes an array; users pass a single record file.
+      wrap-single: true
+    output:
+      root: recordIds
+
+  - command: intervalset delete
+    summary: Soft-delete a WellboreIntervalSet record by id.
+    op: { method: delete, path: "/ddms/v3/wellboreintervalsets/{record_id}" }
+    params:
+      record_id: { flag: --id, short: -id, required: true, help: WellboreIntervalSet record id to delete. }
+    output:
+      message: 1 record deleted
+
+  - command: intervalset version list
+    summary: List all versions of a WellboreIntervalSet record.
+    op: { method: get, path: "/ddms/v3/wellboreintervalsets/{record_id}/versions" }
+    params:
+      record_id: { flag: --id, short: -id, required: true, help: WellboreIntervalSet record id. }
+    output: raw
+
+  - command: intervalset version get
+    summary: Get a specific version of a WellboreIntervalSet record.
+    op: { method: get, path: "/ddms/v3/wellboreintervalsets/{record_id}/versions/{version}" }
+    params:
+      record_id: { flag: --id, short: -id, required: true, help: WellboreIntervalSet record id. }
+      version:   { flag: --version, short: -v, required: true, help: WellboreIntervalSet record version. }
+    output: raw
+
+  # ---- WellLogAcquisition ----------------------------------------------------------------
+  - command: logacquisition get
+    summary: Get a WellLogAcquisition record by id.
+    op: { method: get, path: "/ddms/v3/welllogacquisition/{record_id}" }
+    params:
+      record_id: { flag: --id, short: -id, required: true, help: WellLogAcquisition record id. }
+    output: raw
+
+  - command: logacquisition add
+    summary: Add a WellLogAcquisition record from a JSON file.
+    op: { method: post, path: "/ddms/v3/welllogacquisition" }
+    body:
+      flag: --file
+      short: -f
+      required: true
+      help: JSON file containing the WellLogAcquisition record.
+      # The endpoint takes an array; users pass a single record file.
+      wrap-single: true
+    output:
+      root: recordIds
+
+  - command: logacquisition delete
+    summary: Soft-delete a WellLogAcquisition record by id.
+    op: { method: delete, path: "/ddms/v3/welllogacquisition/{record_id}" }
+    params:
+      record_id: { flag: --id, short: -id, required: true, help: WellLogAcquisition record id to delete. }
+    output:
+      message: 1 record deleted
+
+  - command: logacquisition version list
+    summary: List all versions of a WellLogAcquisition record.
+    op: { method: get, path: "/ddms/v3/welllogacquisition/{record_id}/versions" }
+    params:
+      record_id: { flag: --id, short: -id, required: true, help: WellLogAcquisition record id. }
+    output: raw
+
+  - command: logacquisition version get
+    summary: Get a specific version of a WellLogAcquisition record.
+    op: { method: get, path: "/ddms/v3/welllogacquisition/{record_id}/versions/{version}" }
+    params:
+      record_id: { flag: --id, short: -id, required: true, help: WellLogAcquisition record id. }
+      version:   { flag: --version, short: -v, required: true, help: WellLogAcquisition record version. }
+    output: raw
+
+  # ---- PPFGDataset ----------------------------------------------------------------
+  - command: ppfg get
+    summary: Get a PPFGDataset record by id.
+    op: { method: get, path: "/ddms/v3/ppfgdataset/{record_id}" }
+    params:
+      record_id: { flag: --id, short: -id, required: true, help: PPFGDataset record id. }
+    output: raw
+
+  - command: ppfg add
+    summary: Add a PPFGDataset record from a JSON file.
+    op: { method: post, path: "/ddms/v3/ppfgdataset" }
+    body:
+      flag: --file
+      short: -f
+      required: true
+      help: JSON file containing the PPFGDataset record.
+      # The endpoint takes an array; users pass a single record file.
+      wrap-single: true
+    output:
+      root: recordIds
+
+  - command: ppfg delete
+    summary: Soft-delete a PPFGDataset record by id.
+    op: { method: delete, path: "/ddms/v3/ppfgdataset/{record_id}" }
+    params:
+      record_id: { flag: --id, short: -id, required: true, help: PPFGDataset record id to delete. }
+    output:
+      message: 1 record deleted
+
+  - command: ppfg version list
+    summary: List all versions of a PPFGDataset record.
+    op: { method: get, path: "/ddms/v3/ppfgdataset/{record_id}/versions" }
+    params:
+      record_id: { flag: --id, short: -id, required: true, help: PPFGDataset record id. }
+    output: raw
+
+  - command: ppfg version get
+    summary: Get a specific version of a PPFGDataset record.
+    op: { method: get, path: "/ddms/v3/ppfgdataset/{record_id}/versions/{version}" }
+    params:
+      record_id: { flag: --id, short: -id, required: true, help: PPFGDataset record id. }
+      version:   { flag: --version, short: -v, required: true, help: PPFGDataset record version. }
+    output: raw
+
+  # ---- WellPressureTestRawMeasurement ----------------------------------------------------------------
+  - command: pressuretest get
+    summary: Get a WellPressureTestRawMeasurement record by id.
+    op: { method: get, path: "/ddms/v3/wellpressuretestrawmeasurement/{record_id}" }
+    params:
+      record_id: { flag: --id, short: -id, required: true, help: WellPressureTestRawMeasurement record id. }
+    output: raw
+
+  - command: pressuretest add
+    summary: Add a WellPressureTestRawMeasurement record from a JSON file.
+    op: { method: post, path: "/ddms/v3/wellpressuretestrawmeasurement" }
+    body:
+      flag: --file
+      short: -f
+      required: true
+      help: JSON file containing the WellPressureTestRawMeasurement record.
+      # The endpoint takes an array; users pass a single record file.
+      wrap-single: true
+    output:
+      root: recordIds
+
+  - command: pressuretest delete
+    summary: Soft-delete a WellPressureTestRawMeasurement record by id.
+    op: { method: delete, path: "/ddms/v3/wellpressuretestrawmeasurement/{record_id}" }
+    params:
+      record_id: { flag: --id, short: -id, required: true, help: WellPressureTestRawMeasurement record id to delete. }
+    output:
+      message: 1 record deleted
+
+  - command: pressuretest version list
+    summary: List all versions of a WellPressureTestRawMeasurement record.
+    op: { method: get, path: "/ddms/v3/wellpressuretestrawmeasurement/{record_id}/versions" }
+    params:
+      record_id: { flag: --id, short: -id, required: true, help: WellPressureTestRawMeasurement record id. }
+    output: raw
+
+  - command: pressuretest version get
+    summary: Get a specific version of a WellPressureTestRawMeasurement record.
+    op: { method: get, path: "/ddms/v3/wellpressuretestrawmeasurement/{record_id}/versions/{version}" }
+    params:
+      record_id: { flag: --id, short: -id, required: true, help: WellPressureTestRawMeasurement record id. }
+      version:   { flag: --version, short: -v, required: true, help: WellPressureTestRawMeasurement record version. }
+    output: raw
+
 handwritten: []
 
-exclude: []
+exclude:
+  - op: { method: get, path: "/ddms/v3/ppfgdataset/{record_id}/data" }
+    reason: Bulk data read/write; columnar payloads that no table output can render.
+  - op: { method: post, path: "/ddms/v3/ppfgdataset/{record_id}/data" }
+    reason: Bulk data read/write; columnar payloads that no table output can render.
+  - op: { method: get, path: "/ddms/v3/ppfgdataset/{record_id}/sessions" }
+    reason: Bulk upload session lifecycle; excluded with the rest of bulk IO.
+  - op: { method: post, path: "/ddms/v3/ppfgdataset/{record_id}/sessions" }
+    reason: Bulk upload session lifecycle; excluded with the rest of bulk IO.
+  - op: { method: get, path: "/ddms/v3/ppfgdataset/{record_id}/sessions/{session_id}" }
+    reason: Bulk upload session lifecycle; excluded with the rest of bulk IO.
+  - op: { method: patch, path: "/ddms/v3/ppfgdataset/{record_id}/sessions/{session_id}" }
+    reason: Bulk upload session lifecycle; excluded with the rest of bulk IO.
+  - op: { method: post, path: "/ddms/v3/ppfgdataset/{record_id}/sessions/{session_id}/data" }
+    reason: Chunked bulk upload; a multi-step session protocol, not a single call.
+  - op: { method: get, path: "/ddms/v3/ppfgdataset/{record_id}/versions/{version}/data" }
+    reason: Bulk data for a specific record version; excluded with the rest of bulk IO.
+  - op: { method: get, path: "/ddms/v3/wellboretrajectories/{record_id}/data" }
+    reason: Bulk data read/write; columnar payloads that no table output can render.
+  - op: { method: post, path: "/ddms/v3/wellboretrajectories/{record_id}/data" }
+    reason: Bulk data read/write; columnar payloads that no table output can render.
+  - op: { method: get, path: "/ddms/v3/wellboretrajectories/{record_id}/sessions" }
+    reason: Bulk upload session lifecycle; excluded with the rest of bulk IO.
+  - op: { method: post, path: "/ddms/v3/wellboretrajectories/{record_id}/sessions" }
+    reason: Bulk upload session lifecycle; excluded with the rest of bulk IO.
+  - op: { method: get, path: "/ddms/v3/wellboretrajectories/{record_id}/sessions/{session_id}" }
+    reason: Bulk upload session lifecycle; excluded with the rest of bulk IO.
+  - op: { method: patch, path: "/ddms/v3/wellboretrajectories/{record_id}/sessions/{session_id}" }
+    reason: Bulk upload session lifecycle; excluded with the rest of bulk IO.
+  - op: { method: post, path: "/ddms/v3/wellboretrajectories/{record_id}/sessions/{session_id}/data" }
+    reason: Chunked bulk upload; a multi-step session protocol, not a single call.
+  - op: { method: get, path: "/ddms/v3/wellboretrajectories/{record_id}/versions/{version}/data" }
+    reason: Bulk data for a specific record version; excluded with the rest of bulk IO.
+  - op: { method: get, path: "/ddms/v3/welllogs/{record_id}/data" }
+    reason: Bulk data read/write; columnar payloads that no table output can render.
+  - op: { method: post, path: "/ddms/v3/welllogs/{record_id}/data" }
+    reason: Bulk data read/write; columnar payloads that no table output can render.
+  - op: { method: get, path: "/ddms/v3/welllogs/{record_id}/data/statistics" }
+    reason: Bulk curve statistics; belongs with the bulk data work.
+  - op: { method: get, path: "/ddms/v3/welllogs/{record_id}/sessions" }
+    reason: Bulk upload session lifecycle; excluded with the rest of bulk IO.
+  - op: { method: post, path: "/ddms/v3/welllogs/{record_id}/sessions" }
+    reason: Bulk upload session lifecycle; excluded with the rest of bulk IO.
+  - op: { method: get, path: "/ddms/v3/welllogs/{record_id}/sessions/{session_id}" }
+    reason: Bulk upload session lifecycle; excluded with the rest of bulk IO.
+  - op: { method: patch, path: "/ddms/v3/welllogs/{record_id}/sessions/{session_id}" }
+    reason: Bulk upload session lifecycle; excluded with the rest of bulk IO.
+  - op: { method: post, path: "/ddms/v3/welllogs/{record_id}/sessions/{session_id}/data" }
+    reason: Chunked bulk upload; a multi-step session protocol, not a single call.
+  - op: { method: get, path: "/ddms/v3/welllogs/{record_id}/versions/{version}/data" }
+    reason: Bulk data for a specific record version; excluded with the rest of bulk IO.
+  - op: { method: get, path: "/ddms/v3/welllogs/{record_id}/versions/{version}/data/statistics" }
+    reason: Bulk curve statistics; belongs with the bulk data work.
+  - op: { method: post, path: "/ddms/v3/welllogs/{record_id}/versions/{version}/data/statistics" }
+    reason: Bulk curve statistics; belongs with the bulk data work.
+  - op: { method: get, path: "/ddms/v3/wellpressuretestrawmeasurement/{record_id}/data" }
+    reason: Bulk data read/write; columnar payloads that no table output can render.
+  - op: { method: post, path: "/ddms/v3/wellpressuretestrawmeasurement/{record_id}/data" }
+    reason: Bulk data read/write; columnar payloads that no table output can render.
+  - op: { method: get, path: "/ddms/v3/wellpressuretestrawmeasurement/{record_id}/sessions" }
+    reason: Bulk upload session lifecycle; excluded with the rest of bulk IO.
+  - op: { method: post, path: "/ddms/v3/wellpressuretestrawmeasurement/{record_id}/sessions" }
+    reason: Bulk upload session lifecycle; excluded with the rest of bulk IO.
+  - op: { method: get, path: "/ddms/v3/wellpressuretestrawmeasurement/{record_id}/sessions/{session_id}" }
+    reason: Bulk upload session lifecycle; excluded with the rest of bulk IO.
+  - op: { method: patch, path: "/ddms/v3/wellpressuretestrawmeasurement/{record_id}/sessions/{session_id}" }
+    reason: Bulk upload session lifecycle; excluded with the rest of bulk IO.
+  - op: { method: post, path: "/ddms/v3/wellpressuretestrawmeasurement/{record_id}/sessions/{session_id}/data" }
+    reason: Chunked bulk upload; a multi-step session protocol, not a single call.
+  - op: { method: get, path: "/ddms/v3/wellpressuretestrawmeasurement/{record_id}/versions/{version}/data" }
+    reason: Bulk data for a specific record version; excluded with the rest of bulk IO.

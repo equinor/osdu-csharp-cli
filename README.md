@@ -208,8 +208,9 @@ Expects `osdu-csharp-client` checked out as a sibling directory.
 
 ## Status
 
-Proof of concept, now covering every core service the Python CLI covers except Wellbore
-DDMS: **79 generated commands across 12 services**, plus the hand-written `osducs status`.
+Proof of concept, covering every core service the Python CLI covers, plus the record surface
+of Wellbore DDMS: **121 generated commands across 12 services**, plus the hand-written
+`osducs status`.
 
 | Noun | Fed by |
 | --- | --- |
@@ -222,7 +223,7 @@ DDMS: **79 generated commands across 12 services**, plus the hand-written `osduc
 | `crs` | crs_catalog, crs_conversion |
 | `unit`, `measurement`, `unit-system` | unit v3 |
 | `workflow` | workflow |
-| `wellbore` | wellbore_ddms (5 of 84 operations — scope-limited) |
+| `well`, `wellbore`, `welllog`, `trajectory`, `markerset`, `intervalset`, `logacquisition`, `ppfg`, `pressuretest` | wellbore_ddms (45 of 84 operations — every record type, no bulk data) |
 
 Two nouns are assembled from more than one service (`record`, `crs`) and one service supplies
 several nouns (entitlements, unit). That mapping is the whole point of the resource-first

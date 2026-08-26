@@ -20,11 +20,51 @@ public static partial class WellboreDdmsCommands
     /// <summary>Attaches this service's commands to the global tree.</summary>
     public static void Attach(CommandTree tree)
     {
+        tree.Node("well").Subcommands.Add(BuildWellGet());
+        tree.Node("well").Subcommands.Add(BuildWellAdd());
+        tree.Node("well").Subcommands.Add(BuildWellDelete());
+        tree.Node("well version").Subcommands.Add(BuildWellVersionList());
+        tree.Node("well version").Subcommands.Add(BuildWellVersionGet());
         tree.Node("wellbore").Subcommands.Add(BuildWellboreGet());
         tree.Node("wellbore").Subcommands.Add(BuildWellboreAdd());
         tree.Node("wellbore").Subcommands.Add(BuildWellboreDelete());
         tree.Node("wellbore version").Subcommands.Add(BuildWellboreVersionList());
         tree.Node("wellbore version").Subcommands.Add(BuildWellboreVersionGet());
+        tree.Node("welllog").Subcommands.Add(BuildWelllogGet());
+        tree.Node("welllog").Subcommands.Add(BuildWelllogAdd());
+        tree.Node("welllog").Subcommands.Add(BuildWelllogDelete());
+        tree.Node("welllog version").Subcommands.Add(BuildWelllogVersionList());
+        tree.Node("welllog version").Subcommands.Add(BuildWelllogVersionGet());
+        tree.Node("trajectory").Subcommands.Add(BuildTrajectoryGet());
+        tree.Node("trajectory").Subcommands.Add(BuildTrajectoryAdd());
+        tree.Node("trajectory").Subcommands.Add(BuildTrajectoryDelete());
+        tree.Node("trajectory version").Subcommands.Add(BuildTrajectoryVersionList());
+        tree.Node("trajectory version").Subcommands.Add(BuildTrajectoryVersionGet());
+        tree.Node("markerset").Subcommands.Add(BuildMarkersetGet());
+        tree.Node("markerset").Subcommands.Add(BuildMarkersetAdd());
+        tree.Node("markerset").Subcommands.Add(BuildMarkersetDelete());
+        tree.Node("markerset version").Subcommands.Add(BuildMarkersetVersionList());
+        tree.Node("markerset version").Subcommands.Add(BuildMarkersetVersionGet());
+        tree.Node("intervalset").Subcommands.Add(BuildIntervalsetGet());
+        tree.Node("intervalset").Subcommands.Add(BuildIntervalsetAdd());
+        tree.Node("intervalset").Subcommands.Add(BuildIntervalsetDelete());
+        tree.Node("intervalset version").Subcommands.Add(BuildIntervalsetVersionList());
+        tree.Node("intervalset version").Subcommands.Add(BuildIntervalsetVersionGet());
+        tree.Node("logacquisition").Subcommands.Add(BuildLogacquisitionGet());
+        tree.Node("logacquisition").Subcommands.Add(BuildLogacquisitionAdd());
+        tree.Node("logacquisition").Subcommands.Add(BuildLogacquisitionDelete());
+        tree.Node("logacquisition version").Subcommands.Add(BuildLogacquisitionVersionList());
+        tree.Node("logacquisition version").Subcommands.Add(BuildLogacquisitionVersionGet());
+        tree.Node("ppfg").Subcommands.Add(BuildPpfgGet());
+        tree.Node("ppfg").Subcommands.Add(BuildPpfgAdd());
+        tree.Node("ppfg").Subcommands.Add(BuildPpfgDelete());
+        tree.Node("ppfg version").Subcommands.Add(BuildPpfgVersionList());
+        tree.Node("ppfg version").Subcommands.Add(BuildPpfgVersionGet());
+        tree.Node("pressuretest").Subcommands.Add(BuildPressuretestGet());
+        tree.Node("pressuretest").Subcommands.Add(BuildPressuretestAdd());
+        tree.Node("pressuretest").Subcommands.Add(BuildPressuretestDelete());
+        tree.Node("pressuretest version").Subcommands.Add(BuildPressuretestVersionList());
+        tree.Node("pressuretest version").Subcommands.Add(BuildPressuretestVersionGet());
 
         Customize(tree);
     }
@@ -34,6 +74,153 @@ public static partial class WellboreDdmsCommands
     /// express, or to adjust generated ones. No-op when nothing implements it.
     /// </summary>
     static partial void Customize(CommandTree tree);
+
+    /// <summary>Get a Well record by id.</summary>
+    /// <remarks>GET /ddms/v3/wells/{record_id} on the WellboreDdms service.</remarks>
+    private static Command BuildWellGet()
+    {
+        var recordIdOption = new Option<string>("--id", "-id")
+        {
+            Description = "Well record id.",
+            Required = true,
+        };
+
+        var command = new Command("get", "Get a Well record by id.");
+        command.Options.Add(recordIdOption);
+
+        command.SetAction((parseResult, cancellationToken) =>
+            CliRunner.RunAsync(parseResult, async (context, cancellationToken) =>
+        {
+            var recordId = parseResult.GetValue(recordIdOption)!;
+
+            var result = await context.Client.WellboreDdms.Ddms.V3.Wells[recordId].GetAsync(cancellationToken: cancellationToken);
+
+            return context.Output.Write(
+                await OsduJson.ToJsonAsync(result),
+                OutputSpec.Raw);
+        }, cancellationToken));
+
+        return command;
+    }
+
+    /// <summary>Add a Well record from a JSON file.</summary>
+    /// <remarks>POST /ddms/v3/wells on the WellboreDdms service.</remarks>
+    private static Command BuildWellAdd()
+    {
+        var fileOption = new Option<string>("--file", "-f")
+        {
+            Description = "JSON file containing the Well record.",
+            Required = true,
+        };
+
+        var command = new Command("add", "Add a Well record from a JSON file.");
+        command.Options.Add(fileOption);
+
+        command.SetAction((parseResult, cancellationToken) =>
+            CliRunner.RunAsync(parseResult, async (context, cancellationToken) =>
+        {
+            var bodyJson = CliContext.WrapAsArray(await CliContext.ReadBodyFileAsync(parseResult.GetValue(fileOption)!, cancellationToken));
+            var body = (await KiotaJsonSerializer.DeserializeCollectionAsync<Record>(
+                bodyJson, Record.CreateFromDiscriminatorValue, cancellationToken)).ToList();
+
+            var result = await context.Client.WellboreDdms.Ddms.V3.Wells.PostAsync(body, cancellationToken: cancellationToken);
+
+            return context.Output.Write(
+                await OsduJson.ToJsonAsync(result),
+                OutputSpec.Unwrap("recordIds"));
+        }, cancellationToken));
+
+        return command;
+    }
+
+    /// <summary>Soft-delete a Well record by id.</summary>
+    /// <remarks>DELETE /ddms/v3/wells/{record_id} on the WellboreDdms service.</remarks>
+    private static Command BuildWellDelete()
+    {
+        var recordIdOption = new Option<string>("--id", "-id")
+        {
+            Description = "Well record id to delete.",
+            Required = true,
+        };
+
+        var command = new Command("delete", "Soft-delete a Well record by id.");
+        command.Options.Add(recordIdOption);
+
+        command.SetAction((parseResult, cancellationToken) =>
+            CliRunner.RunAsync(parseResult, async (context, cancellationToken) =>
+        {
+            var recordId = parseResult.GetValue(recordIdOption)!;
+
+            await context.Client.WellboreDdms.Ddms.V3.Wells[recordId].DeleteAsync(cancellationToken: cancellationToken);
+
+            return context.Output.WriteMessage("1 record deleted");
+        }, cancellationToken));
+
+        return command;
+    }
+
+    /// <summary>List all versions of a Well record.</summary>
+    /// <remarks>GET /ddms/v3/wells/{record_id}/versions on the WellboreDdms service.</remarks>
+    private static Command BuildWellVersionList()
+    {
+        var recordIdOption = new Option<string>("--id", "-id")
+        {
+            Description = "Well record id.",
+            Required = true,
+        };
+
+        var command = new Command("list", "List all versions of a Well record.");
+        command.Options.Add(recordIdOption);
+
+        command.SetAction((parseResult, cancellationToken) =>
+            CliRunner.RunAsync(parseResult, async (context, cancellationToken) =>
+        {
+            var recordId = parseResult.GetValue(recordIdOption)!;
+
+            var result = await context.Client.WellboreDdms.Ddms.V3.Wells[recordId].Versions.GetAsync(cancellationToken: cancellationToken);
+
+            return context.Output.Write(
+                await OsduJson.ToJsonAsync(result),
+                OutputSpec.Raw);
+        }, cancellationToken));
+
+        return command;
+    }
+
+    /// <summary>Get a specific version of a Well record.</summary>
+    /// <remarks>GET /ddms/v3/wells/{record_id}/versions/{version} on the WellboreDdms service.</remarks>
+    private static Command BuildWellVersionGet()
+    {
+        var recordIdOption = new Option<string>("--id", "-id")
+        {
+            Description = "Well record id.",
+            Required = true,
+        };
+        var versionOption = new Option<long>("--version", "-v")
+        {
+            Description = "Well record version.",
+            Required = true,
+        };
+
+        var command = new Command("get", "Get a specific version of a Well record.");
+        command.Options.Add(recordIdOption);
+        command.Options.Add(versionOption);
+
+        command.SetAction((parseResult, cancellationToken) =>
+            CliRunner.RunAsync(parseResult, async (context, cancellationToken) =>
+        {
+            var recordId = parseResult.GetValue(recordIdOption)!;
+            var version = parseResult.GetValue(versionOption);
+
+            var result = await context.Client.WellboreDdms.Ddms.V3.Wells[recordId].Versions[version].GetAsync(cancellationToken: cancellationToken);
+
+            return context.Output.Write(
+                await OsduJson.ToJsonAsync(result),
+                OutputSpec.Raw);
+        }, cancellationToken));
+
+        return command;
+    }
 
     /// <summary>Get a Wellbore record by id.</summary>
     /// <remarks>GET /ddms/v3/wellbores/{record_id} on the WellboreDdms service.</remarks>
@@ -173,6 +360,1035 @@ public static partial class WellboreDdmsCommands
             var version = parseResult.GetValue(versionOption);
 
             var result = await context.Client.WellboreDdms.Ddms.V3.Wellbores[recordId].Versions[version].GetAsync(cancellationToken: cancellationToken);
+
+            return context.Output.Write(
+                await OsduJson.ToJsonAsync(result),
+                OutputSpec.Raw);
+        }, cancellationToken));
+
+        return command;
+    }
+
+    /// <summary>Get a WellLog record by id.</summary>
+    /// <remarks>GET /ddms/v3/welllogs/{record_id} on the WellboreDdms service.</remarks>
+    private static Command BuildWelllogGet()
+    {
+        var recordIdOption = new Option<string>("--id", "-id")
+        {
+            Description = "WellLog record id.",
+            Required = true,
+        };
+
+        var command = new Command("get", "Get a WellLog record by id.");
+        command.Options.Add(recordIdOption);
+
+        command.SetAction((parseResult, cancellationToken) =>
+            CliRunner.RunAsync(parseResult, async (context, cancellationToken) =>
+        {
+            var recordId = parseResult.GetValue(recordIdOption)!;
+
+            var result = await context.Client.WellboreDdms.Ddms.V3.Welllogs[recordId].GetAsync(cancellationToken: cancellationToken);
+
+            return context.Output.Write(
+                await OsduJson.ToJsonAsync(result),
+                OutputSpec.Raw);
+        }, cancellationToken));
+
+        return command;
+    }
+
+    /// <summary>Add a WellLog record from a JSON file.</summary>
+    /// <remarks>POST /ddms/v3/welllogs on the WellboreDdms service.</remarks>
+    private static Command BuildWelllogAdd()
+    {
+        var fileOption = new Option<string>("--file", "-f")
+        {
+            Description = "JSON file containing the WellLog record.",
+            Required = true,
+        };
+
+        var command = new Command("add", "Add a WellLog record from a JSON file.");
+        command.Options.Add(fileOption);
+
+        command.SetAction((parseResult, cancellationToken) =>
+            CliRunner.RunAsync(parseResult, async (context, cancellationToken) =>
+        {
+            var bodyJson = CliContext.WrapAsArray(await CliContext.ReadBodyFileAsync(parseResult.GetValue(fileOption)!, cancellationToken));
+            var body = (await KiotaJsonSerializer.DeserializeCollectionAsync<Record>(
+                bodyJson, Record.CreateFromDiscriminatorValue, cancellationToken)).ToList();
+
+            var result = await context.Client.WellboreDdms.Ddms.V3.Welllogs.PostAsync(body, cancellationToken: cancellationToken);
+
+            return context.Output.Write(
+                await OsduJson.ToJsonAsync(result),
+                OutputSpec.Unwrap("recordIds"));
+        }, cancellationToken));
+
+        return command;
+    }
+
+    /// <summary>Soft-delete a WellLog record by id.</summary>
+    /// <remarks>DELETE /ddms/v3/welllogs/{record_id} on the WellboreDdms service.</remarks>
+    private static Command BuildWelllogDelete()
+    {
+        var recordIdOption = new Option<string>("--id", "-id")
+        {
+            Description = "WellLog record id to delete.",
+            Required = true,
+        };
+
+        var command = new Command("delete", "Soft-delete a WellLog record by id.");
+        command.Options.Add(recordIdOption);
+
+        command.SetAction((parseResult, cancellationToken) =>
+            CliRunner.RunAsync(parseResult, async (context, cancellationToken) =>
+        {
+            var recordId = parseResult.GetValue(recordIdOption)!;
+
+            await context.Client.WellboreDdms.Ddms.V3.Welllogs[recordId].DeleteAsync(cancellationToken: cancellationToken);
+
+            return context.Output.WriteMessage("1 record deleted");
+        }, cancellationToken));
+
+        return command;
+    }
+
+    /// <summary>List all versions of a WellLog record.</summary>
+    /// <remarks>GET /ddms/v3/welllogs/{record_id}/versions on the WellboreDdms service.</remarks>
+    private static Command BuildWelllogVersionList()
+    {
+        var recordIdOption = new Option<string>("--id", "-id")
+        {
+            Description = "WellLog record id.",
+            Required = true,
+        };
+
+        var command = new Command("list", "List all versions of a WellLog record.");
+        command.Options.Add(recordIdOption);
+
+        command.SetAction((parseResult, cancellationToken) =>
+            CliRunner.RunAsync(parseResult, async (context, cancellationToken) =>
+        {
+            var recordId = parseResult.GetValue(recordIdOption)!;
+
+            var result = await context.Client.WellboreDdms.Ddms.V3.Welllogs[recordId].Versions.GetAsync(cancellationToken: cancellationToken);
+
+            return context.Output.Write(
+                await OsduJson.ToJsonAsync(result),
+                OutputSpec.Raw);
+        }, cancellationToken));
+
+        return command;
+    }
+
+    /// <summary>Get a specific version of a WellLog record.</summary>
+    /// <remarks>GET /ddms/v3/welllogs/{record_id}/versions/{version} on the WellboreDdms service.</remarks>
+    private static Command BuildWelllogVersionGet()
+    {
+        var recordIdOption = new Option<string>("--id", "-id")
+        {
+            Description = "WellLog record id.",
+            Required = true,
+        };
+        var versionOption = new Option<long>("--version", "-v")
+        {
+            Description = "WellLog record version.",
+            Required = true,
+        };
+
+        var command = new Command("get", "Get a specific version of a WellLog record.");
+        command.Options.Add(recordIdOption);
+        command.Options.Add(versionOption);
+
+        command.SetAction((parseResult, cancellationToken) =>
+            CliRunner.RunAsync(parseResult, async (context, cancellationToken) =>
+        {
+            var recordId = parseResult.GetValue(recordIdOption)!;
+            var version = parseResult.GetValue(versionOption);
+
+            var result = await context.Client.WellboreDdms.Ddms.V3.Welllogs[recordId].Versions[version].GetAsync(cancellationToken: cancellationToken);
+
+            return context.Output.Write(
+                await OsduJson.ToJsonAsync(result),
+                OutputSpec.Raw);
+        }, cancellationToken));
+
+        return command;
+    }
+
+    /// <summary>Get a WellboreTrajectory record by id.</summary>
+    /// <remarks>GET /ddms/v3/wellboretrajectories/{record_id} on the WellboreDdms service.</remarks>
+    private static Command BuildTrajectoryGet()
+    {
+        var recordIdOption = new Option<string>("--id", "-id")
+        {
+            Description = "WellboreTrajectory record id.",
+            Required = true,
+        };
+
+        var command = new Command("get", "Get a WellboreTrajectory record by id.");
+        command.Options.Add(recordIdOption);
+
+        command.SetAction((parseResult, cancellationToken) =>
+            CliRunner.RunAsync(parseResult, async (context, cancellationToken) =>
+        {
+            var recordId = parseResult.GetValue(recordIdOption)!;
+
+            var result = await context.Client.WellboreDdms.Ddms.V3.Wellboretrajectories[recordId].GetAsync(cancellationToken: cancellationToken);
+
+            return context.Output.Write(
+                await OsduJson.ToJsonAsync(result),
+                OutputSpec.Raw);
+        }, cancellationToken));
+
+        return command;
+    }
+
+    /// <summary>Add a WellboreTrajectory record from a JSON file.</summary>
+    /// <remarks>POST /ddms/v3/wellboretrajectories on the WellboreDdms service.</remarks>
+    private static Command BuildTrajectoryAdd()
+    {
+        var fileOption = new Option<string>("--file", "-f")
+        {
+            Description = "JSON file containing the WellboreTrajectory record.",
+            Required = true,
+        };
+
+        var command = new Command("add", "Add a WellboreTrajectory record from a JSON file.");
+        command.Options.Add(fileOption);
+
+        command.SetAction((parseResult, cancellationToken) =>
+            CliRunner.RunAsync(parseResult, async (context, cancellationToken) =>
+        {
+            var bodyJson = CliContext.WrapAsArray(await CliContext.ReadBodyFileAsync(parseResult.GetValue(fileOption)!, cancellationToken));
+            var body = (await KiotaJsonSerializer.DeserializeCollectionAsync<Record>(
+                bodyJson, Record.CreateFromDiscriminatorValue, cancellationToken)).ToList();
+
+            var result = await context.Client.WellboreDdms.Ddms.V3.Wellboretrajectories.PostAsync(body, cancellationToken: cancellationToken);
+
+            return context.Output.Write(
+                await OsduJson.ToJsonAsync(result),
+                OutputSpec.Unwrap("recordIds"));
+        }, cancellationToken));
+
+        return command;
+    }
+
+    /// <summary>Soft-delete a WellboreTrajectory record by id.</summary>
+    /// <remarks>DELETE /ddms/v3/wellboretrajectories/{record_id} on the WellboreDdms service.</remarks>
+    private static Command BuildTrajectoryDelete()
+    {
+        var recordIdOption = new Option<string>("--id", "-id")
+        {
+            Description = "WellboreTrajectory record id to delete.",
+            Required = true,
+        };
+
+        var command = new Command("delete", "Soft-delete a WellboreTrajectory record by id.");
+        command.Options.Add(recordIdOption);
+
+        command.SetAction((parseResult, cancellationToken) =>
+            CliRunner.RunAsync(parseResult, async (context, cancellationToken) =>
+        {
+            var recordId = parseResult.GetValue(recordIdOption)!;
+
+            await context.Client.WellboreDdms.Ddms.V3.Wellboretrajectories[recordId].DeleteAsync(cancellationToken: cancellationToken);
+
+            return context.Output.WriteMessage("1 record deleted");
+        }, cancellationToken));
+
+        return command;
+    }
+
+    /// <summary>List all versions of a WellboreTrajectory record.</summary>
+    /// <remarks>GET /ddms/v3/wellboretrajectories/{record_id}/versions on the WellboreDdms service.</remarks>
+    private static Command BuildTrajectoryVersionList()
+    {
+        var recordIdOption = new Option<string>("--id", "-id")
+        {
+            Description = "WellboreTrajectory record id.",
+            Required = true,
+        };
+
+        var command = new Command("list", "List all versions of a WellboreTrajectory record.");
+        command.Options.Add(recordIdOption);
+
+        command.SetAction((parseResult, cancellationToken) =>
+            CliRunner.RunAsync(parseResult, async (context, cancellationToken) =>
+        {
+            var recordId = parseResult.GetValue(recordIdOption)!;
+
+            var result = await context.Client.WellboreDdms.Ddms.V3.Wellboretrajectories[recordId].Versions.GetAsync(cancellationToken: cancellationToken);
+
+            return context.Output.Write(
+                await OsduJson.ToJsonAsync(result),
+                OutputSpec.Raw);
+        }, cancellationToken));
+
+        return command;
+    }
+
+    /// <summary>Get a specific version of a WellboreTrajectory record.</summary>
+    /// <remarks>GET /ddms/v3/wellboretrajectories/{record_id}/versions/{version} on the WellboreDdms service.</remarks>
+    private static Command BuildTrajectoryVersionGet()
+    {
+        var recordIdOption = new Option<string>("--id", "-id")
+        {
+            Description = "WellboreTrajectory record id.",
+            Required = true,
+        };
+        var versionOption = new Option<long>("--version", "-v")
+        {
+            Description = "WellboreTrajectory record version.",
+            Required = true,
+        };
+
+        var command = new Command("get", "Get a specific version of a WellboreTrajectory record.");
+        command.Options.Add(recordIdOption);
+        command.Options.Add(versionOption);
+
+        command.SetAction((parseResult, cancellationToken) =>
+            CliRunner.RunAsync(parseResult, async (context, cancellationToken) =>
+        {
+            var recordId = parseResult.GetValue(recordIdOption)!;
+            var version = parseResult.GetValue(versionOption);
+
+            var result = await context.Client.WellboreDdms.Ddms.V3.Wellboretrajectories[recordId].Versions[version].GetAsync(cancellationToken: cancellationToken);
+
+            return context.Output.Write(
+                await OsduJson.ToJsonAsync(result),
+                OutputSpec.Raw);
+        }, cancellationToken));
+
+        return command;
+    }
+
+    /// <summary>Get a WellboreMarkerSet record by id.</summary>
+    /// <remarks>GET /ddms/v3/wellboremarkersets/{record_id} on the WellboreDdms service.</remarks>
+    private static Command BuildMarkersetGet()
+    {
+        var recordIdOption = new Option<string>("--id", "-id")
+        {
+            Description = "WellboreMarkerSet record id.",
+            Required = true,
+        };
+
+        var command = new Command("get", "Get a WellboreMarkerSet record by id.");
+        command.Options.Add(recordIdOption);
+
+        command.SetAction((parseResult, cancellationToken) =>
+            CliRunner.RunAsync(parseResult, async (context, cancellationToken) =>
+        {
+            var recordId = parseResult.GetValue(recordIdOption)!;
+
+            var result = await context.Client.WellboreDdms.Ddms.V3.Wellboremarkersets[recordId].GetAsync(cancellationToken: cancellationToken);
+
+            return context.Output.Write(
+                await OsduJson.ToJsonAsync(result),
+                OutputSpec.Raw);
+        }, cancellationToken));
+
+        return command;
+    }
+
+    /// <summary>Add a WellboreMarkerSet record from a JSON file.</summary>
+    /// <remarks>POST /ddms/v3/wellboremarkersets on the WellboreDdms service.</remarks>
+    private static Command BuildMarkersetAdd()
+    {
+        var fileOption = new Option<string>("--file", "-f")
+        {
+            Description = "JSON file containing the WellboreMarkerSet record.",
+            Required = true,
+        };
+
+        var command = new Command("add", "Add a WellboreMarkerSet record from a JSON file.");
+        command.Options.Add(fileOption);
+
+        command.SetAction((parseResult, cancellationToken) =>
+            CliRunner.RunAsync(parseResult, async (context, cancellationToken) =>
+        {
+            var bodyJson = CliContext.WrapAsArray(await CliContext.ReadBodyFileAsync(parseResult.GetValue(fileOption)!, cancellationToken));
+            var body = (await KiotaJsonSerializer.DeserializeCollectionAsync<Record>(
+                bodyJson, Record.CreateFromDiscriminatorValue, cancellationToken)).ToList();
+
+            var result = await context.Client.WellboreDdms.Ddms.V3.Wellboremarkersets.PostAsync(body, cancellationToken: cancellationToken);
+
+            return context.Output.Write(
+                await OsduJson.ToJsonAsync(result),
+                OutputSpec.Unwrap("recordIds"));
+        }, cancellationToken));
+
+        return command;
+    }
+
+    /// <summary>Soft-delete a WellboreMarkerSet record by id.</summary>
+    /// <remarks>DELETE /ddms/v3/wellboremarkersets/{record_id} on the WellboreDdms service.</remarks>
+    private static Command BuildMarkersetDelete()
+    {
+        var recordIdOption = new Option<string>("--id", "-id")
+        {
+            Description = "WellboreMarkerSet record id to delete.",
+            Required = true,
+        };
+
+        var command = new Command("delete", "Soft-delete a WellboreMarkerSet record by id.");
+        command.Options.Add(recordIdOption);
+
+        command.SetAction((parseResult, cancellationToken) =>
+            CliRunner.RunAsync(parseResult, async (context, cancellationToken) =>
+        {
+            var recordId = parseResult.GetValue(recordIdOption)!;
+
+            await context.Client.WellboreDdms.Ddms.V3.Wellboremarkersets[recordId].DeleteAsync(cancellationToken: cancellationToken);
+
+            return context.Output.WriteMessage("1 record deleted");
+        }, cancellationToken));
+
+        return command;
+    }
+
+    /// <summary>List all versions of a WellboreMarkerSet record.</summary>
+    /// <remarks>GET /ddms/v3/wellboremarkersets/{record_id}/versions on the WellboreDdms service.</remarks>
+    private static Command BuildMarkersetVersionList()
+    {
+        var recordIdOption = new Option<string>("--id", "-id")
+        {
+            Description = "WellboreMarkerSet record id.",
+            Required = true,
+        };
+
+        var command = new Command("list", "List all versions of a WellboreMarkerSet record.");
+        command.Options.Add(recordIdOption);
+
+        command.SetAction((parseResult, cancellationToken) =>
+            CliRunner.RunAsync(parseResult, async (context, cancellationToken) =>
+        {
+            var recordId = parseResult.GetValue(recordIdOption)!;
+
+            var result = await context.Client.WellboreDdms.Ddms.V3.Wellboremarkersets[recordId].Versions.GetAsync(cancellationToken: cancellationToken);
+
+            return context.Output.Write(
+                await OsduJson.ToJsonAsync(result),
+                OutputSpec.Raw);
+        }, cancellationToken));
+
+        return command;
+    }
+
+    /// <summary>Get a specific version of a WellboreMarkerSet record.</summary>
+    /// <remarks>GET /ddms/v3/wellboremarkersets/{record_id}/versions/{version} on the WellboreDdms service.</remarks>
+    private static Command BuildMarkersetVersionGet()
+    {
+        var recordIdOption = new Option<string>("--id", "-id")
+        {
+            Description = "WellboreMarkerSet record id.",
+            Required = true,
+        };
+        var versionOption = new Option<long>("--version", "-v")
+        {
+            Description = "WellboreMarkerSet record version.",
+            Required = true,
+        };
+
+        var command = new Command("get", "Get a specific version of a WellboreMarkerSet record.");
+        command.Options.Add(recordIdOption);
+        command.Options.Add(versionOption);
+
+        command.SetAction((parseResult, cancellationToken) =>
+            CliRunner.RunAsync(parseResult, async (context, cancellationToken) =>
+        {
+            var recordId = parseResult.GetValue(recordIdOption)!;
+            var version = parseResult.GetValue(versionOption);
+
+            var result = await context.Client.WellboreDdms.Ddms.V3.Wellboremarkersets[recordId].Versions[version].GetAsync(cancellationToken: cancellationToken);
+
+            return context.Output.Write(
+                await OsduJson.ToJsonAsync(result),
+                OutputSpec.Raw);
+        }, cancellationToken));
+
+        return command;
+    }
+
+    /// <summary>Get a WellboreIntervalSet record by id.</summary>
+    /// <remarks>GET /ddms/v3/wellboreintervalsets/{record_id} on the WellboreDdms service.</remarks>
+    private static Command BuildIntervalsetGet()
+    {
+        var recordIdOption = new Option<string>("--id", "-id")
+        {
+            Description = "WellboreIntervalSet record id.",
+            Required = true,
+        };
+
+        var command = new Command("get", "Get a WellboreIntervalSet record by id.");
+        command.Options.Add(recordIdOption);
+
+        command.SetAction((parseResult, cancellationToken) =>
+            CliRunner.RunAsync(parseResult, async (context, cancellationToken) =>
+        {
+            var recordId = parseResult.GetValue(recordIdOption)!;
+
+            var result = await context.Client.WellboreDdms.Ddms.V3.Wellboreintervalsets[recordId].GetAsync(cancellationToken: cancellationToken);
+
+            return context.Output.Write(
+                await OsduJson.ToJsonAsync(result),
+                OutputSpec.Raw);
+        }, cancellationToken));
+
+        return command;
+    }
+
+    /// <summary>Add a WellboreIntervalSet record from a JSON file.</summary>
+    /// <remarks>POST /ddms/v3/wellboreintervalsets on the WellboreDdms service.</remarks>
+    private static Command BuildIntervalsetAdd()
+    {
+        var fileOption = new Option<string>("--file", "-f")
+        {
+            Description = "JSON file containing the WellboreIntervalSet record.",
+            Required = true,
+        };
+
+        var command = new Command("add", "Add a WellboreIntervalSet record from a JSON file.");
+        command.Options.Add(fileOption);
+
+        command.SetAction((parseResult, cancellationToken) =>
+            CliRunner.RunAsync(parseResult, async (context, cancellationToken) =>
+        {
+            var bodyJson = CliContext.WrapAsArray(await CliContext.ReadBodyFileAsync(parseResult.GetValue(fileOption)!, cancellationToken));
+            var body = (await KiotaJsonSerializer.DeserializeCollectionAsync<Record>(
+                bodyJson, Record.CreateFromDiscriminatorValue, cancellationToken)).ToList();
+
+            var result = await context.Client.WellboreDdms.Ddms.V3.Wellboreintervalsets.PostAsync(body, cancellationToken: cancellationToken);
+
+            return context.Output.Write(
+                await OsduJson.ToJsonAsync(result),
+                OutputSpec.Unwrap("recordIds"));
+        }, cancellationToken));
+
+        return command;
+    }
+
+    /// <summary>Soft-delete a WellboreIntervalSet record by id.</summary>
+    /// <remarks>DELETE /ddms/v3/wellboreintervalsets/{record_id} on the WellboreDdms service.</remarks>
+    private static Command BuildIntervalsetDelete()
+    {
+        var recordIdOption = new Option<string>("--id", "-id")
+        {
+            Description = "WellboreIntervalSet record id to delete.",
+            Required = true,
+        };
+
+        var command = new Command("delete", "Soft-delete a WellboreIntervalSet record by id.");
+        command.Options.Add(recordIdOption);
+
+        command.SetAction((parseResult, cancellationToken) =>
+            CliRunner.RunAsync(parseResult, async (context, cancellationToken) =>
+        {
+            var recordId = parseResult.GetValue(recordIdOption)!;
+
+            await context.Client.WellboreDdms.Ddms.V3.Wellboreintervalsets[recordId].DeleteAsync(cancellationToken: cancellationToken);
+
+            return context.Output.WriteMessage("1 record deleted");
+        }, cancellationToken));
+
+        return command;
+    }
+
+    /// <summary>List all versions of a WellboreIntervalSet record.</summary>
+    /// <remarks>GET /ddms/v3/wellboreintervalsets/{record_id}/versions on the WellboreDdms service.</remarks>
+    private static Command BuildIntervalsetVersionList()
+    {
+        var recordIdOption = new Option<string>("--id", "-id")
+        {
+            Description = "WellboreIntervalSet record id.",
+            Required = true,
+        };
+
+        var command = new Command("list", "List all versions of a WellboreIntervalSet record.");
+        command.Options.Add(recordIdOption);
+
+        command.SetAction((parseResult, cancellationToken) =>
+            CliRunner.RunAsync(parseResult, async (context, cancellationToken) =>
+        {
+            var recordId = parseResult.GetValue(recordIdOption)!;
+
+            var result = await context.Client.WellboreDdms.Ddms.V3.Wellboreintervalsets[recordId].Versions.GetAsync(cancellationToken: cancellationToken);
+
+            return context.Output.Write(
+                await OsduJson.ToJsonAsync(result),
+                OutputSpec.Raw);
+        }, cancellationToken));
+
+        return command;
+    }
+
+    /// <summary>Get a specific version of a WellboreIntervalSet record.</summary>
+    /// <remarks>GET /ddms/v3/wellboreintervalsets/{record_id}/versions/{version} on the WellboreDdms service.</remarks>
+    private static Command BuildIntervalsetVersionGet()
+    {
+        var recordIdOption = new Option<string>("--id", "-id")
+        {
+            Description = "WellboreIntervalSet record id.",
+            Required = true,
+        };
+        var versionOption = new Option<long>("--version", "-v")
+        {
+            Description = "WellboreIntervalSet record version.",
+            Required = true,
+        };
+
+        var command = new Command("get", "Get a specific version of a WellboreIntervalSet record.");
+        command.Options.Add(recordIdOption);
+        command.Options.Add(versionOption);
+
+        command.SetAction((parseResult, cancellationToken) =>
+            CliRunner.RunAsync(parseResult, async (context, cancellationToken) =>
+        {
+            var recordId = parseResult.GetValue(recordIdOption)!;
+            var version = parseResult.GetValue(versionOption);
+
+            var result = await context.Client.WellboreDdms.Ddms.V3.Wellboreintervalsets[recordId].Versions[version].GetAsync(cancellationToken: cancellationToken);
+
+            return context.Output.Write(
+                await OsduJson.ToJsonAsync(result),
+                OutputSpec.Raw);
+        }, cancellationToken));
+
+        return command;
+    }
+
+    /// <summary>Get a WellLogAcquisition record by id.</summary>
+    /// <remarks>GET /ddms/v3/welllogacquisition/{record_id} on the WellboreDdms service.</remarks>
+    private static Command BuildLogacquisitionGet()
+    {
+        var recordIdOption = new Option<string>("--id", "-id")
+        {
+            Description = "WellLogAcquisition record id.",
+            Required = true,
+        };
+
+        var command = new Command("get", "Get a WellLogAcquisition record by id.");
+        command.Options.Add(recordIdOption);
+
+        command.SetAction((parseResult, cancellationToken) =>
+            CliRunner.RunAsync(parseResult, async (context, cancellationToken) =>
+        {
+            var recordId = parseResult.GetValue(recordIdOption)!;
+
+            var result = await context.Client.WellboreDdms.Ddms.V3.Welllogacquisition[recordId].GetAsync(cancellationToken: cancellationToken);
+
+            return context.Output.Write(
+                await OsduJson.ToJsonAsync(result),
+                OutputSpec.Raw);
+        }, cancellationToken));
+
+        return command;
+    }
+
+    /// <summary>Add a WellLogAcquisition record from a JSON file.</summary>
+    /// <remarks>POST /ddms/v3/welllogacquisition on the WellboreDdms service.</remarks>
+    private static Command BuildLogacquisitionAdd()
+    {
+        var fileOption = new Option<string>("--file", "-f")
+        {
+            Description = "JSON file containing the WellLogAcquisition record.",
+            Required = true,
+        };
+
+        var command = new Command("add", "Add a WellLogAcquisition record from a JSON file.");
+        command.Options.Add(fileOption);
+
+        command.SetAction((parseResult, cancellationToken) =>
+            CliRunner.RunAsync(parseResult, async (context, cancellationToken) =>
+        {
+            var bodyJson = CliContext.WrapAsArray(await CliContext.ReadBodyFileAsync(parseResult.GetValue(fileOption)!, cancellationToken));
+            var body = (await KiotaJsonSerializer.DeserializeCollectionAsync<Record>(
+                bodyJson, Record.CreateFromDiscriminatorValue, cancellationToken)).ToList();
+
+            var result = await context.Client.WellboreDdms.Ddms.V3.Welllogacquisition.PostAsync(body, cancellationToken: cancellationToken);
+
+            return context.Output.Write(
+                await OsduJson.ToJsonAsync(result),
+                OutputSpec.Unwrap("recordIds"));
+        }, cancellationToken));
+
+        return command;
+    }
+
+    /// <summary>Soft-delete a WellLogAcquisition record by id.</summary>
+    /// <remarks>DELETE /ddms/v3/welllogacquisition/{record_id} on the WellboreDdms service.</remarks>
+    private static Command BuildLogacquisitionDelete()
+    {
+        var recordIdOption = new Option<string>("--id", "-id")
+        {
+            Description = "WellLogAcquisition record id to delete.",
+            Required = true,
+        };
+
+        var command = new Command("delete", "Soft-delete a WellLogAcquisition record by id.");
+        command.Options.Add(recordIdOption);
+
+        command.SetAction((parseResult, cancellationToken) =>
+            CliRunner.RunAsync(parseResult, async (context, cancellationToken) =>
+        {
+            var recordId = parseResult.GetValue(recordIdOption)!;
+
+            await context.Client.WellboreDdms.Ddms.V3.Welllogacquisition[recordId].DeleteAsync(cancellationToken: cancellationToken);
+
+            return context.Output.WriteMessage("1 record deleted");
+        }, cancellationToken));
+
+        return command;
+    }
+
+    /// <summary>List all versions of a WellLogAcquisition record.</summary>
+    /// <remarks>GET /ddms/v3/welllogacquisition/{record_id}/versions on the WellboreDdms service.</remarks>
+    private static Command BuildLogacquisitionVersionList()
+    {
+        var recordIdOption = new Option<string>("--id", "-id")
+        {
+            Description = "WellLogAcquisition record id.",
+            Required = true,
+        };
+
+        var command = new Command("list", "List all versions of a WellLogAcquisition record.");
+        command.Options.Add(recordIdOption);
+
+        command.SetAction((parseResult, cancellationToken) =>
+            CliRunner.RunAsync(parseResult, async (context, cancellationToken) =>
+        {
+            var recordId = parseResult.GetValue(recordIdOption)!;
+
+            var result = await context.Client.WellboreDdms.Ddms.V3.Welllogacquisition[recordId].Versions.GetAsync(cancellationToken: cancellationToken);
+
+            return context.Output.Write(
+                await OsduJson.ToJsonAsync(result),
+                OutputSpec.Raw);
+        }, cancellationToken));
+
+        return command;
+    }
+
+    /// <summary>Get a specific version of a WellLogAcquisition record.</summary>
+    /// <remarks>GET /ddms/v3/welllogacquisition/{record_id}/versions/{version} on the WellboreDdms service.</remarks>
+    private static Command BuildLogacquisitionVersionGet()
+    {
+        var recordIdOption = new Option<string>("--id", "-id")
+        {
+            Description = "WellLogAcquisition record id.",
+            Required = true,
+        };
+        var versionOption = new Option<long>("--version", "-v")
+        {
+            Description = "WellLogAcquisition record version.",
+            Required = true,
+        };
+
+        var command = new Command("get", "Get a specific version of a WellLogAcquisition record.");
+        command.Options.Add(recordIdOption);
+        command.Options.Add(versionOption);
+
+        command.SetAction((parseResult, cancellationToken) =>
+            CliRunner.RunAsync(parseResult, async (context, cancellationToken) =>
+        {
+            var recordId = parseResult.GetValue(recordIdOption)!;
+            var version = parseResult.GetValue(versionOption);
+
+            var result = await context.Client.WellboreDdms.Ddms.V3.Welllogacquisition[recordId].Versions[version].GetAsync(cancellationToken: cancellationToken);
+
+            return context.Output.Write(
+                await OsduJson.ToJsonAsync(result),
+                OutputSpec.Raw);
+        }, cancellationToken));
+
+        return command;
+    }
+
+    /// <summary>Get a PPFGDataset record by id.</summary>
+    /// <remarks>GET /ddms/v3/ppfgdataset/{record_id} on the WellboreDdms service.</remarks>
+    private static Command BuildPpfgGet()
+    {
+        var recordIdOption = new Option<string>("--id", "-id")
+        {
+            Description = "PPFGDataset record id.",
+            Required = true,
+        };
+
+        var command = new Command("get", "Get a PPFGDataset record by id.");
+        command.Options.Add(recordIdOption);
+
+        command.SetAction((parseResult, cancellationToken) =>
+            CliRunner.RunAsync(parseResult, async (context, cancellationToken) =>
+        {
+            var recordId = parseResult.GetValue(recordIdOption)!;
+
+            var result = await context.Client.WellboreDdms.Ddms.V3.Ppfgdataset[recordId].GetAsync(cancellationToken: cancellationToken);
+
+            return context.Output.Write(
+                await OsduJson.ToJsonAsync(result),
+                OutputSpec.Raw);
+        }, cancellationToken));
+
+        return command;
+    }
+
+    /// <summary>Add a PPFGDataset record from a JSON file.</summary>
+    /// <remarks>POST /ddms/v3/ppfgdataset on the WellboreDdms service.</remarks>
+    private static Command BuildPpfgAdd()
+    {
+        var fileOption = new Option<string>("--file", "-f")
+        {
+            Description = "JSON file containing the PPFGDataset record.",
+            Required = true,
+        };
+
+        var command = new Command("add", "Add a PPFGDataset record from a JSON file.");
+        command.Options.Add(fileOption);
+
+        command.SetAction((parseResult, cancellationToken) =>
+            CliRunner.RunAsync(parseResult, async (context, cancellationToken) =>
+        {
+            var bodyJson = CliContext.WrapAsArray(await CliContext.ReadBodyFileAsync(parseResult.GetValue(fileOption)!, cancellationToken));
+            var body = (await KiotaJsonSerializer.DeserializeCollectionAsync<Record>(
+                bodyJson, Record.CreateFromDiscriminatorValue, cancellationToken)).ToList();
+
+            var result = await context.Client.WellboreDdms.Ddms.V3.Ppfgdataset.PostAsync(body, cancellationToken: cancellationToken);
+
+            return context.Output.Write(
+                await OsduJson.ToJsonAsync(result),
+                OutputSpec.Unwrap("recordIds"));
+        }, cancellationToken));
+
+        return command;
+    }
+
+    /// <summary>Soft-delete a PPFGDataset record by id.</summary>
+    /// <remarks>DELETE /ddms/v3/ppfgdataset/{record_id} on the WellboreDdms service.</remarks>
+    private static Command BuildPpfgDelete()
+    {
+        var recordIdOption = new Option<string>("--id", "-id")
+        {
+            Description = "PPFGDataset record id to delete.",
+            Required = true,
+        };
+
+        var command = new Command("delete", "Soft-delete a PPFGDataset record by id.");
+        command.Options.Add(recordIdOption);
+
+        command.SetAction((parseResult, cancellationToken) =>
+            CliRunner.RunAsync(parseResult, async (context, cancellationToken) =>
+        {
+            var recordId = parseResult.GetValue(recordIdOption)!;
+
+            await context.Client.WellboreDdms.Ddms.V3.Ppfgdataset[recordId].DeleteAsync(cancellationToken: cancellationToken);
+
+            return context.Output.WriteMessage("1 record deleted");
+        }, cancellationToken));
+
+        return command;
+    }
+
+    /// <summary>List all versions of a PPFGDataset record.</summary>
+    /// <remarks>GET /ddms/v3/ppfgdataset/{record_id}/versions on the WellboreDdms service.</remarks>
+    private static Command BuildPpfgVersionList()
+    {
+        var recordIdOption = new Option<string>("--id", "-id")
+        {
+            Description = "PPFGDataset record id.",
+            Required = true,
+        };
+
+        var command = new Command("list", "List all versions of a PPFGDataset record.");
+        command.Options.Add(recordIdOption);
+
+        command.SetAction((parseResult, cancellationToken) =>
+            CliRunner.RunAsync(parseResult, async (context, cancellationToken) =>
+        {
+            var recordId = parseResult.GetValue(recordIdOption)!;
+
+            var result = await context.Client.WellboreDdms.Ddms.V3.Ppfgdataset[recordId].Versions.GetAsync(cancellationToken: cancellationToken);
+
+            return context.Output.Write(
+                await OsduJson.ToJsonAsync(result),
+                OutputSpec.Raw);
+        }, cancellationToken));
+
+        return command;
+    }
+
+    /// <summary>Get a specific version of a PPFGDataset record.</summary>
+    /// <remarks>GET /ddms/v3/ppfgdataset/{record_id}/versions/{version} on the WellboreDdms service.</remarks>
+    private static Command BuildPpfgVersionGet()
+    {
+        var recordIdOption = new Option<string>("--id", "-id")
+        {
+            Description = "PPFGDataset record id.",
+            Required = true,
+        };
+        var versionOption = new Option<long>("--version", "-v")
+        {
+            Description = "PPFGDataset record version.",
+            Required = true,
+        };
+
+        var command = new Command("get", "Get a specific version of a PPFGDataset record.");
+        command.Options.Add(recordIdOption);
+        command.Options.Add(versionOption);
+
+        command.SetAction((parseResult, cancellationToken) =>
+            CliRunner.RunAsync(parseResult, async (context, cancellationToken) =>
+        {
+            var recordId = parseResult.GetValue(recordIdOption)!;
+            var version = parseResult.GetValue(versionOption);
+
+            var result = await context.Client.WellboreDdms.Ddms.V3.Ppfgdataset[recordId].Versions[version].GetAsync(cancellationToken: cancellationToken);
+
+            return context.Output.Write(
+                await OsduJson.ToJsonAsync(result),
+                OutputSpec.Raw);
+        }, cancellationToken));
+
+        return command;
+    }
+
+    /// <summary>Get a WellPressureTestRawMeasurement record by id.</summary>
+    /// <remarks>GET /ddms/v3/wellpressuretestrawmeasurement/{record_id} on the WellboreDdms service.</remarks>
+    private static Command BuildPressuretestGet()
+    {
+        var recordIdOption = new Option<string>("--id", "-id")
+        {
+            Description = "WellPressureTestRawMeasurement record id.",
+            Required = true,
+        };
+
+        var command = new Command("get", "Get a WellPressureTestRawMeasurement record by id.");
+        command.Options.Add(recordIdOption);
+
+        command.SetAction((parseResult, cancellationToken) =>
+            CliRunner.RunAsync(parseResult, async (context, cancellationToken) =>
+        {
+            var recordId = parseResult.GetValue(recordIdOption)!;
+
+            var result = await context.Client.WellboreDdms.Ddms.V3.Wellpressuretestrawmeasurement[recordId].GetAsync(cancellationToken: cancellationToken);
+
+            return context.Output.Write(
+                await OsduJson.ToJsonAsync(result),
+                OutputSpec.Raw);
+        }, cancellationToken));
+
+        return command;
+    }
+
+    /// <summary>Add a WellPressureTestRawMeasurement record from a JSON file.</summary>
+    /// <remarks>POST /ddms/v3/wellpressuretestrawmeasurement on the WellboreDdms service.</remarks>
+    private static Command BuildPressuretestAdd()
+    {
+        var fileOption = new Option<string>("--file", "-f")
+        {
+            Description = "JSON file containing the WellPressureTestRawMeasurement record.",
+            Required = true,
+        };
+
+        var command = new Command("add", "Add a WellPressureTestRawMeasurement record from a JSON file.");
+        command.Options.Add(fileOption);
+
+        command.SetAction((parseResult, cancellationToken) =>
+            CliRunner.RunAsync(parseResult, async (context, cancellationToken) =>
+        {
+            var bodyJson = CliContext.WrapAsArray(await CliContext.ReadBodyFileAsync(parseResult.GetValue(fileOption)!, cancellationToken));
+            var body = (await KiotaJsonSerializer.DeserializeCollectionAsync<Record>(
+                bodyJson, Record.CreateFromDiscriminatorValue, cancellationToken)).ToList();
+
+            var result = await context.Client.WellboreDdms.Ddms.V3.Wellpressuretestrawmeasurement.PostAsync(body, cancellationToken: cancellationToken);
+
+            return context.Output.Write(
+                await OsduJson.ToJsonAsync(result),
+                OutputSpec.Unwrap("recordIds"));
+        }, cancellationToken));
+
+        return command;
+    }
+
+    /// <summary>Soft-delete a WellPressureTestRawMeasurement record by id.</summary>
+    /// <remarks>DELETE /ddms/v3/wellpressuretestrawmeasurement/{record_id} on the WellboreDdms service.</remarks>
+    private static Command BuildPressuretestDelete()
+    {
+        var recordIdOption = new Option<string>("--id", "-id")
+        {
+            Description = "WellPressureTestRawMeasurement record id to delete.",
+            Required = true,
+        };
+
+        var command = new Command("delete", "Soft-delete a WellPressureTestRawMeasurement record by id.");
+        command.Options.Add(recordIdOption);
+
+        command.SetAction((parseResult, cancellationToken) =>
+            CliRunner.RunAsync(parseResult, async (context, cancellationToken) =>
+        {
+            var recordId = parseResult.GetValue(recordIdOption)!;
+
+            await context.Client.WellboreDdms.Ddms.V3.Wellpressuretestrawmeasurement[recordId].DeleteAsync(cancellationToken: cancellationToken);
+
+            return context.Output.WriteMessage("1 record deleted");
+        }, cancellationToken));
+
+        return command;
+    }
+
+    /// <summary>List all versions of a WellPressureTestRawMeasurement record.</summary>
+    /// <remarks>GET /ddms/v3/wellpressuretestrawmeasurement/{record_id}/versions on the WellboreDdms service.</remarks>
+    private static Command BuildPressuretestVersionList()
+    {
+        var recordIdOption = new Option<string>("--id", "-id")
+        {
+            Description = "WellPressureTestRawMeasurement record id.",
+            Required = true,
+        };
+
+        var command = new Command("list", "List all versions of a WellPressureTestRawMeasurement record.");
+        command.Options.Add(recordIdOption);
+
+        command.SetAction((parseResult, cancellationToken) =>
+            CliRunner.RunAsync(parseResult, async (context, cancellationToken) =>
+        {
+            var recordId = parseResult.GetValue(recordIdOption)!;
+
+            var result = await context.Client.WellboreDdms.Ddms.V3.Wellpressuretestrawmeasurement[recordId].Versions.GetAsync(cancellationToken: cancellationToken);
+
+            return context.Output.Write(
+                await OsduJson.ToJsonAsync(result),
+                OutputSpec.Raw);
+        }, cancellationToken));
+
+        return command;
+    }
+
+    /// <summary>Get a specific version of a WellPressureTestRawMeasurement record.</summary>
+    /// <remarks>GET /ddms/v3/wellpressuretestrawmeasurement/{record_id}/versions/{version} on the WellboreDdms service.</remarks>
+    private static Command BuildPressuretestVersionGet()
+    {
+        var recordIdOption = new Option<string>("--id", "-id")
+        {
+            Description = "WellPressureTestRawMeasurement record id.",
+            Required = true,
+        };
+        var versionOption = new Option<long>("--version", "-v")
+        {
+            Description = "WellPressureTestRawMeasurement record version.",
+            Required = true,
+        };
+
+        var command = new Command("get", "Get a specific version of a WellPressureTestRawMeasurement record.");
+        command.Options.Add(recordIdOption);
+        command.Options.Add(versionOption);
+
+        command.SetAction((parseResult, cancellationToken) =>
+            CliRunner.RunAsync(parseResult, async (context, cancellationToken) =>
+        {
+            var recordId = parseResult.GetValue(recordIdOption)!;
+            var version = parseResult.GetValue(versionOption);
+
+            var result = await context.Client.WellboreDdms.Ddms.V3.Wellpressuretestrawmeasurement[recordId].Versions[version].GetAsync(cancellationToken: cancellationToken);
 
             return context.Output.Write(
                 await OsduJson.ToJsonAsync(result),

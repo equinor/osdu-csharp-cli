@@ -7,7 +7,7 @@ whether it can be packaged for a managed Windows laptop — which is where the P
 struggles.
 
 You are being asked to use it for twenty minutes and say what is wrong with it. Rough edges
-are expected and useful; **81 of its commands were generated from a spec and most have never
+are expected and useful; **121 of its commands were generated from a spec and most have never
 been run by a human.**
 
 It does not replace `osducli`. The binary is called `osducs` precisely so both can sit on your
@@ -122,7 +122,7 @@ about. If you want to exercise them, tell us and we will find a scratch partitio
 Most useful, in order:
 
 1. **A command that ran but told you nothing useful** — empty columns, the wrong fields, a
-   table where you wanted the detail. Output columns for 81 commands were chosen by reading
+   table where you wanted the detail. Output columns for 121 commands were chosen by reading
    spec field names, and many have never met a real response. Each is a one-line fix.
 2. **Help that did not answer your question.** If you could not work out what a flag wanted,
    that is a defect.
@@ -154,6 +154,8 @@ the code.
 | `GET /records` → `500 not implemented` | In the spec, absent from ADME. |
 | `--by data.Something` → `400 Aggregations are not supported` | Only keyword-indexed fields aggregate; on dev that means envelope fields, not `data.*`. |
 | Count shows exactly `10,000+` | That is the cap, not the answer. Add `--track-total-count`. |
+| `wellbore get` / `trajectory get` → `422` | The **stored record** carries a property its schema rejects (`'WellboreIdentity' was unexpected`). A data problem on the service, not the CLI. |
+| `well get` / `markerset get` → `404` while `well version list` works | The DDMS strips the version suffix from the id and looks up the base id. Server-side; the CLI sends the id you gave it. |
 | macOS quarantine, Windows SmartScreen | Not signed yet. Known, and being decided. |
 
 More detail in [TROUBLESHOOTING.md](TROUBLESHOOTING.md).

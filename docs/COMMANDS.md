@@ -19,14 +19,22 @@ no manifest. Run `osducs --help` for the full tree.
 | [`dataset`](#dataset) | `get`, `add`, `delete`, `undelete`, `upload-url`, `download-url`, `revoke-url` |
 | [`file`](#file) | `get`, `add`, `delete`, `upload-url`, `download-url`, `revoke-url` |
 | [`group`](#group) | `list`, `add`, `delete`, `member list`, `member add`, `member delete`, `member count` |
+| [`intervalset`](#intervalset) | `get`, `add`, `delete`, `version list`, `version get` |
 | [`legaltag`](#legaltag) | `list`, `get`, `add`, `update`, `delete`, `validate`, `properties` |
+| [`logacquisition`](#logacquisition) | `get`, `add`, `delete`, `version list`, `version get` |
+| [`markerset`](#markerset) | `get`, `add`, `delete`, `version list`, `version get` |
 | [`measurement`](#measurement) | `list`, `get`, `search`, `maps` |
 | [`member`](#member) | `group list`, `delete` |
+| [`ppfg`](#ppfg) | `get`, `add`, `delete`, `version list`, `version get` |
+| [`pressuretest`](#pressuretest) | `get`, `add`, `delete`, `version list`, `version get` |
 | [`record`](#record) | `search`, `aggregate`, `list`, `get`, `headers`, `delete`, `version list`, `version get` |
 | [`schema`](#schema) | `list`, `get`, `add`, `update` |
+| [`trajectory`](#trajectory) | `get`, `add`, `delete`, `version list`, `version get` |
 | [`unit`](#unit) | `list`, `get`, `search`, `by-symbol`, `by-measurement`, `by-system`, `preferred`, `maps`, `conversion scale`, `conversion abcd`, `catalog get`, `catalog search`, `catalog map-states`, `catalog last-modified` |
 | [`unit-system`](#unit-system) | `list`, `get` |
+| [`well`](#well) | `get`, `add`, `delete`, `version list`, `version get` |
 | [`wellbore`](#wellbore) | `get`, `add`, `delete`, `version list`, `version get` |
+| [`welllog`](#welllog) | `get`, `add`, `delete`, `version list`, `version get` |
 | [`workflow`](#workflow) | `list`, `get`, `add`, `delete`, `run list`, `run get`, `run trigger`, `run update`, `run latest` |
 
 ## crs
@@ -318,6 +326,59 @@ List the members of a group.
 | `--role` |  | Return only members with this role. |
 | `--include-type` |  | Include each member's type in the output. |
 
+## intervalset
+
+### `osducs intervalset add`
+
+Add a WellboreIntervalSet record from a JSON file.
+
+`POST /ddms/v3/wellboreintervalsets` — wellbore_ddms
+
+| Option | Required | Description |
+|---|---|---|
+| `-f`, `--file` | yes | JSON file containing the WellboreIntervalSet record. |
+
+### `osducs intervalset delete`
+
+Soft-delete a WellboreIntervalSet record by id.
+
+`DELETE /ddms/v3/wellboreintervalsets/{record_id}` — wellbore_ddms
+
+| Option | Required | Description |
+|---|---|---|
+| `-id`, `--id` | yes | WellboreIntervalSet record id to delete. |
+
+### `osducs intervalset get`
+
+Get a WellboreIntervalSet record by id.
+
+`GET /ddms/v3/wellboreintervalsets/{record_id}` — wellbore_ddms
+
+| Option | Required | Description |
+|---|---|---|
+| `-id`, `--id` | yes | WellboreIntervalSet record id. |
+
+### `osducs intervalset version get`
+
+Get a specific version of a WellboreIntervalSet record.
+
+`GET /ddms/v3/wellboreintervalsets/{record_id}/versions/{version}` — wellbore_ddms
+
+| Option | Required | Description |
+|---|---|---|
+| `-id`, `--id` | yes | WellboreIntervalSet record id. |
+| `-v`, `--version` | yes | WellboreIntervalSet record version. |
+
+### `osducs intervalset version list`
+
+List all versions of a WellboreIntervalSet record.
+
+`GET /ddms/v3/wellboreintervalsets/{record_id}/versions` — wellbore_ddms
+
+| Option | Required | Description |
+|---|---|---|
+| `-id`, `--id` | yes | WellboreIntervalSet record id. |
+
 ## legaltag
 
 ### `osducs legaltag add`
@@ -394,6 +455,112 @@ Check which of the given LegalTag names are invalid, and why.
 |---|---|---|
 | `-n`, `--name` | yes | LegalTag name to check. Repeat for several. |
 
+## logacquisition
+
+### `osducs logacquisition add`
+
+Add a WellLogAcquisition record from a JSON file.
+
+`POST /ddms/v3/welllogacquisition` — wellbore_ddms
+
+| Option | Required | Description |
+|---|---|---|
+| `-f`, `--file` | yes | JSON file containing the WellLogAcquisition record. |
+
+### `osducs logacquisition delete`
+
+Soft-delete a WellLogAcquisition record by id.
+
+`DELETE /ddms/v3/welllogacquisition/{record_id}` — wellbore_ddms
+
+| Option | Required | Description |
+|---|---|---|
+| `-id`, `--id` | yes | WellLogAcquisition record id to delete. |
+
+### `osducs logacquisition get`
+
+Get a WellLogAcquisition record by id.
+
+`GET /ddms/v3/welllogacquisition/{record_id}` — wellbore_ddms
+
+| Option | Required | Description |
+|---|---|---|
+| `-id`, `--id` | yes | WellLogAcquisition record id. |
+
+### `osducs logacquisition version get`
+
+Get a specific version of a WellLogAcquisition record.
+
+`GET /ddms/v3/welllogacquisition/{record_id}/versions/{version}` — wellbore_ddms
+
+| Option | Required | Description |
+|---|---|---|
+| `-id`, `--id` | yes | WellLogAcquisition record id. |
+| `-v`, `--version` | yes | WellLogAcquisition record version. |
+
+### `osducs logacquisition version list`
+
+List all versions of a WellLogAcquisition record.
+
+`GET /ddms/v3/welllogacquisition/{record_id}/versions` — wellbore_ddms
+
+| Option | Required | Description |
+|---|---|---|
+| `-id`, `--id` | yes | WellLogAcquisition record id. |
+
+## markerset
+
+### `osducs markerset add`
+
+Add a WellboreMarkerSet record from a JSON file.
+
+`POST /ddms/v3/wellboremarkersets` — wellbore_ddms
+
+| Option | Required | Description |
+|---|---|---|
+| `-f`, `--file` | yes | JSON file containing the WellboreMarkerSet record. |
+
+### `osducs markerset delete`
+
+Soft-delete a WellboreMarkerSet record by id.
+
+`DELETE /ddms/v3/wellboremarkersets/{record_id}` — wellbore_ddms
+
+| Option | Required | Description |
+|---|---|---|
+| `-id`, `--id` | yes | WellboreMarkerSet record id to delete. |
+
+### `osducs markerset get`
+
+Get a WellboreMarkerSet record by id.
+
+`GET /ddms/v3/wellboremarkersets/{record_id}` — wellbore_ddms
+
+| Option | Required | Description |
+|---|---|---|
+| `-id`, `--id` | yes | WellboreMarkerSet record id. |
+
+### `osducs markerset version get`
+
+Get a specific version of a WellboreMarkerSet record.
+
+`GET /ddms/v3/wellboremarkersets/{record_id}/versions/{version}` — wellbore_ddms
+
+| Option | Required | Description |
+|---|---|---|
+| `-id`, `--id` | yes | WellboreMarkerSet record id. |
+| `-v`, `--version` | yes | WellboreMarkerSet record version. |
+
+### `osducs markerset version list`
+
+List all versions of a WellboreMarkerSet record.
+
+`GET /ddms/v3/wellboremarkersets/{record_id}/versions` — wellbore_ddms
+
+| Option | Required | Description |
+|---|---|---|
+| `-id`, `--id` | yes | WellboreMarkerSet record id. |
+
 ## measurement
 
 ### `osducs measurement get`
@@ -464,6 +631,112 @@ List the groups a member belongs to.
 | `--type` |  | Filter by group type: DATA, SERVICE or USER. |
 | `--appid` |  | Filter to groups granted to this application id. |
 | `--role-required` |  | Include the member's role in each group. |
+
+## ppfg
+
+### `osducs ppfg add`
+
+Add a PPFGDataset record from a JSON file.
+
+`POST /ddms/v3/ppfgdataset` — wellbore_ddms
+
+| Option | Required | Description |
+|---|---|---|
+| `-f`, `--file` | yes | JSON file containing the PPFGDataset record. |
+
+### `osducs ppfg delete`
+
+Soft-delete a PPFGDataset record by id.
+
+`DELETE /ddms/v3/ppfgdataset/{record_id}` — wellbore_ddms
+
+| Option | Required | Description |
+|---|---|---|
+| `-id`, `--id` | yes | PPFGDataset record id to delete. |
+
+### `osducs ppfg get`
+
+Get a PPFGDataset record by id.
+
+`GET /ddms/v3/ppfgdataset/{record_id}` — wellbore_ddms
+
+| Option | Required | Description |
+|---|---|---|
+| `-id`, `--id` | yes | PPFGDataset record id. |
+
+### `osducs ppfg version get`
+
+Get a specific version of a PPFGDataset record.
+
+`GET /ddms/v3/ppfgdataset/{record_id}/versions/{version}` — wellbore_ddms
+
+| Option | Required | Description |
+|---|---|---|
+| `-id`, `--id` | yes | PPFGDataset record id. |
+| `-v`, `--version` | yes | PPFGDataset record version. |
+
+### `osducs ppfg version list`
+
+List all versions of a PPFGDataset record.
+
+`GET /ddms/v3/ppfgdataset/{record_id}/versions` — wellbore_ddms
+
+| Option | Required | Description |
+|---|---|---|
+| `-id`, `--id` | yes | PPFGDataset record id. |
+
+## pressuretest
+
+### `osducs pressuretest add`
+
+Add a WellPressureTestRawMeasurement record from a JSON file.
+
+`POST /ddms/v3/wellpressuretestrawmeasurement` — wellbore_ddms
+
+| Option | Required | Description |
+|---|---|---|
+| `-f`, `--file` | yes | JSON file containing the WellPressureTestRawMeasurement record. |
+
+### `osducs pressuretest delete`
+
+Soft-delete a WellPressureTestRawMeasurement record by id.
+
+`DELETE /ddms/v3/wellpressuretestrawmeasurement/{record_id}` — wellbore_ddms
+
+| Option | Required | Description |
+|---|---|---|
+| `-id`, `--id` | yes | WellPressureTestRawMeasurement record id to delete. |
+
+### `osducs pressuretest get`
+
+Get a WellPressureTestRawMeasurement record by id.
+
+`GET /ddms/v3/wellpressuretestrawmeasurement/{record_id}` — wellbore_ddms
+
+| Option | Required | Description |
+|---|---|---|
+| `-id`, `--id` | yes | WellPressureTestRawMeasurement record id. |
+
+### `osducs pressuretest version get`
+
+Get a specific version of a WellPressureTestRawMeasurement record.
+
+`GET /ddms/v3/wellpressuretestrawmeasurement/{record_id}/versions/{version}` — wellbore_ddms
+
+| Option | Required | Description |
+|---|---|---|
+| `-id`, `--id` | yes | WellPressureTestRawMeasurement record id. |
+| `-v`, `--version` | yes | WellPressureTestRawMeasurement record version. |
+
+### `osducs pressuretest version list`
+
+List all versions of a WellPressureTestRawMeasurement record.
+
+`GET /ddms/v3/wellpressuretestrawmeasurement/{record_id}/versions` — wellbore_ddms
+
+| Option | Required | Description |
+|---|---|---|
+| `-id`, `--id` | yes | WellPressureTestRawMeasurement record id. |
 
 ## record
 
@@ -657,6 +930,59 @@ Create or replace a schema from a JSON file.
 |---|---|---|
 | `-f`, `--file` | yes | JSON file containing the schema request (schemaInfo and schema). |
 
+## trajectory
+
+### `osducs trajectory add`
+
+Add a WellboreTrajectory record from a JSON file.
+
+`POST /ddms/v3/wellboretrajectories` — wellbore_ddms
+
+| Option | Required | Description |
+|---|---|---|
+| `-f`, `--file` | yes | JSON file containing the WellboreTrajectory record. |
+
+### `osducs trajectory delete`
+
+Soft-delete a WellboreTrajectory record by id.
+
+`DELETE /ddms/v3/wellboretrajectories/{record_id}` — wellbore_ddms
+
+| Option | Required | Description |
+|---|---|---|
+| `-id`, `--id` | yes | WellboreTrajectory record id to delete. |
+
+### `osducs trajectory get`
+
+Get a WellboreTrajectory record by id.
+
+`GET /ddms/v3/wellboretrajectories/{record_id}` — wellbore_ddms
+
+| Option | Required | Description |
+|---|---|---|
+| `-id`, `--id` | yes | WellboreTrajectory record id. |
+
+### `osducs trajectory version get`
+
+Get a specific version of a WellboreTrajectory record.
+
+`GET /ddms/v3/wellboretrajectories/{record_id}/versions/{version}` — wellbore_ddms
+
+| Option | Required | Description |
+|---|---|---|
+| `-id`, `--id` | yes | WellboreTrajectory record id. |
+| `-v`, `--version` | yes | WellboreTrajectory record version. |
+
+### `osducs trajectory version list`
+
+List all versions of a WellboreTrajectory record.
+
+`GET /ddms/v3/wellboretrajectories/{record_id}/versions` — wellbore_ddms
+
+| Option | Required | Description |
+|---|---|---|
+| `-id`, `--id` | yes | WellboreTrajectory record id. |
+
 ## unit
 
 ### `osducs unit by-measurement`
@@ -837,6 +1163,59 @@ List the available unit systems.
 | `--offset` |  | Number of unit systems to skip. |
 | `--limit` |  | Maximum number of unit systems to return. |
 
+## well
+
+### `osducs well add`
+
+Add a Well record from a JSON file.
+
+`POST /ddms/v3/wells` — wellbore_ddms
+
+| Option | Required | Description |
+|---|---|---|
+| `-f`, `--file` | yes | JSON file containing the Well record. |
+
+### `osducs well delete`
+
+Soft-delete a Well record by id.
+
+`DELETE /ddms/v3/wells/{record_id}` — wellbore_ddms
+
+| Option | Required | Description |
+|---|---|---|
+| `-id`, `--id` | yes | Well record id to delete. |
+
+### `osducs well get`
+
+Get a Well record by id.
+
+`GET /ddms/v3/wells/{record_id}` — wellbore_ddms
+
+| Option | Required | Description |
+|---|---|---|
+| `-id`, `--id` | yes | Well record id. |
+
+### `osducs well version get`
+
+Get a specific version of a Well record.
+
+`GET /ddms/v3/wells/{record_id}/versions/{version}` — wellbore_ddms
+
+| Option | Required | Description |
+|---|---|---|
+| `-id`, `--id` | yes | Well record id. |
+| `-v`, `--version` | yes | Well record version. |
+
+### `osducs well version list`
+
+List all versions of a Well record.
+
+`GET /ddms/v3/wells/{record_id}/versions` — wellbore_ddms
+
+| Option | Required | Description |
+|---|---|---|
+| `-id`, `--id` | yes | Well record id. |
+
 ## wellbore
 
 ### `osducs wellbore add`
@@ -889,6 +1268,59 @@ List all versions of a Wellbore record.
 | Option | Required | Description |
 |---|---|---|
 | `-id`, `--id` | yes | Wellbore record id. |
+
+## welllog
+
+### `osducs welllog add`
+
+Add a WellLog record from a JSON file.
+
+`POST /ddms/v3/welllogs` — wellbore_ddms
+
+| Option | Required | Description |
+|---|---|---|
+| `-f`, `--file` | yes | JSON file containing the WellLog record. |
+
+### `osducs welllog delete`
+
+Soft-delete a WellLog record by id.
+
+`DELETE /ddms/v3/welllogs/{record_id}` — wellbore_ddms
+
+| Option | Required | Description |
+|---|---|---|
+| `-id`, `--id` | yes | WellLog record id to delete. |
+
+### `osducs welllog get`
+
+Get a WellLog record by id.
+
+`GET /ddms/v3/welllogs/{record_id}` — wellbore_ddms
+
+| Option | Required | Description |
+|---|---|---|
+| `-id`, `--id` | yes | WellLog record id. |
+
+### `osducs welllog version get`
+
+Get a specific version of a WellLog record.
+
+`GET /ddms/v3/welllogs/{record_id}/versions/{version}` — wellbore_ddms
+
+| Option | Required | Description |
+|---|---|---|
+| `-id`, `--id` | yes | WellLog record id. |
+| `-v`, `--version` | yes | WellLog record version. |
+
+### `osducs welllog version list`
+
+List all versions of a WellLog record.
+
+`GET /ddms/v3/welllogs/{record_id}/versions` — wellbore_ddms
+
+| Option | Required | Description |
+|---|---|---|
+| `-id`, `--id` | yes | WellLog record id. |
 
 ## workflow
 

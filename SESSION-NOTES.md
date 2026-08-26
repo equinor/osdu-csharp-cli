@@ -669,6 +669,40 @@ specs means the CLI will always be able to express slightly more than the platfo
 answer. Worth saying plainly in the peer test instructions, or the first 404 will be reported
 as a defect.
 
+### Wellbore DDMS widened to every record type, no bulk data
+
+It was 5 operations of 84 — one resource, enough to exercise `scope:` and nothing more. It is
+now **45 of 84**: all nine typed resources (`well`, `wellbore`, `welllog`, `trajectory`,
+`markerset`, `intervalset`, `logacquisition`, `ppfg`, `pressuretest`), each with the same five
+commands — `get`, `add`, `delete`, `version list`, `version get`. The regularity is the point:
+learn one, know all nine.
+
+The 35 bulk operations are **excluded individually with reasons rather than left out of
+`scope:`**. That distinction matters. Out of scope means untriaged and silent; excluded means
+a new bulk endpoint upstream fails the build as `missing`. Bulk IO is genuinely different
+work — chunked upload is a multi-step session protocol, the payloads are columnar, and no
+table output can render a log curve — but "different work" is not the same as "invisible".
+
+`purge`, a query flag on `DELETE` for the four bulk-carrying types, is knowingly not exposed.
+It escalates a soft delete to something irreversible and the spec documents it with an empty
+description. Inferring an irreversible flag's behaviour from its name, with no confirmation
+guard in place (R6 is still unimplemented), is not a trade worth making.
+
+**Two standing mysteries resolved, both server-side.** Exercising the new commands against dev
+finally produced the response bodies:
+
+- The long-standing `wellbore get` **422** is a stored-data problem, not a CLI one:
+  `Unevaluated properties are not allowed ('WellboreIdentity' was unexpected)`. The DDMS
+  validates a record against its schema on read, and these records carry a property the
+  schema version it validates against rejects. `trajectory get` fails the same way; `welllog
+  get` succeeds. Nothing in the CLI can fix this and nothing in the CLI caused it.
+- The **404** on `well get` and `markerset get` is stranger and also server-side: the DDMS
+  strips the trailing version suffix from the id and looks up the base id, which Storage then
+  reports missing — while `well version list` on the *same* id returns five versions and
+  `record get` returns the record. The CLI sends exactly the id it was given.
+
+Both belong in the peer-test "known, do not report" list, not the defect queue.
+
 ### `status` covered ten of twelve services
 
 The status table is hand-written — it fans out across services and must survive one of them

@@ -59,7 +59,7 @@ safety feature.
 
 ## 2. The tree
 
-> **Status: built.** Every tree in this section is implemented — 79 generated commands
+> **Status: built.** Every tree in this section is implemented — 121 generated commands
 > across 12 services plus the hand-written `osdu status`. Where the delivered shape differs
 > from the sketch below, the delivered shape is authoritative; run `osdu <noun> --help` to
 > see it. Two changes were made during implementation:
