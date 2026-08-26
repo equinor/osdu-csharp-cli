@@ -429,6 +429,8 @@ class Service:
     spec_file: str
     commands: list[Command]
     groups: dict[str, str]
+    # Named help section for this service's root nouns; empty means the default group.
+    section: str = ""
     coverage: "Coverage" = field(default=None)  # type: ignore[assignment]
 
     @property
@@ -475,7 +477,7 @@ class Coverage:
 # and turns `e.g. osdu.` into a key, quietly losing the example.
 MANIFEST_KEYS = {
     "top": {"service", "spec", "client", "models", "description", "groups", "scope",
-            "commands", "handwritten", "exclude"},
+            "section", "commands", "handwritten", "exclude"},
     "command": {"command", "summary", "op", "builder", "params", "body", "output",
                 "examples", "require-one-of", "mutually-exclusive"},
     "op": {"method", "path"},
@@ -599,6 +601,7 @@ def build_service(manifest_path: Path) -> Service:
         spec_file=f"{manifest['spec']}{f' ({spec_version})' if spec_version else ''}",
         commands=commands,
         groups=manifest.get("groups") or {},
+        section=manifest.get("section") or "",
     )
     service.coverage = compute_coverage(operations, claimed, manifest.get("scope"),
                                         len(commands),
@@ -1234,7 +1237,26 @@ def emit_registry(services: list[Service]) -> str:
     lines += [f"        tree.Node({csharp_string(label)});" for label in ordered]
     lines.append("")
     lines += [f"        {service.class_name}.Attach(tree);" for service in services]
-    lines += ["", "        return tree.Roots;", "    }", "}"]
+    lines += ["", "        return tree.Roots;", "    }", ""]
+
+    # Root nouns grouped into named help sections. A manifest without `section:` leaves its
+    # nouns in the default group, which is why most services need no entry here.
+    sections: dict[str, str] = {
+        noun: service.section
+        for service in services if service.section
+        for noun in service.roots
+    }
+
+    lines += [
+        "    /// <summary>Root nouns that belong in a named help section rather than the",
+        "    /// default one. Declared by `section:` in the service manifest.</summary>",
+        "    public static IReadOnlyDictionary<string, string> Sections { get; } =",
+        "        new Dictionary<string, string>(StringComparer.Ordinal)",
+        "        {",
+    ]
+    lines += [f"            [{csharp_string(noun)}] = {csharp_string(section)},"
+              for noun, section in sorted(sections.items())]
+    lines += ["        };", "}"]
     return "\n".join(lines) + "\n"
 
 

@@ -67,3 +67,17 @@ def test_no_probe_exists_for_a_service_with_no_commands():
 @pytest.mark.parametrize("service", sorted(EXEMPT))
 def test_exemptions_carry_a_reason(service):
     assert EXEMPT[service].strip(), f"{service} is exempt without a reason"
+
+
+def test_wellbore_resources_are_grouped_out_of_the_default_help_section():
+    """The nine DDMS nouns must not sit in the root help's default list.
+
+    They outnumber every other service put together; ungrouped, they push `record`, `schema`
+    and `search` down the front page of a tool most people open for exactly those three.
+    """
+    manifest = yaml.safe_load(
+        (ROOT / "cli-manifest" / "wellbore_ddms.yaml").read_text(encoding="utf-8"))
+    assert manifest.get("section"), (
+        "wellbore_ddms.yaml must declare `section:` — nine root nouns in the default help "
+        "group crowd out the core ones"
+    )

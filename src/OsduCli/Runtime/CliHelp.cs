@@ -36,6 +36,30 @@ public static class CliHelp
     private const int Gap = 2;
     private const int MinDescriptionWidth = 20;
 
+    /// <summary>
+    /// Root nouns that render under a named heading instead of plain "Commands".
+    /// </summary>
+    /// <remarks>
+    /// Grouping exists because a flat list stops being a list once it is long enough.
+    /// Widening Wellbore DDMS to all nine of its record types put nine of twenty-two entries
+    /// on the front page for a service that is not what most users came for, pushing
+    /// `record`, `schema` and `search` down among them. Sections are declared by `section:`
+    /// in a service manifest and flow through `GeneratedCommands.Sections`, so adding a
+    /// tenth wellbore resource needs no change here.
+    /// </remarks>
+    private static readonly Dictionary<string, string> Categories = new(StringComparer.Ordinal);
+
+    /// <summary>Section heading rendered last, for commands about the tool itself.</summary>
+    private const string ToolSection = "CLI";
+
+    public static void Categorise(IReadOnlyDictionary<string, string> sections)
+    {
+        foreach (var (name, section) in sections)
+            Categories[name] = section;
+    }
+
+    public static void Categorise(string name, string section) => Categories[name] = section;
+
     public static void Install(RootCommand root)
     {
         foreach (var option in root.Options)
@@ -78,7 +102,7 @@ public static class CliHelp
         foreach (var option in options.Where(IsCommon))
             rows.Add((Label(option), option.Description ?? string.Empty, "Common Options"));
         foreach (var sub in command.Subcommands.Where(c => !c.Hidden))
-            rows.Add((sub.Name, sub.Description ?? string.Empty, "Commands"));
+            rows.Add((sub.Name, sub.Description ?? string.Empty, SectionFor(sub)));
 
         if (rows.Count == 0)
             return;
@@ -86,7 +110,19 @@ public static class CliHelp
         // One column width across all sections so descriptions line up down the page.
         var leftWidth = rows.Max(row => row.Left.Length);
 
-        foreach (var section in new[] { "Arguments", "Options", "Common Options", "Commands" })
+        // Named sections sort alphabetically between the default group and the tool
+        // section, so the order is predictable without anyone maintaining a list.
+        var named = rows.Select(row => row.Section)
+            .Where(section => section is not ("Arguments" or "Options" or "Common Options"
+                or "Commands" or ToolSection))
+            .Distinct()
+            .OrderBy(section => section, StringComparer.Ordinal);
+
+        var ordered = new[] { "Arguments", "Options", "Common Options", "Commands" }
+            .Concat(named)
+            .Append(ToolSection);
+
+        foreach (var section in ordered)
         {
             var inSection = rows.Where(row => row.Section == section).ToList();
             if (inSection.Count == 0)
@@ -156,6 +192,13 @@ public static class CliHelp
             label += "...";
         return IsRequired(argument) ? label + " (REQUIRED)" : label;
     }
+
+    /// <summary>
+    /// The heading a subcommand renders under. Only top-level commands are categorised;
+    /// anything nested falls into the default group, which is what a noun's own help wants.
+    /// </summary>
+    private static string SectionFor(Command command) =>
+        Categories.GetValueOrDefault(command.Name, "Commands");
 
     private static Command? Parent(Command command) =>
         command.Parents.OfType<Command>().FirstOrDefault();

@@ -30,29 +30,33 @@ spec: wellbore_ddms
 client: WellboreDdms
 description: Wellbore DDMS — typed wellbore records.
 
+# Nine typed resources would otherwise be nine of the twenty-two entries on the root
+# help page, crowding out `record`, `schema` and `search`. They get their own section.
+section: Wellbore DDMS
+
 # Every typed resource under /ddms/v3. The bulk operations inside these prefixes are claimed
 # by `exclude:` below, not left unscoped.
 scope:
   - "/ddms/v3/*"
 
 groups:
-  well: Manage Well records in the Wellbore DDMS.
+  well: Manage Well records.
   well version: Inspect Well record version history.
-  wellbore: Manage Wellbore records in the Wellbore DDMS.
+  wellbore: Manage Wellbore records.
   wellbore version: Inspect Wellbore record version history.
-  welllog: Manage WellLog records in the Wellbore DDMS.
+  welllog: Manage WellLog records.
   welllog version: Inspect WellLog record version history.
-  trajectory: Manage WellboreTrajectory records in the Wellbore DDMS.
+  trajectory: Manage WellboreTrajectory records.
   trajectory version: Inspect WellboreTrajectory record version history.
-  markerset: Manage WellboreMarkerSet records in the Wellbore DDMS.
+  markerset: Manage WellboreMarkerSet records.
   markerset version: Inspect WellboreMarkerSet record version history.
-  intervalset: Manage WellboreIntervalSet records in the Wellbore DDMS.
+  intervalset: Manage WellboreIntervalSet records.
   intervalset version: Inspect WellboreIntervalSet record version history.
-  logacquisition: Manage WellLogAcquisition records in the Wellbore DDMS.
+  logacquisition: Manage WellLogAcquisition records.
   logacquisition version: Inspect WellLogAcquisition record version history.
-  ppfg: Manage PPFGDataset records in the Wellbore DDMS.
+  ppfg: Manage PPFGDataset records.
   ppfg version: Inspect PPFGDataset record version history.
-  pressuretest: Manage WellPressureTestRawMeasurement records in the Wellbore DDMS.
+  pressuretest: Manage WellPressureTestRawMeasurement records.
   pressuretest version: Inspect WellPressureTestRawMeasurement record version history.
 
 commands:

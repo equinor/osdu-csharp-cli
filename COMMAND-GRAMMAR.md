@@ -564,6 +564,29 @@ concerns: a wrong count and a non-number are parse errors with readable messages
 number is read with `InvariantCulture` so a Norwegian decimal comma cannot change what a
 coordinate means.
 
+## `section`
+
+An optional top-level manifest key that puts a service's root nouns under their own heading
+in `osducs --help`:
+
+```yaml
+section: Wellbore DDMS
+```
+
+Without it, every noun lands in one flat `Commands:` list. That was fine at twelve entries
+and stopped being fine at twenty-two: widening Wellbore DDMS to all nine of its record types
+meant nine of them were DDMS resources, sorted alphabetically in among `record`, `schema` and
+`workflow` — so the three nouns most users open the tool for were the hardest to find.
+
+Ordering is fixed and needs no maintenance: the default group first, named sections
+alphabetically after it, and `CLI` — the commands about the tool itself — always last. One
+column width spans every section so descriptions stay aligned down the page.
+
+Sections apply only to the root list. A noun's own help is a short list of verbs and gains
+nothing from headings.
+
+---
+
 ## Unknown keys are rejected
 
 Every level of a manifest has a fixed set of allowed keys, and anything else fails the gate:

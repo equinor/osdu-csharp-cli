@@ -53,3 +53,14 @@ def test_a_non_mapping_is_ignored():
     # `output: raw` is a string, not a mapping, and must not trip the checker.
     check_keys("output", "raw", "here")
     check_keys("output", None, "here")
+
+
+def test_section_is_a_known_top_level_key():
+    # `section:` groups a service's root nouns under their own help heading. It is optional,
+    # so a typo would otherwise be ignored and the nouns would silently stay ungrouped.
+    check_keys("top", {"service": "wellbore_ddms", "section": "Wellbore DDMS"}, "here")
+
+
+def test_a_mistyped_section_key_is_rejected():
+    with pytest.raises(ManifestError, match="sections"):
+        check_keys("top", {"service": "wellbore_ddms", "sections": "Wellbore DDMS"}, "here")

@@ -29,15 +29,15 @@ public static class GeneratedCommands
         tree.Describe("unit", "Work with units of measure — look them up and derive conversions between them.");
         tree.Describe("measurement", "Work with measurements — the quantities that units measure.");
         tree.Describe("unit-system", "Work with unit systems — named sets of preferred units.");
-        tree.Describe("well", "Manage Well records in the Wellbore DDMS.");
-        tree.Describe("wellbore", "Manage Wellbore records in the Wellbore DDMS.");
-        tree.Describe("welllog", "Manage WellLog records in the Wellbore DDMS.");
-        tree.Describe("trajectory", "Manage WellboreTrajectory records in the Wellbore DDMS.");
-        tree.Describe("markerset", "Manage WellboreMarkerSet records in the Wellbore DDMS.");
-        tree.Describe("intervalset", "Manage WellboreIntervalSet records in the Wellbore DDMS.");
-        tree.Describe("logacquisition", "Manage WellLogAcquisition records in the Wellbore DDMS.");
-        tree.Describe("ppfg", "Manage PPFGDataset records in the Wellbore DDMS.");
-        tree.Describe("pressuretest", "Manage WellPressureTestRawMeasurement records in the Wellbore DDMS.");
+        tree.Describe("well", "Manage Well records.");
+        tree.Describe("wellbore", "Manage Wellbore records.");
+        tree.Describe("welllog", "Manage WellLog records.");
+        tree.Describe("trajectory", "Manage WellboreTrajectory records.");
+        tree.Describe("markerset", "Manage WellboreMarkerSet records.");
+        tree.Describe("intervalset", "Manage WellboreIntervalSet records.");
+        tree.Describe("logacquisition", "Manage WellLogAcquisition records.");
+        tree.Describe("ppfg", "Manage PPFGDataset records.");
+        tree.Describe("pressuretest", "Manage WellPressureTestRawMeasurement records.");
         tree.Describe("workflow", "Work with workflows — the ingestion and processing pipelines of OSDU.");
         tree.Describe("group member", "Manage who belongs to a group.");
         tree.Describe("member group", "Inspect the groups a member belongs to.");
@@ -107,4 +107,20 @@ public static class GeneratedCommands
 
         return tree.Roots;
     }
+
+    /// <summary>Root nouns that belong in a named help section rather than the
+    /// default one. Declared by `section:` in the service manifest.</summary>
+    public static IReadOnlyDictionary<string, string> Sections { get; } =
+        new Dictionary<string, string>(StringComparer.Ordinal)
+        {
+            ["intervalset"] = "Wellbore DDMS",
+            ["logacquisition"] = "Wellbore DDMS",
+            ["markerset"] = "Wellbore DDMS",
+            ["ppfg"] = "Wellbore DDMS",
+            ["pressuretest"] = "Wellbore DDMS",
+            ["trajectory"] = "Wellbore DDMS",
+            ["well"] = "Wellbore DDMS",
+            ["wellbore"] = "Wellbore DDMS",
+            ["welllog"] = "Wellbore DDMS",
+        };
 }

@@ -11,6 +11,12 @@ var root = new RootCommand(
 GlobalOptions.AddTo(root);
 CliHelp.Install(root);
 
+// Help sections. The generated ones come from `section:` in the manifests; the commands
+// about the tool itself are grouped here because no manifest owns them.
+CliHelp.Categorise(GeneratedCommands.Sections);
+CliHelp.Categorise("status", "CLI");
+CliHelp.Categorise("completion", "CLI");
+
 foreach (var command in GeneratedCommands.All())
     root.Subcommands.Add(command);
 
