@@ -817,7 +817,7 @@ more than technical.
 2. **Decide the macOS channel before building a notarization pipeline.** If Macs are
    Jamf-managed, MDM-installed binaries skip quarantine entirely and the fiddliest part
    disappears. Worth ten minutes of asking before days of building.
-3. **Merge `0.3.0` and run a peer round.** Point people at `docs/USAGE.md` and
+3. ~~Merge `0.3.0`~~ — released 2026-08-26. **Run a peer round.** Point people at `docs/USAGE.md` and
    `docs/TROUBLESHOOTING.md`; the second matters more than it looks, because two of the five
    failure categories in the sweep were not defects, and the first report back will otherwise
    be one of them.
@@ -838,7 +838,7 @@ manifest.
 | | |
 |---|---|
 | Repo | [equinor/osdu-csharp-cli](https://github.com/equinor/osdu-csharp-cli), internal, CI green |
-| Released | `v0.2.1`; `0.3.0` staged in [#3](https://github.com/equinor/osdu-csharp-cli/pull/3) |
+| Released | [`v0.3.0`](https://github.com/equinor/osdu-csharp-cli/releases/tag/v0.3.0), 2026-08-26, binaries attached |
 | Binary | `osducs`, 84 MB self-contained, 30 MB compressed, three platforms |
 | Client | `Equinor.OsduCsharpClient` 1.1.9, three fixes contributed |
 | Commands | 81 generated across 12 services, plus `status` and `completion` |
