@@ -143,9 +143,11 @@ is a curated subset either way. Naive one-command-per-endpoint generation produc
 
 ## 4. What was built
 
+> Snapshot from partway through, kept because the growth figures below are the evidence for
+> the "generator is a fixed cost" claim. For current numbers see [§10](#10-where-it-stands-2026-08-26).
+
 New sibling directory `~/dev/equinor/osdu-csharp-cli`, named to match `osdu-csharp-client`
-and `osdu-csharp-samples`. Self-contained; **not `git init`'d — CI has therefore never
-actually run.**
+and `osdu-csharp-samples`.
 
 ```
 tools/generate_cli.py               1,101   the generator
@@ -158,8 +160,9 @@ README.md, COMMAND-GRAMMAR.md         600
 .github/workflows/generate.yml         52   manifest gate + staleness check + 3-platform build
 ```
 
-Toolchain: .NET 10.0.400, `System.CommandLine` 2.0.11, PyYAML. The CLI project references
-`osdu-csharp-client` by `ProjectReference` for the PoC; swap for the NuGet package later.
+Toolchain: .NET 10.0.400, `System.CommandLine` 2.0.11, PyYAML. The CLI referenced
+`osdu-csharp-client` by `ProjectReference` at this point; it now consumes the published
+package.
 
 **The generator is the fixed cost, and it is paid.** It grew from 758 to 1,101 lines over the
 session, almost entirely to support the expansion in §6 — after which each additional service
@@ -479,43 +482,44 @@ count how many compile. Storage needed only the pom fix.
 
 ## 8. Open items
 
-### Not done, in priority order
+### Resolved
 
-1. ~~**The MSAL token cache is still plaintext.**~~ **Fixed and submitted** —
-   [osdu-csharp-client#98](https://github.com/equinor/osdu-csharp-client/pull/98), open for
-   review 2026-08-25. Merging releases 1.1.7 via release-please, which this CLI then
-   consumes in place of its ProjectReference.
-   `TokenCacheStorage` registers `MsalCacheHelper` — DPAPI on Windows, Keychain on macOS,
-   libsecret on Linux — for both the interactive and device-flow providers. Where no secure
-   store exists it falls back to **in-memory only**, never to a plaintext file. A cache left
-   by the old version is detected (MSAL v3 blobs are JSON, so they start with `{`) and
-   deleted, so the fix does not ship while the plaintext token stays readable. 50/50 client
-   tests pass, 4 of them new.
-2. ~~**Nothing has run against a live OSDU instance.**~~ **First live run, 2026-08-24** —
-   see §8.9. Only two read-only calls; the 80-command surface is still almost entirely
-   unexercised. Auth, real responses and HTTP error
-   mapping are all unproven — and the surface that is unproven is now 80 commands across 12
-   services, not 11 across two.
-3. ~~**The repo is not `git init`'d.**~~ **Done.** Pushed 2026-08-25 to
-   [equinor/osdu-csharp-cli](https://github.com/equinor/osdu-csharp-cli) (internal
-   visibility). CI is green: the manifest gate, the staleness check and the three-platform
-   build all run. `v0.2.0` is released with binaries attached. See §8.10.
-4. ~~**No test project.**~~ **Done** (2026-08-24) — `tests/OsduCli.Tests`, 49 tests,
-   xunit.v3 on Microsoft.Testing.Platform to match osdu-csharp-client. Covers `CommandTree`
-   assembly and verb ordering, `OutputWriter` projection, the hand-written help renderer,
-   config resolution, and a walk of the real generated tree that asserts every node has a
-   description, no path is duplicated, every leaf has an action and every node renders help
-   — the checks §5 previously performed by hand at the end of a session.
-   Added `OsduCli.slnx`, without which `dotnet test` had no project to find.
-   **It found a real bug:** `CliConfig`'s flat environment aliases built a dictionary of
-   `{envValue: envValue}` rather than `{configKey: envValue}`, so `OSDU_SERVER` and its
-   siblings had never worked — including the fallback the "no configuration found" error
-   message tells users to reach for. Fixed.
-5. **NativeAOT does not build.** Attempted 2026-08-24 on osx-arm64; three blockers, all in
-   osdu-csharp-client's facade rather than the CLI. Details in §8.7. CI stays on
+Kept short; the detail is in the subsections below and in the linked pull requests.
+
+| Was open | Resolved |
+|---|---|
+| Plaintext MSAL token cache | [client#98](https://github.com/equinor/osdu-csharp-client/pull/98) → 1.1.7 |
+| Storage query endpoints answer 415 | [client#101](https://github.com/equinor/osdu-csharp-client/pull/101) → 1.1.8 |
+| `record get` prints nothing | [client#103](https://github.com/equinor/osdu-csharp-client/pull/103) → 1.1.9 |
+| Nothing had run against a live instance | §8.4 — 16 examples and a read-only sweep of 45 GETs |
+| Repo not under version control, CI never run | [equinor/osdu-csharp-cli](https://github.com/equinor/osdu-csharp-cli), internal, CI green |
+| No test project | 115 C# tests |
+| The generator itself was untested | 65 Python tests, incl. golden files (§8.6) |
+| Shell completion had no registration scripts | §8.9 — and the claim it replaced was wrong |
+| Binary name collided with the Python CLI | `osducs` (§8.10) |
+| Documentation was contributor-only | `docs/USAGE.md`, `docs/COMMANDS.md`, `docs/TROUBLESHOOTING.md` |
+
+### Still open
+
+1. **Nothing is signed.** No Authenticode, no notarization. macOS peers need
+   `xattr -d com.apple.quarantine`; Windows shows a SmartScreen warning and **WDAC may block
+   it outright on a managed laptop**. That last point is the original question this whole
+   exercise came from, and it is still unanswered by the Windows team. It decides whether a
+   rollout beyond a hand-held test round is possible at all.
+2. **NativeAOT does not build.** Three blockers, all in the client's facade rather than the
+   CLI — §8.7. The prize is 8.3 MB and ~0 ms startup against 84 MB; CI stays on
    self-contained single-file, which does publish cleanly.
-6. ~~**Shell completion has no registration scripts.**~~ **Done** (2026-08-24), and the
-   claim it was replacing turned out to be wrong — see §8.8.
+3. **Write commands are untested.** The live sweep was read-only by construction: 45 GETs
+   and a handful of query-shaped POSTs. Every `add`, `update`, `delete`, `upload` and
+   `trigger` — 32 commands — has never been run against anything.
+4. **Wellbore DDMS remains scoped out**, 5 of 84 operations. If it is in fact used, that
+   triage is the largest single piece of remaining manifest work.
+5. **`measurement get`, `unit by-measurement`, `unit preferred` all answer `400`.** Feeding
+   them the `essence` object from `measurement list` is evidently not what they want, and
+   `wellbore get` answers `422` on an id Storage accepts. Both need someone who knows the
+   domain; they are the only sweep failures not explained by permissions or platform lag.
+6. **A contributor guide.** Adding a command end to end is currently spread across
+   COMMAND-GRAMMAR.md rather than written down as a walkthrough.
 
 ### Reusing the Python CLI's profiles, and first contact
 
@@ -665,6 +669,109 @@ specs means the CLI will always be able to express slightly more than the platfo
 answer. Worth saying plainly in the peer test instructions, or the first 404 will be reported
 as a defect.
 
+### Three client fixes, all found by running the thing
+
+None of these were visible from reading code; each needed a real request on a real service.
+
+**Plaintext token cache** ([#98](https://github.com/equinor/osdu-csharp-client/pull/98)).
+Both MSAL providers wrote `SerializeMsalV3()` straight to `~/.osdu/msal_cache.bin` —
+unencrypted refresh tokens on disk, and two such files were sitting on the development
+machine. Replaced with `MsalCacheHelper`: DPAPI, Keychain or libsecret. Where no secure store
+exists it falls back to **in-memory only, never to a plaintext file**, and a cache left by the
+old version is detected by its first byte and deleted — otherwise the fix would ship while the
+readable token stayed.
+
+**415 on every Storage query** ([#101](https://github.com/equinor/osdu-csharp-client/pull/101)).
+`GET /query/records` answered `Content-Type 'null' is not supported`. The controller declares
+`consumes` for the sibling POST and Spring enforces it on the GET. Python clients never
+notice because their HTTP libraries will send a bare `Content-Type` on a bodiless request;
+.NET structurally cannot, because it is a *content* header and there is no content. Fixed by
+giving bodiless requests an empty JSON body. Kiota's `requestConfiguration.Headers` does not
+help — verified, it is dropped for the same reason.
+
+**`record get` printed nothing** ([#103](https://github.com/equinor/osdu-csharp-client/pull/103)).
+A `200`, a full record on the wire, and an empty line on screen. Storage documents that
+response as `application/json` with `schema: {type: string}` — `ResponseEntity<String>`
+leaking into the spec — so Kiota generates `Task<string?>`, cannot turn an object into a
+string, and returns null. A successful call that tells the user nothing is the worst failure
+shape in the set, and only a live call surfaced it.
+
+### The read-only sweep
+
+Classified all 80 generated commands by HTTP method, ran the 45 GETs plus the query-shaped
+POSTs against dev, harvested real ids from one command to drive the next. Verbs were the wrong
+classifier — `group member count` and `unit conversion scale` are reads whose last word says
+otherwise — so method decided it.
+
+What it found, in the proportions that matter:
+
+| | |
+|---|---|
+| Worked | schema, legaltag, group, unit, measurement, unit-system, workflow, record search/version |
+| Permissions, not bugs | `record list` 403, `group member list` 401 |
+| Platform lag, not bugs | `record headers` 404 (M27) |
+| **Real CLI bugs** | `record get` empty (client), `crs get`/`crs transform` sending a request that cannot succeed |
+| Needs domain knowledge | the measurement/unit 400s, `wellbore get` 422 |
+
+Two of five categories are not defects. That ratio is why `docs/TROUBLESHOOTING.md` leads
+with whose fault each symptom is.
+
+### Search, expanded to what people actually need
+
+`record search` grew from `--kind --query --limit --offset` to also carry `--sort-by`,
+`--sort-order`, `--track-total-count`, `--returned-fields`, `--excluded-fields`,
+`--spatial-field`, `--bbox`, `--near` and `--within`, and gained a sibling `record aggregate`.
+
+Each needed a mechanism rather than a flag, and each mechanism came from a failure the naive
+version would have caused:
+
+| Mechanism | Because otherwise |
+|---|---|
+| `columns-from` | a projected field is fetched at the user's request and then not shown |
+| `total-from` | `totalCount` sits outside the projection root and is discarded |
+| nested body fields | `sort` is an object with parallel arrays; a flat field cannot express it |
+| `parts` | a bounding box would need four separate flags |
+| `mutually-exclusive` | "only these" and "everything but these" both set, and the service does not document which wins |
+| `require-one-of` | `crs get` with neither id sends a request that cannot succeed |
+
+Two judgement calls worth revisiting if they age badly. **`record aggregate` is a separate
+command** rather than a flag on search, accepted 2026-08-25 — recorded against R2 in
+COMMAND-GRAMMAR.md with the reasoning. **`--track-total-count` prints `10,000+`** when the
+count is exactly the cap, because reporting a bare 10,000 where the truth is 141,286 is worse
+than reporting nothing.
+
+### Testing the generator, and what it caught
+
+The C# suite tested what the generator produces; nothing tested the generator. pytest closed
+that (65 tests), and the tests were mutation-checked rather than trusted: the unknown-key
+check made a no-op, `int64` collapsed to `int32`, builder derivation stopped refusing
+`:action` paths, the optional-field guard inverted, `parts` indices off by one, the total
+written after the table — every mutation caught.
+
+**Golden files** cover emission specifically, because the gap between "rejects bad manifests"
+and "the generated tree behaves" is *valid C# that is subtly the wrong C#*. The `parts`
+off-by-one is the case in point: it compiles, passes every other test, and silently sends the
+wrong latitude.
+
+The same argument produced `tools/smoke_test.py`. Help examples are untested documentation
+and rot silently — `data.Country:"Norway"` sat in `record search --help` matching nothing,
+because that field is on no OSDU kind. CI cannot catch it; it needs a service and a token. So
+the examples live in the manifests beside the command they document, and an empty result
+counts as a failure.
+
+### Shipping
+
+`v0.2.0` and `v0.2.1` are released with binaries for three platforms — **84 MB built, 30 MB
+compressed**, no runtime needed. `0.3.0` is staged and carries the whole search expansion.
+
+Two CI bugs, neither visible without a real run. `needs.release-please.outputs.tag_name` does
+not exist — `equinor/ops-actions` exposes `path_tag_names`, a JSON map — so the upload
+reported "release not found" against a release that had just been created. And the NuGet auth
+step failed **only on Windows**, because `${GITHUB_TOKEN}` is bash syntax and the default
+shell there is pwsh, so the password was empty and the `401` looked like a permissions
+problem. `fail-fast: false` was added after one platform's failure cancelled the other two
+and hid that they would have worked.
+
 ### Known divergences from the Python CLI
 
 All three are deliberate and documented in the manifests or COMMAND-GRAMMAR.md.
@@ -701,28 +808,49 @@ feature half.
 
 ## 9. Suggested next steps
 
-The command-surface question is now answered; what remains is almost entirely about proving
-the thing works and can be shipped safely.
+The command surface and the tooling around it are settled. What remains is organisational
+more than technical.
 
-1. ~~Swap the token cache to `MsalCacheHelper`~~ — **done**, see §8.1. Needs review and a
-   push; the branch exists only locally.
-2. ~~`git init` the repo~~ — **done**, see §8.3. Still needs a remote before CI can run.
-3. **Exercise the rest of the command surface against a real instance.** First contact is
-   made (§8.9) — auth, base URIs and output rendering all work — but only `status` and one
-   `record get` have actually run.
-   ~~Point the CLI at a real OSDU instance~~ and run the 80 commands. This is now the single
-   biggest source of unknowns: auth, real response shapes, HTTP error mapping and the output
-   projections in 12 manifests are all unverified against a live service.
-4. **Decide the Mac distribution channel before building a notarization pipeline.** If Macs
-   are Jamf-managed, MDM-installed binaries skip quarantine entirely and the fiddliest part
-   of macOS distribution disappears.
-5. ~~Add a test project for the runtime layer~~ — **done**, see §8.4. ~~Try a NativeAOT
-   publish~~ — **attempted, and it does not work today**; see §8.7 for the blocker chain.
-   CI stays on self-contained single-file until the client library is AOT-clean.
-6. ~~Write shell completion registration scripts~~ — **done**, see §8.8. The PowerShell
-   execution-policy question is still worth raising with the Windows team alongside WDAC;
-   the emitted script says what to do about it, but nobody has tried it on a managed
-   machine.
+1. **Get the WDAC answer from the Windows team.** An unsigned `osducs.exe` may simply not run
+   on a managed laptop, and that decides whether anything beyond a hand-held test round is
+   possible. This is the question the whole exercise started from and it is still open.
+2. **Decide the macOS channel before building a notarization pipeline.** If Macs are
+   Jamf-managed, MDM-installed binaries skip quarantine entirely and the fiddliest part
+   disappears. Worth ten minutes of asking before days of building.
+3. **Merge `0.3.0` and run a peer round.** Point people at `docs/USAGE.md` and
+   `docs/TROUBLESHOOTING.md`; the second matters more than it looks, because two of the five
+   failure categories in the sweep were not defects, and the first report back will otherwise
+   be one of them.
+4. **Exercise the write commands.** 32 of them — every `add`, `update`, `delete`, `upload`
+   and `trigger` — have never run against anything. They want a scratch partition, not dev.
+5. **Answer the measurement/unit `400`s** (§8, still open 5). The only sweep failures without
+   an explanation, and likely a quick manifest fix for someone who knows the domain.
+6. **Revisit NativeAOT** once the client's facade is AOT-clean: 84 MB to 8.3 MB, and ~0 ms
+   startup.
 
 `config`, `version`, `list` and `dataload` stay hand-written by design and never enter a
 manifest.
+
+---
+
+## 10. Where it stands, 2026-08-26
+
+| | |
+|---|---|
+| Repo | [equinor/osdu-csharp-cli](https://github.com/equinor/osdu-csharp-cli), internal, CI green |
+| Released | `v0.2.1`; `0.3.0` staged in [#3](https://github.com/equinor/osdu-csharp-cli/pull/3) |
+| Binary | `osducs`, 84 MB self-contained, 30 MB compressed, three platforms |
+| Client | `Equinor.OsduCsharpClient` 1.1.9, three fixes contributed |
+| Commands | 81 generated across 12 services, plus `status` and `completion` |
+| Tests | 115 C#, 65 Python (incl. 7 golden), 16 live smoke examples |
+| Gates | pytest → manifests → generated-code staleness → command-reference staleness → build → tests → 3-platform publish |
+| Docs | usage, generated command reference, troubleshooting, command grammar |
+
+Upstream, six OSDU spec defects were filed from what this work turned up, and three client
+fixes were contributed back.
+
+**The honest summary:** the design question — can a CLI's command surface be generated from
+OpenAPI specs plus an editorial manifest — is answered yes, with the manifest carrying
+exactly the decisions a spec cannot express. What is unproven is everything about
+distribution, and one unanswered question from a Windows administrator could still make the
+whole approach moot on the platform it was built for.
