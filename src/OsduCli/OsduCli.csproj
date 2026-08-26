@@ -23,11 +23,12 @@
   </ItemGroup>
 
   <!-- The client is consumed as a package, not a sibling checkout, so this repo builds on
-       its own. 1.1.8 is the first release that both encrypts the MSAL token cache (#98)
-       and sends a content type on bodiless requests (#101), without which Storage's
-       query endpoints answer 415. Do not go below it. -->
+       its own. 1.1.9 is the first release with all three client fixes this CLI depends on:
+       an encrypted MSAL token cache (#98), a content type on bodiless requests (#101,
+       without which Storage's query endpoints answer 415), and untyped string responses
+       (#103, without which `record get` prints nothing). Do not go below it. -->
   <ItemGroup>
-    <PackageReference Include="Equinor.OsduCsharpClient" Version="1.1.8" />
+    <PackageReference Include="Equinor.OsduCsharpClient" Version="1.1.9" />
   </ItemGroup>
 
 </Project>
