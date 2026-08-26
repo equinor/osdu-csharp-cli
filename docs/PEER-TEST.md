@@ -1,0 +1,161 @@
+# Trying osducs — a 20-minute test round
+
+`osducs` is a proof of concept: an OSDU command line whose commands are **generated from the
+OSDU OpenAPI specs**, rather than hand-written like the Python `osducli`. The question it is
+meant to answer is whether that approach produces a CLI people actually want to use, and
+whether it can be packaged for a managed Windows laptop — which is where the Python one
+struggles.
+
+You are being asked to use it for twenty minutes and say what is wrong with it. Rough edges
+are expected and useful; **81 of its commands were generated from a spec and most have never
+been run by a human.**
+
+It does not replace `osducli`. The binary is called `osducs` precisely so both can sit on your
+`PATH` while you decide.
+
+---
+
+## 1. Install (2 minutes)
+
+The repository is internal, so the download needs to be authenticated. A plain `curl` of the
+asset URL returns 404.
+
+**macOS (Apple silicon)**
+
+```bash
+gh release download --repo equinor/osdu-csharp-cli --pattern "osducs-osx-arm64.tar.gz"
+tar -xzf osducs-osx-arm64.tar.gz && chmod +x osducs
+xattr -d com.apple.quarantine ./osducs     # not yet notarized
+sudo mv osducs /usr/local/bin/
+```
+
+**Windows**
+
+```powershell
+gh release download --repo equinor/osdu-csharp-cli --pattern "osducs-win-x64.zip"
+Expand-Archive osducs-win-x64.zip -DestinationPath .
+```
+
+SmartScreen will warn: the binary is unsigned. **If your laptop refuses to run it at all,
+that is the single most useful thing you can tell us** — see §5.
+
+**Linux** — `osducs-linux-x64.tar.gz`, same shape as macOS without the `xattr` line.
+
+No browser? The [releases page](https://github.com/equinor/osdu-csharp-cli/releases/latest)
+works if you are signed in to GitHub.
+
+## 2. First run (1 minute)
+
+**If you already use `osducli`, there is nothing to configure.** `osducs` reads the same
+profiles from `~/.osducli/` and follows whichever one you have selected.
+
+```bash
+osducs status
+```
+
+```
+https://equinorswedev.energy.azure.com  partition dev
+Service       Status  Version          Build
+------------  ------  ---------------  ------------------------
+crs-catalog   ok      0.29.2-SNAPSHOT  2026-08-05T09:49:35.371Z
+storage       ok      0.29.4-SNAPSHOT  2026-08-05T19:04:12.267Z
+```
+
+Use `-c <profile>` to point at another, e.g. `osducs status -c test`.
+
+If you do not use `osducli`, see [USAGE.md](USAGE.md#configuration).
+
+## 3. Things to try (15 minutes)
+
+Please stay on a **development partition**. Everything below is read-only.
+
+```bash
+# What is in this partition, and how much of it
+osducs record aggregate --kind "osdu:wks:*:*" --by kind
+
+# Find something
+osducs record search --kind "osdu:wks:master-data--Well:*" --limit 5
+osducs record search --kind "osdu:wks:master-data--Well:*" --query 'data.FacilityName:GB*'
+
+# Choose your own columns
+osducs record search --kind "osdu:wks:master-data--Well:*" --limit 5 \
+    -f id -f data.FacilityName
+
+# The real match count — without this it stops at 10000
+osducs record search --kind "osdu:wks:master-data--Well:*" --limit 1 --track-total-count
+
+# Read one record (take an id from a search above)
+osducs record get --id "<id from above>"
+
+# Governance
+osducs legaltag list
+osducs record aggregate --kind "osdu:wks:master-data--*:*" --by legal.legaltags
+
+# Discoverability — does the help tell you what you need?
+osducs --help
+osducs record --help
+osducs record search --help
+```
+
+Then **go off-script**. Look for the thing you would actually do in a normal week and see
+whether you can work out how to do it from `--help` alone. That is the part we most want
+tested.
+
+Tab completion, if you want it:
+
+```bash
+echo 'eval "$(osducs completion zsh)"' >> ~/.zshrc     # bash, fish, powershell also work
+```
+
+## 4. Please avoid, for now
+
+**Write commands are untested.** Every `add`, `update`, `delete`, `upload` and `trigger` —
+32 commands — was generated from a spec and has never been run against anything. They may
+work; they may also do something you did not intend. Do not point them at data you care
+about. If you want to exercise them, tell us and we will find a scratch partition.
+
+## 5. What to report
+
+Most useful, in order:
+
+1. **A command that ran but told you nothing useful** — empty columns, the wrong fields, a
+   table where you wanted the detail. Output columns for 81 commands were chosen by reading
+   spec field names, and many have never met a real response. Each is a one-line fix.
+2. **Help that did not answer your question.** If you could not work out what a flag wanted,
+   that is a defect.
+3. **A command you expected to exist and could not find**, or one whose name you would have
+   guessed differently. Commands are named for the *resource* (`osducs record search`, not
+   `osducs search`), and whether that reads naturally is exactly what is in question.
+4. **Windows: whether it runs at all.** WDAC or AppLocker blocking an unsigned executable is
+   the finding that decides whether this approach is viable, and none of us can test it from
+   a Mac.
+
+Include the command you ran. `--debug` prints the request and response if you want to attach
+more:
+
+```bash
+osducs record get --id "…" --debug
+```
+
+Raise it wherever suits — an issue on
+[equinor/osdu-csharp-cli](https://github.com/equinor/osdu-csharp-cli/issues) keeps it with
+the code.
+
+## 6. Known, please do not report
+
+| You see | Why |
+|---|---|
+| `record list` → `403 not authorized` | Storage's kind-scoped query needs entitlements most people lack. **Use `record search`.** |
+| `group member list` → `401` | Same, on Entitlements. |
+| `record headers` → `404 No static resource` | The endpoint is real but **arrives with M27**. The CLI is ahead of ADME. |
+| `GET /records` → `500 not implemented` | In the spec, absent from ADME. |
+| `--by data.Something` → `400 Aggregations are not supported` | Only keyword-indexed fields aggregate; on dev that means envelope fields, not `data.*`. |
+| Count shows exactly `10,000+` | That is the cap, not the answer. Add `--track-total-count`. |
+| macOS quarantine, Windows SmartScreen | Not signed yet. Known, and being decided. |
+
+More detail in [TROUBLESHOOTING.md](TROUBLESHOOTING.md).
+
+---
+
+**Reference:** [USAGE.md](USAGE.md) for the everyday guide, [COMMANDS.md](COMMANDS.md) for
+every command and flag.

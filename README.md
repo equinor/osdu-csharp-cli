@@ -9,21 +9,21 @@ stay hand-written, and which this PoC makes explicit rather than implicit.
 
 ## Install
 
-Download the archive for your platform from the [latest release][releases], extract it, and
-put `osducs` on your `PATH`.
+The repository is **internal**, so release assets need an authenticated download — a plain
+`curl` of the asset URL returns 404. Either use the GitHub CLI:
 
 ```bash
-# macOS (Apple silicon)
-curl -L -o osducs.tar.gz https://github.com/equinor/osdu-csharp-cli/releases/latest/download/osducs-osx-arm64.tar.gz
-tar -xzf osducs.tar.gz && chmod +x osducs
+gh release download --repo equinor/osdu-csharp-cli --pattern "osducs-osx-arm64.tar.gz"
+tar -xzf osducs-osx-arm64.tar.gz && chmod +x osducs
 
-# macOS quarantines anything downloaded from a browser or curl. Until the binary is
-# signed and notarized, clear it yourself:
+# macOS quarantines downloads until the binary is signed and notarized
 xattr -d com.apple.quarantine ./osducs
 ```
 
-Linux is `osducs-linux-x64.tar.gz`; Windows is `osducs-win-x64.zip`. Around 30 MB
-compressed. Nothing else is needed — the .NET runtime is inside the binary.
+…or download from the [releases page][releases] in a browser you are signed in with.
+
+`osducs-linux-x64.tar.gz` and `osducs-win-x64.zip` are the other two. Around 30 MB
+compressed; nothing else is needed, since the .NET runtime is inside the binary.
 
 The command is `osducs`, not `osdu`, so it sits alongside the Python
 [`osducli`](https://community.opengroup.org/osdu/platform/data-flow/data-loading/osdu-cli)
@@ -35,6 +35,7 @@ rather than replacing it.
 
 | | |
 |---|---|
+| [docs/PEER-TEST.md](docs/PEER-TEST.md) | **hand this to a tester** — install, what to try, what not to report |
 | [docs/USAGE.md](docs/USAGE.md) | configuration, output, finding records — the everyday guide |
 | [docs/COMMANDS.md](docs/COMMANDS.md) | every command and flag, generated from the manifests |
 | [docs/TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md) | failure modes seen against a live instance, and which are not the CLI's fault |
