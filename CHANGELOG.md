@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.3.1](https://github.com/equinor/osdu-csharp-cli/compare/v0.3.0...v0.3.1) (2026-08-26)
+
+
+### Bug Fixes
+
+* **status:** probe all twelve services, not ten ([920188d](https://github.com/equinor/osdu-csharp-cli/commit/920188d86cb671c69932a694f112094cad1a5a45))
+
 ## [0.3.0](https://github.com/equinor/osdu-csharp-cli/compare/v0.2.1...v0.3.0) (2026-08-26)
 
 
