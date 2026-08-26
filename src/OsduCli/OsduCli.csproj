@@ -3,7 +3,7 @@
   <PropertyGroup>
     <OutputType>Exe</OutputType>
     <AssemblyName>osducs</AssemblyName>
-    <Version>0.2.1</Version>
+    <Version>0.3.0</Version>
     <RootNamespace>Equinor.OsduCli</RootNamespace>
     <InvariantGlobalization>true</InvariantGlobalization>
   </PropertyGroup>
@@ -15,11 +15,11 @@
   </ItemGroup>
 
   <ItemGroup>
-    <PackageReference Include="Microsoft.Extensions.Logging.Console" Version="10.0.11" />
-    <PackageReference Include="System.CommandLine" Version="2.0.11" />
-    <PackageReference Include="Microsoft.Extensions.Configuration" Version="10.0.11" />
-    <PackageReference Include="Microsoft.Extensions.Configuration.Json" Version="10.0.11" />
-    <PackageReference Include="Microsoft.Extensions.Configuration.EnvironmentVariables" Version="10.0.11" />
+    <PackageReference Include="Microsoft.Extensions.Logging.Console" Version="10.0.11"/>
+    <PackageReference Include="System.CommandLine" Version="2.0.11"/>
+    <PackageReference Include="Microsoft.Extensions.Configuration" Version="10.0.11"/>
+    <PackageReference Include="Microsoft.Extensions.Configuration.Json" Version="10.0.11"/>
+    <PackageReference Include="Microsoft.Extensions.Configuration.EnvironmentVariables" Version="10.0.11"/>
   </ItemGroup>
 
   <!-- The client is consumed as a package, not a sibling checkout, so this repo builds on
@@ -28,7 +28,7 @@
        without which Storage's query endpoints answer 415), and untyped string responses
        (#103, without which `record get` prints nothing). Do not go below it. -->
   <ItemGroup>
-    <PackageReference Include="Equinor.OsduCsharpClient" Version="1.1.9" />
+    <PackageReference Include="Equinor.OsduCsharpClient" Version="1.1.9"/>
   </ItemGroup>
 
 </Project>
