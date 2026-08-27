@@ -47,12 +47,16 @@ public static class GeneratedCommands
         tree.Describe("well version", "Inspect Well record version history.");
         tree.Describe("wellbore version", "Inspect Wellbore record version history.");
         tree.Describe("welllog version", "Inspect WellLog record version history.");
+        tree.Describe("welllog data", "Read WellLog bulk data.");
         tree.Describe("trajectory version", "Inspect WellboreTrajectory record version history.");
+        tree.Describe("trajectory data", "Read WellboreTrajectory bulk data.");
         tree.Describe("markerset version", "Inspect WellboreMarkerSet record version history.");
         tree.Describe("intervalset version", "Inspect WellboreIntervalSet record version history.");
         tree.Describe("logacquisition version", "Inspect WellLogAcquisition record version history.");
         tree.Describe("ppfg version", "Inspect PPFGDataset record version history.");
+        tree.Describe("ppfg data", "Read PPFGDataset bulk data.");
         tree.Describe("pressuretest version", "Inspect WellPressureTestRawMeasurement record version history.");
+        tree.Describe("pressuretest data", "Read WellPressureTestRawMeasurement bulk data.");
         tree.Describe("workflow run", "Inspect and manage individual workflow executions.");
 
         tree.Node("crs");
@@ -84,12 +88,16 @@ public static class GeneratedCommands
         tree.Node("well version");
         tree.Node("wellbore version");
         tree.Node("welllog version");
+        tree.Node("welllog data");
         tree.Node("trajectory version");
+        tree.Node("trajectory data");
         tree.Node("markerset version");
         tree.Node("intervalset version");
         tree.Node("logacquisition version");
         tree.Node("ppfg version");
+        tree.Node("ppfg data");
         tree.Node("pressuretest version");
+        tree.Node("pressuretest data");
         tree.Node("workflow run");
 
         CrsCatalogCommands.Attach(tree);

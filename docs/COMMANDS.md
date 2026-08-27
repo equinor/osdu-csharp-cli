@@ -25,16 +25,16 @@ no manifest. Run `osducs --help` for the full tree.
 | [`markerset`](#markerset) | `get`, `add`, `delete`, `version list`, `version get` |
 | [`measurement`](#measurement) | `list`, `get`, `search`, `maps` |
 | [`member`](#member) | `group list`, `delete` |
-| [`ppfg`](#ppfg) | `get`, `add`, `delete`, `version list`, `version get` |
-| [`pressuretest`](#pressuretest) | `get`, `add`, `delete`, `version list`, `version get` |
+| [`ppfg`](#ppfg) | `get`, `add`, `delete`, `version list`, `version get`, `data get`, `version data` |
+| [`pressuretest`](#pressuretest) | `get`, `add`, `delete`, `version list`, `version get`, `data get`, `version data` |
 | [`record`](#record) | `search`, `aggregate`, `list`, `get`, `headers`, `delete`, `version list`, `version get` |
 | [`schema`](#schema) | `list`, `get`, `add`, `update` |
-| [`trajectory`](#trajectory) | `get`, `add`, `delete`, `version list`, `version get` |
+| [`trajectory`](#trajectory) | `get`, `add`, `delete`, `version list`, `version get`, `data get`, `version data` |
 | [`unit`](#unit) | `list`, `get`, `search`, `by-symbol`, `by-measurement`, `by-system`, `preferred`, `maps`, `conversion scale`, `conversion abcd`, `catalog get`, `catalog search`, `catalog map-states`, `catalog last-modified` |
 | [`unit-system`](#unit-system) | `list`, `get` |
 | [`well`](#well) | `get`, `add`, `delete`, `version list`, `version get` |
 | [`wellbore`](#wellbore) | `get`, `add`, `delete`, `version list`, `version get` |
-| [`welllog`](#welllog) | `get`, `add`, `delete`, `version list`, `version get` |
+| [`welllog`](#welllog) | `get`, `add`, `delete`, `version list`, `version get`, `data get`, `version data`, `data stats`, `version stats` |
 | [`workflow`](#workflow) | `list`, `get`, `add`, `delete`, `run list`, `run get`, `run trigger`, `run update`, `run latest` |
 
 ## crs
@@ -644,6 +644,22 @@ Add a PPFGDataset record from a JSON file.
 |---|---|---|
 | `-f`, `--file` | yes | JSON file containing the PPFGDataset record. |
 
+### `osducs ppfg data get`
+
+Read the bulk data of a PPFGDataset record.
+
+`GET /ddms/v3/ppfgdataset/{record_id}/data` — wellbore_ddms
+
+| Option | Required | Description |
+|---|---|---|
+| `-id`, `--id` | yes | PPFGDataset record id. |
+| `--offset` |  | Row to start at. |
+| `-l`, `--limit` |  | Maximum rows to return. |
+| `--curves` |  | Comma-separated columns to return, e.g. MD,GR. Omit for all. |
+| `--filter` |  | Row filter as column:operator:value, e.g. MD:gte:1000. Operators: lt, lte, gt, gte, eq, neq. |
+| `--describe` |  | Return row and column counts instead of the data. |
+| `--orient` |  | JSON shape of the response. |
+
 ### `osducs ppfg delete`
 
 Soft-delete a PPFGDataset record by id.
@@ -663,6 +679,23 @@ Get a PPFGDataset record by id.
 | Option | Required | Description |
 |---|---|---|
 | `-id`, `--id` | yes | PPFGDataset record id. |
+
+### `osducs ppfg version data`
+
+Read the bulk data of a specific PPFGDataset version.
+
+`GET /ddms/v3/ppfgdataset/{record_id}/versions/{version}/data` — wellbore_ddms
+
+| Option | Required | Description |
+|---|---|---|
+| `-id`, `--id` | yes | PPFGDataset record id. |
+| `-v`, `--version` | yes | PPFGDataset record version. |
+| `--offset` |  | Row to start at. |
+| `-l`, `--limit` |  | Maximum rows to return. |
+| `--curves` |  | Comma-separated columns to return, e.g. MD,GR. Omit for all. |
+| `--filter` |  | Row filter as column:operator:value, e.g. MD:gte:1000. Operators: lt, lte, gt, gte, eq, neq. |
+| `--describe` |  | Return row and column counts instead of the data. |
+| `--orient` |  | JSON shape of the response. |
 
 ### `osducs ppfg version get`
 
@@ -697,6 +730,22 @@ Add a WellPressureTestRawMeasurement record from a JSON file.
 |---|---|---|
 | `-f`, `--file` | yes | JSON file containing the WellPressureTestRawMeasurement record. |
 
+### `osducs pressuretest data get`
+
+Read the bulk data of a WellPressureTestRawMeasurement record.
+
+`GET /ddms/v3/wellpressuretestrawmeasurement/{record_id}/data` — wellbore_ddms
+
+| Option | Required | Description |
+|---|---|---|
+| `-id`, `--id` | yes | WellPressureTestRawMeasurement record id. |
+| `--offset` |  | Row to start at. |
+| `-l`, `--limit` |  | Maximum rows to return. |
+| `--curves` |  | Comma-separated columns to return, e.g. MD,GR. Omit for all. |
+| `--filter` |  | Row filter as column:operator:value, e.g. MD:gte:1000. Operators: lt, lte, gt, gte, eq, neq. |
+| `--describe` |  | Return row and column counts instead of the data. |
+| `--orient` |  | JSON shape of the response. |
+
 ### `osducs pressuretest delete`
 
 Soft-delete a WellPressureTestRawMeasurement record by id.
@@ -716,6 +765,23 @@ Get a WellPressureTestRawMeasurement record by id.
 | Option | Required | Description |
 |---|---|---|
 | `-id`, `--id` | yes | WellPressureTestRawMeasurement record id. |
+
+### `osducs pressuretest version data`
+
+Read the bulk data of a specific WellPressureTestRawMeasurement version.
+
+`GET /ddms/v3/wellpressuretestrawmeasurement/{record_id}/versions/{version}/data` — wellbore_ddms
+
+| Option | Required | Description |
+|---|---|---|
+| `-id`, `--id` | yes | WellPressureTestRawMeasurement record id. |
+| `-v`, `--version` | yes | WellPressureTestRawMeasurement record version. |
+| `--offset` |  | Row to start at. |
+| `-l`, `--limit` |  | Maximum rows to return. |
+| `--curves` |  | Comma-separated columns to return, e.g. MD,GR. Omit for all. |
+| `--filter` |  | Row filter as column:operator:value, e.g. MD:gte:1000. Operators: lt, lte, gt, gte, eq, neq. |
+| `--describe` |  | Return row and column counts instead of the data. |
+| `--orient` |  | JSON shape of the response. |
 
 ### `osducs pressuretest version get`
 
@@ -942,6 +1008,22 @@ Add a WellboreTrajectory record from a JSON file.
 |---|---|---|
 | `-f`, `--file` | yes | JSON file containing the WellboreTrajectory record. |
 
+### `osducs trajectory data get`
+
+Read the bulk data of a WellboreTrajectory record.
+
+`GET /ddms/v3/wellboretrajectories/{record_id}/data` — wellbore_ddms
+
+| Option | Required | Description |
+|---|---|---|
+| `-id`, `--id` | yes | WellboreTrajectory record id. |
+| `--offset` |  | Row to start at. |
+| `-l`, `--limit` |  | Maximum rows to return. |
+| `--curves` |  | Comma-separated columns to return, e.g. MD,GR. Omit for all. |
+| `--filter` |  | Row filter as column:operator:value, e.g. MD:gte:1000. Operators: lt, lte, gt, gte, eq, neq. |
+| `--describe` |  | Return row and column counts instead of the data. |
+| `--orient` |  | JSON shape of the response. |
+
 ### `osducs trajectory delete`
 
 Soft-delete a WellboreTrajectory record by id.
@@ -961,6 +1043,23 @@ Get a WellboreTrajectory record by id.
 | Option | Required | Description |
 |---|---|---|
 | `-id`, `--id` | yes | WellboreTrajectory record id. |
+
+### `osducs trajectory version data`
+
+Read the bulk data of a specific WellboreTrajectory version.
+
+`GET /ddms/v3/wellboretrajectories/{record_id}/versions/{version}/data` — wellbore_ddms
+
+| Option | Required | Description |
+|---|---|---|
+| `-id`, `--id` | yes | WellboreTrajectory record id. |
+| `-v`, `--version` | yes | WellboreTrajectory record version. |
+| `--offset` |  | Row to start at. |
+| `-l`, `--limit` |  | Maximum rows to return. |
+| `--curves` |  | Comma-separated columns to return, e.g. MD,GR. Omit for all. |
+| `--filter` |  | Row filter as column:operator:value, e.g. MD:gte:1000. Operators: lt, lte, gt, gte, eq, neq. |
+| `--describe` |  | Return row and column counts instead of the data. |
+| `--orient` |  | JSON shape of the response. |
 
 ### `osducs trajectory version get`
 
@@ -1281,6 +1380,33 @@ Add a WellLog record from a JSON file.
 |---|---|---|
 | `-f`, `--file` | yes | JSON file containing the WellLog record. |
 
+### `osducs welllog data get`
+
+Read the bulk data of a WellLog record.
+
+`GET /ddms/v3/welllogs/{record_id}/data` — wellbore_ddms
+
+| Option | Required | Description |
+|---|---|---|
+| `-id`, `--id` | yes | WellLog record id. |
+| `--offset` |  | Row to start at. |
+| `-l`, `--limit` |  | Maximum rows to return. |
+| `--curves` |  | Comma-separated columns to return, e.g. MD,GR. Omit for all. |
+| `--filter` |  | Row filter as column:operator:value, e.g. MD:gte:1000. Operators: lt, lte, gt, gte, eq, neq. |
+| `--describe` |  | Return row and column counts instead of the data. |
+| `--orient` |  | JSON shape of the response. |
+
+### `osducs welllog data stats`
+
+Summary statistics for the curves of a WellLog record.
+
+`GET /ddms/v3/welllogs/{record_id}/data/statistics` — wellbore_ddms
+
+| Option | Required | Description |
+|---|---|---|
+| `-id`, `--id` | yes | WellLog record id. |
+| `--curves` |  | Comma-separated columns, e.g. MD,GR. Omit for all. |
+
 ### `osducs welllog delete`
 
 Soft-delete a WellLog record by id.
@@ -1300,6 +1426,23 @@ Get a WellLog record by id.
 | Option | Required | Description |
 |---|---|---|
 | `-id`, `--id` | yes | WellLog record id. |
+
+### `osducs welllog version data`
+
+Read the bulk data of a specific WellLog version.
+
+`GET /ddms/v3/welllogs/{record_id}/versions/{version}/data` — wellbore_ddms
+
+| Option | Required | Description |
+|---|---|---|
+| `-id`, `--id` | yes | WellLog record id. |
+| `-v`, `--version` | yes | WellLog record version. |
+| `--offset` |  | Row to start at. |
+| `-l`, `--limit` |  | Maximum rows to return. |
+| `--curves` |  | Comma-separated columns to return, e.g. MD,GR. Omit for all. |
+| `--filter` |  | Row filter as column:operator:value, e.g. MD:gte:1000. Operators: lt, lte, gt, gte, eq, neq. |
+| `--describe` |  | Return row and column counts instead of the data. |
+| `--orient` |  | JSON shape of the response. |
 
 ### `osducs welllog version get`
 
@@ -1321,6 +1464,18 @@ List all versions of a WellLog record.
 | Option | Required | Description |
 |---|---|---|
 | `-id`, `--id` | yes | WellLog record id. |
+
+### `osducs welllog version stats`
+
+Summary statistics for the curves of a specific WellLog version.
+
+`GET /ddms/v3/welllogs/{record_id}/versions/{version}/data/statistics` — wellbore_ddms
+
+| Option | Required | Description |
+|---|---|---|
+| `-id`, `--id` | yes | WellLog record id. |
+| `-v`, `--version` | yes | WellLog record version. |
+| `--curves` |  | Comma-separated columns, e.g. MD,GR. Omit for all. |
 
 ## workflow
 

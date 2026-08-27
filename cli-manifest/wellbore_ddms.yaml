@@ -1,41 +1,47 @@
 # CLI manifest for the Wellbore DDMS service.
 #
-# Scope: every typed record resource, none of the bulk data. The nine resource types share
-# one shape — create, get, soft-delete, list versions, get a version — so this manifest is
-# nine copies of five commands, and the regularity is the point: a user who learns
-# `welllog get` already knows `trajectory get`.
+# Scope: every typed record resource, plus reading their bulk data. The nine resource types
+# share one record shape — create, get, soft-delete, list versions, get a version — so most
+# of this manifest is nine copies of five commands, and the regularity is the point: a user
+# who learns `welllog get` already knows `trajectory get`.
 #
-# What is deliberately outside the scope, and why:
+# The four types that carry bulk data (welllog, trajectory, ppfg, pressuretest) add reads of
+# it: `<noun> data get` for the latest, `<noun> version data` for a specific version. These
+# are ordinary paginated queries — offset, limit, column selection, row filters — and map
+# onto the manifest vocabulary with nothing new.
 #
-#   * The 35 bulk data and session operations (`/data`, `/data/statistics`, `/sessions/*`).
-#     Bulk IO is what a DDMS is for, but it is a different piece of work, not more of this
-#     one: chunked upload is a multi-step session protocol, the payloads are columnar rather
-#     than JSON records, and `--output table` is meaningless for a log curve. They are listed
-#     individually under `exclude:` rather than left out of `scope:`, so that a new bulk
-#     endpoint upstream fails the build as `missing` instead of passing as untriaged.
+# Writing bulk data is still excluded, and that is a considered line rather than a to-do:
 #
-#   * `/about` and `/version` — service identity, which R5 puts in `osducs status`.
+#   * `POST .../data` replaces a whole curve set in one call, and takes JSON or Parquet.
+#   * The `sessions` endpoints are a five-call transactional protocol — open a session, send
+#     chunks, patch it to commit or abandon it — which is a stateful workflow, not a command.
 #
-#   * `/log-recognition/*` — a catalog admin surface, not a record resource.
+# Both are listed individually under `exclude:` rather than left out of `scope:`, so a new
+# bulk endpoint upstream fails the build as `missing` instead of passing as untriaged.
 #
-# One parameter is knowingly not exposed: `DELETE` on the four bulk-carrying types
-# (welllogs, wellboretrajectories, ppfgdataset, wellpressuretestrawmeasurement) accepts a
+# Also outside the scope: `/about` and `/version` (service identity, which R5 puts in
+# `osducs status`) and `/log-recognition/*` (catalog admin, not a record resource).
+#
+# One parameter is knowingly not exposed: `DELETE` on the four bulk-carrying types accepts a
 # `purge` query flag, default false, which the spec documents with an empty description. The
-# delete commands here are all soft deletes. Adding an irreversible flag whose exact effect
-# the spec does not state — and which no confirmation guard would cover, R6 not being
-# implemented yet — is not something to do by inference from its name.
+# delete commands here are all soft deletes. Inferring an irreversible flag's behaviour from
+# its name, with no confirmation guard in place (R6 is not implemented), is not a trade worth
+# making.
+#
+# Bulk reads return JSON here. The endpoints also offer `application/x-parquet` by content
+# negotiation, which would need binary output plumbing the CLI does not have yet.
 
 service: wellbore_ddms
 spec: wellbore_ddms
 client: WellboreDdms
 description: Wellbore DDMS — typed wellbore records.
 
-# Nine typed resources would otherwise be nine of the twenty-two entries on the root
-# help page, crowding out `record`, `schema` and `search`. They get their own section.
+# Nine typed resources would otherwise be nine of the twenty-two entries on the root help
+# page, crowding out `record`, `schema` and `search`. They get their own section.
 section: Wellbore DDMS
 
-# Every typed resource under /ddms/v3. The bulk operations inside these prefixes are claimed
-# by `exclude:` below, not left unscoped.
+# Every typed resource under /ddms/v3. The bulk write operations inside these prefixes are
+# claimed by `exclude:` below, not left unscoped.
 scope:
   - "/ddms/v3/*"
 
@@ -46,8 +52,10 @@ groups:
   wellbore version: Inspect Wellbore record version history.
   welllog: Manage WellLog records.
   welllog version: Inspect WellLog record version history.
+  welllog data: Read WellLog bulk data.
   trajectory: Manage WellboreTrajectory records.
   trajectory version: Inspect WellboreTrajectory record version history.
+  trajectory data: Read WellboreTrajectory bulk data.
   markerset: Manage WellboreMarkerSet records.
   markerset version: Inspect WellboreMarkerSet record version history.
   intervalset: Manage WellboreIntervalSet records.
@@ -56,8 +64,10 @@ groups:
   logacquisition version: Inspect WellLogAcquisition record version history.
   ppfg: Manage PPFGDataset records.
   ppfg version: Inspect PPFGDataset record version history.
+  ppfg data: Read PPFGDataset bulk data.
   pressuretest: Manage WellPressureTestRawMeasurement records.
   pressuretest version: Inspect WellPressureTestRawMeasurement record version history.
+  pressuretest data: Read WellPressureTestRawMeasurement bulk data.
 
 commands:
 
@@ -193,6 +203,50 @@ commands:
       version:   { flag: --version, short: -v, required: true, help: WellLog record version. }
     output: raw
 
+  - command: welllog data get
+    summary: Read the bulk data of a WellLog record.
+    op: { method: get, path: "/ddms/v3/welllogs/{record_id}/data" }
+    params:
+      record_id: { flag: --id, short: -id, required: true, help: WellLog record id. }
+      offset:    { flag: --offset, help: Row to start at. }
+      limit:     { flag: --limit, short: -l, help: Maximum rows to return. }
+      curves:    { flag: --curves, help: "Comma-separated columns to return, e.g. MD,GR. Omit for all." }
+      filter:    { flag: --filter, help: "Row filter as column:operator:value, e.g. MD:gte:1000. Operators: lt, lte, gt, gte, eq, neq." }
+      describe:  { flag: --describe, help: Return row and column counts instead of the data. }
+      orient:    { flag: --orient, help: JSON shape of the response. }
+    output: raw
+
+  - command: welllog version data
+    summary: Read the bulk data of a specific WellLog version.
+    op: { method: get, path: "/ddms/v3/welllogs/{record_id}/versions/{version}/data" }
+    params:
+      record_id: { flag: --id, short: -id, required: true, help: WellLog record id. }
+      version:   { flag: --version, short: -v, required: true, help: WellLog record version. }
+      offset:    { flag: --offset, help: Row to start at. }
+      limit:     { flag: --limit, short: -l, help: Maximum rows to return. }
+      curves:    { flag: --curves, help: "Comma-separated columns to return, e.g. MD,GR. Omit for all." }
+      filter:    { flag: --filter, help: "Row filter as column:operator:value, e.g. MD:gte:1000. Operators: lt, lte, gt, gte, eq, neq." }
+      describe:  { flag: --describe, help: Return row and column counts instead of the data. }
+      orient:    { flag: --orient, help: JSON shape of the response. }
+    output: raw
+
+  - command: welllog data stats
+    summary: Summary statistics for the curves of a WellLog record.
+    op: { method: get, path: "/ddms/v3/welllogs/{record_id}/data/statistics" }
+    params:
+      record_id: { flag: --id, short: -id, required: true, help: WellLog record id. }
+      curves:    { flag: --curves, help: "Comma-separated columns, e.g. MD,GR. Omit for all." }
+    output: raw
+
+  - command: welllog version stats
+    summary: Summary statistics for the curves of a specific WellLog version.
+    op: { method: get, path: "/ddms/v3/welllogs/{record_id}/versions/{version}/data/statistics" }
+    params:
+      record_id: { flag: --id, short: -id, required: true, help: WellLog record id. }
+      version:   { flag: --version, short: -v, required: true, help: WellLog record version. }
+      curves:    { flag: --curves, help: "Comma-separated columns, e.g. MD,GR. Omit for all." }
+    output: raw
+
   # ---- WellboreTrajectory ----------------------------------------------------------------
   - command: trajectory get
     summary: Get a WellboreTrajectory record by id.
@@ -235,6 +289,33 @@ commands:
     params:
       record_id: { flag: --id, short: -id, required: true, help: WellboreTrajectory record id. }
       version:   { flag: --version, short: -v, required: true, help: WellboreTrajectory record version. }
+    output: raw
+
+  - command: trajectory data get
+    summary: Read the bulk data of a WellboreTrajectory record.
+    op: { method: get, path: "/ddms/v3/wellboretrajectories/{record_id}/data" }
+    params:
+      record_id: { flag: --id, short: -id, required: true, help: WellboreTrajectory record id. }
+      offset:    { flag: --offset, help: Row to start at. }
+      limit:     { flag: --limit, short: -l, help: Maximum rows to return. }
+      curves:    { flag: --curves, help: "Comma-separated columns to return, e.g. MD,GR. Omit for all." }
+      filter:    { flag: --filter, help: "Row filter as column:operator:value, e.g. MD:gte:1000. Operators: lt, lte, gt, gte, eq, neq." }
+      describe:  { flag: --describe, help: Return row and column counts instead of the data. }
+      orient:    { flag: --orient, help: JSON shape of the response. }
+    output: raw
+
+  - command: trajectory version data
+    summary: Read the bulk data of a specific WellboreTrajectory version.
+    op: { method: get, path: "/ddms/v3/wellboretrajectories/{record_id}/versions/{version}/data" }
+    params:
+      record_id: { flag: --id, short: -id, required: true, help: WellboreTrajectory record id. }
+      version:   { flag: --version, short: -v, required: true, help: WellboreTrajectory record version. }
+      offset:    { flag: --offset, help: Row to start at. }
+      limit:     { flag: --limit, short: -l, help: Maximum rows to return. }
+      curves:    { flag: --curves, help: "Comma-separated columns to return, e.g. MD,GR. Omit for all." }
+      filter:    { flag: --filter, help: "Row filter as column:operator:value, e.g. MD:gte:1000. Operators: lt, lte, gt, gte, eq, neq." }
+      describe:  { flag: --describe, help: Return row and column counts instead of the data. }
+      orient:    { flag: --orient, help: JSON shape of the response. }
     output: raw
 
   # ---- WellboreMarkerSet ----------------------------------------------------------------
@@ -413,6 +494,33 @@ commands:
       version:   { flag: --version, short: -v, required: true, help: PPFGDataset record version. }
     output: raw
 
+  - command: ppfg data get
+    summary: Read the bulk data of a PPFGDataset record.
+    op: { method: get, path: "/ddms/v3/ppfgdataset/{record_id}/data" }
+    params:
+      record_id: { flag: --id, short: -id, required: true, help: PPFGDataset record id. }
+      offset:    { flag: --offset, help: Row to start at. }
+      limit:     { flag: --limit, short: -l, help: Maximum rows to return. }
+      curves:    { flag: --curves, help: "Comma-separated columns to return, e.g. MD,GR. Omit for all." }
+      filter:    { flag: --filter, help: "Row filter as column:operator:value, e.g. MD:gte:1000. Operators: lt, lte, gt, gte, eq, neq." }
+      describe:  { flag: --describe, help: Return row and column counts instead of the data. }
+      orient:    { flag: --orient, help: JSON shape of the response. }
+    output: raw
+
+  - command: ppfg version data
+    summary: Read the bulk data of a specific PPFGDataset version.
+    op: { method: get, path: "/ddms/v3/ppfgdataset/{record_id}/versions/{version}/data" }
+    params:
+      record_id: { flag: --id, short: -id, required: true, help: PPFGDataset record id. }
+      version:   { flag: --version, short: -v, required: true, help: PPFGDataset record version. }
+      offset:    { flag: --offset, help: Row to start at. }
+      limit:     { flag: --limit, short: -l, help: Maximum rows to return. }
+      curves:    { flag: --curves, help: "Comma-separated columns to return, e.g. MD,GR. Omit for all." }
+      filter:    { flag: --filter, help: "Row filter as column:operator:value, e.g. MD:gte:1000. Operators: lt, lte, gt, gte, eq, neq." }
+      describe:  { flag: --describe, help: Return row and column counts instead of the data. }
+      orient:    { flag: --orient, help: JSON shape of the response. }
+    output: raw
+
   # ---- WellPressureTestRawMeasurement ----------------------------------------------------------------
   - command: pressuretest get
     summary: Get a WellPressureTestRawMeasurement record by id.
@@ -457,76 +565,83 @@ commands:
       version:   { flag: --version, short: -v, required: true, help: WellPressureTestRawMeasurement record version. }
     output: raw
 
+  - command: pressuretest data get
+    summary: Read the bulk data of a WellPressureTestRawMeasurement record.
+    op: { method: get, path: "/ddms/v3/wellpressuretestrawmeasurement/{record_id}/data" }
+    params:
+      record_id: { flag: --id, short: -id, required: true, help: WellPressureTestRawMeasurement record id. }
+      offset:    { flag: --offset, help: Row to start at. }
+      limit:     { flag: --limit, short: -l, help: Maximum rows to return. }
+      curves:    { flag: --curves, help: "Comma-separated columns to return, e.g. MD,GR. Omit for all." }
+      filter:    { flag: --filter, help: "Row filter as column:operator:value, e.g. MD:gte:1000. Operators: lt, lte, gt, gte, eq, neq." }
+      describe:  { flag: --describe, help: Return row and column counts instead of the data. }
+      orient:    { flag: --orient, help: JSON shape of the response. }
+    output: raw
+
+  - command: pressuretest version data
+    summary: Read the bulk data of a specific WellPressureTestRawMeasurement version.
+    op: { method: get, path: "/ddms/v3/wellpressuretestrawmeasurement/{record_id}/versions/{version}/data" }
+    params:
+      record_id: { flag: --id, short: -id, required: true, help: WellPressureTestRawMeasurement record id. }
+      version:   { flag: --version, short: -v, required: true, help: WellPressureTestRawMeasurement record version. }
+      offset:    { flag: --offset, help: Row to start at. }
+      limit:     { flag: --limit, short: -l, help: Maximum rows to return. }
+      curves:    { flag: --curves, help: "Comma-separated columns to return, e.g. MD,GR. Omit for all." }
+      filter:    { flag: --filter, help: "Row filter as column:operator:value, e.g. MD:gte:1000. Operators: lt, lte, gt, gte, eq, neq." }
+      describe:  { flag: --describe, help: Return row and column counts instead of the data. }
+      orient:    { flag: --orient, help: JSON shape of the response. }
+    output: raw
+
 handwritten: []
 
 exclude:
-  - op: { method: get, path: "/ddms/v3/ppfgdataset/{record_id}/data" }
-    reason: Bulk data read/write; columnar payloads that no table output can render.
   - op: { method: post, path: "/ddms/v3/ppfgdataset/{record_id}/data" }
-    reason: Bulk data read/write; columnar payloads that no table output can render.
+    reason: Replaces a record's entire bulk payload in one call, JSON or Parquet. Excluded with the rest of bulk write.
   - op: { method: get, path: "/ddms/v3/ppfgdataset/{record_id}/sessions" }
-    reason: Bulk upload session lifecycle; excluded with the rest of bulk IO.
+    reason: Bulk upload session lifecycle — open, inspect, commit or abandon. A stateful workflow, not a single call.
   - op: { method: post, path: "/ddms/v3/ppfgdataset/{record_id}/sessions" }
-    reason: Bulk upload session lifecycle; excluded with the rest of bulk IO.
+    reason: Bulk upload session lifecycle — open, inspect, commit or abandon. A stateful workflow, not a single call.
   - op: { method: get, path: "/ddms/v3/ppfgdataset/{record_id}/sessions/{session_id}" }
-    reason: Bulk upload session lifecycle; excluded with the rest of bulk IO.
+    reason: Bulk upload session lifecycle — open, inspect, commit or abandon. A stateful workflow, not a single call.
   - op: { method: patch, path: "/ddms/v3/ppfgdataset/{record_id}/sessions/{session_id}" }
-    reason: Bulk upload session lifecycle; excluded with the rest of bulk IO.
+    reason: Bulk upload session lifecycle — open, inspect, commit or abandon. A stateful workflow, not a single call.
   - op: { method: post, path: "/ddms/v3/ppfgdataset/{record_id}/sessions/{session_id}/data" }
-    reason: Chunked bulk upload; a multi-step session protocol, not a single call.
-  - op: { method: get, path: "/ddms/v3/ppfgdataset/{record_id}/versions/{version}/data" }
-    reason: Bulk data for a specific record version; excluded with the rest of bulk IO.
-  - op: { method: get, path: "/ddms/v3/wellboretrajectories/{record_id}/data" }
-    reason: Bulk data read/write; columnar payloads that no table output can render.
+    reason: Chunked bulk upload; a step inside the session protocol, not a command.
   - op: { method: post, path: "/ddms/v3/wellboretrajectories/{record_id}/data" }
-    reason: Bulk data read/write; columnar payloads that no table output can render.
+    reason: Replaces a record's entire bulk payload in one call, JSON or Parquet. Excluded with the rest of bulk write.
   - op: { method: get, path: "/ddms/v3/wellboretrajectories/{record_id}/sessions" }
-    reason: Bulk upload session lifecycle; excluded with the rest of bulk IO.
+    reason: Bulk upload session lifecycle — open, inspect, commit or abandon. A stateful workflow, not a single call.
   - op: { method: post, path: "/ddms/v3/wellboretrajectories/{record_id}/sessions" }
-    reason: Bulk upload session lifecycle; excluded with the rest of bulk IO.
+    reason: Bulk upload session lifecycle — open, inspect, commit or abandon. A stateful workflow, not a single call.
   - op: { method: get, path: "/ddms/v3/wellboretrajectories/{record_id}/sessions/{session_id}" }
-    reason: Bulk upload session lifecycle; excluded with the rest of bulk IO.
+    reason: Bulk upload session lifecycle — open, inspect, commit or abandon. A stateful workflow, not a single call.
   - op: { method: patch, path: "/ddms/v3/wellboretrajectories/{record_id}/sessions/{session_id}" }
-    reason: Bulk upload session lifecycle; excluded with the rest of bulk IO.
+    reason: Bulk upload session lifecycle — open, inspect, commit or abandon. A stateful workflow, not a single call.
   - op: { method: post, path: "/ddms/v3/wellboretrajectories/{record_id}/sessions/{session_id}/data" }
-    reason: Chunked bulk upload; a multi-step session protocol, not a single call.
-  - op: { method: get, path: "/ddms/v3/wellboretrajectories/{record_id}/versions/{version}/data" }
-    reason: Bulk data for a specific record version; excluded with the rest of bulk IO.
-  - op: { method: get, path: "/ddms/v3/welllogs/{record_id}/data" }
-    reason: Bulk data read/write; columnar payloads that no table output can render.
+    reason: Chunked bulk upload; a step inside the session protocol, not a command.
   - op: { method: post, path: "/ddms/v3/welllogs/{record_id}/data" }
-    reason: Bulk data read/write; columnar payloads that no table output can render.
-  - op: { method: get, path: "/ddms/v3/welllogs/{record_id}/data/statistics" }
-    reason: Bulk curve statistics; belongs with the bulk data work.
+    reason: Replaces a record's entire bulk payload in one call, JSON or Parquet. Excluded with the rest of bulk write.
   - op: { method: get, path: "/ddms/v3/welllogs/{record_id}/sessions" }
-    reason: Bulk upload session lifecycle; excluded with the rest of bulk IO.
+    reason: Bulk upload session lifecycle — open, inspect, commit or abandon. A stateful workflow, not a single call.
   - op: { method: post, path: "/ddms/v3/welllogs/{record_id}/sessions" }
-    reason: Bulk upload session lifecycle; excluded with the rest of bulk IO.
+    reason: Bulk upload session lifecycle — open, inspect, commit or abandon. A stateful workflow, not a single call.
   - op: { method: get, path: "/ddms/v3/welllogs/{record_id}/sessions/{session_id}" }
-    reason: Bulk upload session lifecycle; excluded with the rest of bulk IO.
+    reason: Bulk upload session lifecycle — open, inspect, commit or abandon. A stateful workflow, not a single call.
   - op: { method: patch, path: "/ddms/v3/welllogs/{record_id}/sessions/{session_id}" }
-    reason: Bulk upload session lifecycle; excluded with the rest of bulk IO.
+    reason: Bulk upload session lifecycle — open, inspect, commit or abandon. A stateful workflow, not a single call.
   - op: { method: post, path: "/ddms/v3/welllogs/{record_id}/sessions/{session_id}/data" }
-    reason: Chunked bulk upload; a multi-step session protocol, not a single call.
-  - op: { method: get, path: "/ddms/v3/welllogs/{record_id}/versions/{version}/data" }
-    reason: Bulk data for a specific record version; excluded with the rest of bulk IO.
-  - op: { method: get, path: "/ddms/v3/welllogs/{record_id}/versions/{version}/data/statistics" }
-    reason: Bulk curve statistics; belongs with the bulk data work.
+    reason: Chunked bulk upload; a step inside the session protocol, not a command.
   - op: { method: post, path: "/ddms/v3/welllogs/{record_id}/versions/{version}/data/statistics" }
-    reason: Bulk curve statistics; belongs with the bulk data work.
-  - op: { method: get, path: "/ddms/v3/wellpressuretestrawmeasurement/{record_id}/data" }
-    reason: Bulk data read/write; columnar payloads that no table output can render.
+    reason: Writes computed statistics back; paired with the bulk write path.
   - op: { method: post, path: "/ddms/v3/wellpressuretestrawmeasurement/{record_id}/data" }
-    reason: Bulk data read/write; columnar payloads that no table output can render.
+    reason: Replaces a record's entire bulk payload in one call, JSON or Parquet. Excluded with the rest of bulk write.
   - op: { method: get, path: "/ddms/v3/wellpressuretestrawmeasurement/{record_id}/sessions" }
-    reason: Bulk upload session lifecycle; excluded with the rest of bulk IO.
+    reason: Bulk upload session lifecycle — open, inspect, commit or abandon. A stateful workflow, not a single call.
   - op: { method: post, path: "/ddms/v3/wellpressuretestrawmeasurement/{record_id}/sessions" }
-    reason: Bulk upload session lifecycle; excluded with the rest of bulk IO.
+    reason: Bulk upload session lifecycle — open, inspect, commit or abandon. A stateful workflow, not a single call.
   - op: { method: get, path: "/ddms/v3/wellpressuretestrawmeasurement/{record_id}/sessions/{session_id}" }
-    reason: Bulk upload session lifecycle; excluded with the rest of bulk IO.
+    reason: Bulk upload session lifecycle — open, inspect, commit or abandon. A stateful workflow, not a single call.
   - op: { method: patch, path: "/ddms/v3/wellpressuretestrawmeasurement/{record_id}/sessions/{session_id}" }
-    reason: Bulk upload session lifecycle; excluded with the rest of bulk IO.
+    reason: Bulk upload session lifecycle — open, inspect, commit or abandon. A stateful workflow, not a single call.
   - op: { method: post, path: "/ddms/v3/wellpressuretestrawmeasurement/{record_id}/sessions/{session_id}/data" }
-    reason: Chunked bulk upload; a multi-step session protocol, not a single call.
-  - op: { method: get, path: "/ddms/v3/wellpressuretestrawmeasurement/{record_id}/versions/{version}/data" }
-    reason: Bulk data for a specific record version; excluded with the rest of bulk IO.
+    reason: Chunked bulk upload; a step inside the session protocol, not a command.

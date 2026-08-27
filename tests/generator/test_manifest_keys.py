@@ -64,3 +64,18 @@ def test_section_is_a_known_top_level_key():
 def test_a_mistyped_section_key_is_rejected():
     with pytest.raises(ManifestError, match="sections"):
         check_keys("top", {"service": "wellbore_ddms", "sections": "Wellbore DDMS"}, "here")
+
+
+def test_a_global_option_alias_cannot_be_reused():
+    # `-c` is the global --config. A command that claims it either shadows the global or
+    # makes the parse ambiguous; `--curves` did exactly this.
+    from generate_cli import check_alias
+
+    with pytest.raises(ManifestError, match="global option"):
+        check_alias("-c", "here", "parameter 'curves' short alias")
+
+
+def test_an_unreserved_alias_is_accepted():
+    from generate_cli import check_alias
+
+    check_alias("--curves", "here", "parameter 'curves' flag")

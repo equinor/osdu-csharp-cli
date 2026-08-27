@@ -98,3 +98,63 @@ class TestIdentifierShaping:
     ])
     def test_pascal(self, name, expected):
         assert pascal(name) == expected
+
+
+# ---- FastAPI's optional-parameter wrapper ------------------------------------------------
+
+from generate_cli import kiota_param_type, normalise_schema, shared_enum_type
+
+NULLABLE_INT = {"anyOf": [{"type": "integer", "format": "int64"}, {"type": "null"}]}
+SPEC = {"components": {"schemas": {"JSONOrient": {"type": "string",
+                                                 "enum": ["split", "columns"]}}}}
+
+
+def test_a_nullable_wrapper_is_unwrapped_to_its_one_real_branch():
+    assert normalise_schema(NULLABLE_INT, {})["type"] == "integer"
+
+
+def test_a_ref_is_resolved_so_its_enum_is_visible():
+    schema = normalise_schema({"$ref": "#/components/schemas/JSONOrient"}, SPEC)
+    assert schema["enum"] == ["split", "columns"]
+
+
+def test_a_genuine_union_is_left_alone():
+    # Two real branches have no single C# type; picking the first would be a guess.
+    union = {"anyOf": [{"type": "integer"}, {"type": "string"}]}
+    assert normalise_schema(union, {}) == union
+
+
+def test_the_wrapper_costs_the_format_because_kiota_loses_it_too():
+    # Spec says int64, but Kiota emits `int?` for a wrapped parameter. Following the spec
+    # here produces `long?` and code that does not compile.
+    assert kiota_param_type(normalise_schema(NULLABLE_INT, {}), wrapped=True) == "int?"
+
+
+def test_an_unwrapped_int64_still_maps_to_long():
+    assert kiota_param_type({"type": "integer", "format": "int64"}, wrapped=False) == "long?"
+
+
+def test_a_wrapped_array_collapses_the_way_kiota_collapses_it():
+    wrapped_array = {"anyOf": [{"type": "array", "items": {"type": "string"}},
+                               {"type": "null"}]}
+    assert kiota_param_type(normalise_schema(wrapped_array, {}), wrapped=True) == "string"
+
+
+def test_a_boolean_parameter_becomes_a_flag():
+    # `Option<bool?>` renders as `--describe <describe>`; no CLI asks for `--describe true`.
+    assert kiota_param_type({"type": "boolean", "default": False}, wrapped=True) == "bool"
+
+
+def test_a_boolean_defaulting_to_true_keeps_its_nullable_form():
+    # Sending false unconditionally would flip it, so this one cannot be a plain flag.
+    assert kiota_param_type({"type": "boolean", "default": True}, wrapped=True) == "bool?"
+
+
+def test_a_shared_enum_resolves_to_the_models_namespace():
+    # A $ref'd enum is generated once under Models, not per endpoint.
+    got = shared_enum_type("WellboreDdms", {"$ref": "#/components/schemas/JSONOrient"})
+    assert got == "global::Equinor.OsduCsharpClient.WellboreDdms.Models.JSONOrient"
+
+
+def test_an_inline_enum_has_no_shared_type():
+    assert shared_enum_type("WellboreDdms", {"type": "string", "enum": ["a"]}) is None

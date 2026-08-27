@@ -35,11 +35,17 @@ public static partial class WellboreDdmsCommands
         tree.Node("welllog").Subcommands.Add(BuildWelllogDelete());
         tree.Node("welllog version").Subcommands.Add(BuildWelllogVersionList());
         tree.Node("welllog version").Subcommands.Add(BuildWelllogVersionGet());
+        tree.Node("welllog data").Subcommands.Add(BuildWelllogDataGet());
+        tree.Node("welllog version").Subcommands.Add(BuildWelllogVersionData());
+        tree.Node("welllog data").Subcommands.Add(BuildWelllogDataStats());
+        tree.Node("welllog version").Subcommands.Add(BuildWelllogVersionStats());
         tree.Node("trajectory").Subcommands.Add(BuildTrajectoryGet());
         tree.Node("trajectory").Subcommands.Add(BuildTrajectoryAdd());
         tree.Node("trajectory").Subcommands.Add(BuildTrajectoryDelete());
         tree.Node("trajectory version").Subcommands.Add(BuildTrajectoryVersionList());
         tree.Node("trajectory version").Subcommands.Add(BuildTrajectoryVersionGet());
+        tree.Node("trajectory data").Subcommands.Add(BuildTrajectoryDataGet());
+        tree.Node("trajectory version").Subcommands.Add(BuildTrajectoryVersionData());
         tree.Node("markerset").Subcommands.Add(BuildMarkersetGet());
         tree.Node("markerset").Subcommands.Add(BuildMarkersetAdd());
         tree.Node("markerset").Subcommands.Add(BuildMarkersetDelete());
@@ -60,11 +66,15 @@ public static partial class WellboreDdmsCommands
         tree.Node("ppfg").Subcommands.Add(BuildPpfgDelete());
         tree.Node("ppfg version").Subcommands.Add(BuildPpfgVersionList());
         tree.Node("ppfg version").Subcommands.Add(BuildPpfgVersionGet());
+        tree.Node("ppfg data").Subcommands.Add(BuildPpfgDataGet());
+        tree.Node("ppfg version").Subcommands.Add(BuildPpfgVersionData());
         tree.Node("pressuretest").Subcommands.Add(BuildPressuretestGet());
         tree.Node("pressuretest").Subcommands.Add(BuildPressuretestAdd());
         tree.Node("pressuretest").Subcommands.Add(BuildPressuretestDelete());
         tree.Node("pressuretest version").Subcommands.Add(BuildPressuretestVersionList());
         tree.Node("pressuretest version").Subcommands.Add(BuildPressuretestVersionGet());
+        tree.Node("pressuretest data").Subcommands.Add(BuildPressuretestDataGet());
+        tree.Node("pressuretest version").Subcommands.Add(BuildPressuretestVersionData());
 
         Customize(tree);
     }
@@ -516,6 +526,242 @@ public static partial class WellboreDdmsCommands
         return command;
     }
 
+    /// <summary>Read the bulk data of a WellLog record.</summary>
+    /// <remarks>GET /ddms/v3/welllogs/{record_id}/data on the WellboreDdms service.</remarks>
+    private static Command BuildWelllogDataGet()
+    {
+        var recordIdOption = new Option<string>("--id", "-id")
+        {
+            Description = "WellLog record id.",
+            Required = true,
+        };
+        var offsetOption = new Option<int?>("--offset")
+        {
+            Description = "Row to start at.",
+        };
+        var limitOption = new Option<int?>("--limit", "-l")
+        {
+            Description = "Maximum rows to return.",
+        };
+        var curvesOption = new Option<string>("--curves")
+        {
+            Description = "Comma-separated columns to return, e.g. MD,GR. Omit for all.",
+        };
+        var filterOption = new Option<string>("--filter")
+        {
+            Description = "Row filter as column:operator:value, e.g. MD:gte:1000. Operators: lt, lte, gt, gte, eq, neq.",
+        };
+        var describeOption = new Option<bool>("--describe")
+        {
+            Description = "Return row and column counts instead of the data.",
+        };
+        var orientOption = new Option<string>("--orient")
+        {
+            Description = "JSON shape of the response. One of: split, columns.",
+        };
+        orientOption.AcceptOnlyFromAmong("split", "columns");
+
+        var command = new Command("get", "Read the bulk data of a WellLog record.");
+        command.Options.Add(recordIdOption);
+        command.Options.Add(offsetOption);
+        command.Options.Add(limitOption);
+        command.Options.Add(curvesOption);
+        command.Options.Add(filterOption);
+        command.Options.Add(describeOption);
+        command.Options.Add(orientOption);
+
+        command.SetAction((parseResult, cancellationToken) =>
+            CliRunner.RunAsync(parseResult, async (context, cancellationToken) =>
+        {
+            var recordId = parseResult.GetValue(recordIdOption)!;
+            var offset = parseResult.GetValue(offsetOption);
+            var limit = parseResult.GetValue(limitOption);
+            var curves = parseResult.GetValue(curvesOption);
+            var filter = parseResult.GetValue(filterOption);
+            var describe = parseResult.GetValue(describeOption);
+            var orient = parseResult.GetValue(orientOption);
+
+            var result = await context.Client.WellboreDdms.Ddms.V3.Welllogs[recordId].Data.GetAsync(configuration =>
+            {
+                configuration.QueryParameters.Offset = offset;
+                configuration.QueryParameters.Limit = limit;
+                configuration.QueryParameters.Curves = curves;
+                configuration.QueryParameters.Filter = filter;
+                configuration.QueryParameters.Describe = describe;
+                if (orient is not null)
+                    configuration.QueryParameters.Orient = Enum.Parse<global::Equinor.OsduCsharpClient.WellboreDdms.Models.JSONOrient>(orient, true);
+            }, cancellationToken);
+
+            return context.Output.Write(
+                await OsduJson.ToJsonAsync(result),
+                OutputSpec.Raw);
+        }, cancellationToken));
+
+        return command;
+    }
+
+    /// <summary>Read the bulk data of a specific WellLog version.</summary>
+    /// <remarks>GET /ddms/v3/welllogs/{record_id}/versions/{version}/data on the WellboreDdms service.</remarks>
+    private static Command BuildWelllogVersionData()
+    {
+        var recordIdOption = new Option<string>("--id", "-id")
+        {
+            Description = "WellLog record id.",
+            Required = true,
+        };
+        var versionOption = new Option<long>("--version", "-v")
+        {
+            Description = "WellLog record version.",
+            Required = true,
+        };
+        var offsetOption = new Option<int?>("--offset")
+        {
+            Description = "Row to start at.",
+        };
+        var limitOption = new Option<int?>("--limit", "-l")
+        {
+            Description = "Maximum rows to return.",
+        };
+        var curvesOption = new Option<string>("--curves")
+        {
+            Description = "Comma-separated columns to return, e.g. MD,GR. Omit for all.",
+        };
+        var filterOption = new Option<string>("--filter")
+        {
+            Description = "Row filter as column:operator:value, e.g. MD:gte:1000. Operators: lt, lte, gt, gte, eq, neq.",
+        };
+        var describeOption = new Option<bool>("--describe")
+        {
+            Description = "Return row and column counts instead of the data.",
+        };
+        var orientOption = new Option<string>("--orient")
+        {
+            Description = "JSON shape of the response. One of: split, columns.",
+        };
+        orientOption.AcceptOnlyFromAmong("split", "columns");
+
+        var command = new Command("data", "Read the bulk data of a specific WellLog version.");
+        command.Options.Add(recordIdOption);
+        command.Options.Add(versionOption);
+        command.Options.Add(offsetOption);
+        command.Options.Add(limitOption);
+        command.Options.Add(curvesOption);
+        command.Options.Add(filterOption);
+        command.Options.Add(describeOption);
+        command.Options.Add(orientOption);
+
+        command.SetAction((parseResult, cancellationToken) =>
+            CliRunner.RunAsync(parseResult, async (context, cancellationToken) =>
+        {
+            var recordId = parseResult.GetValue(recordIdOption)!;
+            var version = parseResult.GetValue(versionOption);
+            var offset = parseResult.GetValue(offsetOption);
+            var limit = parseResult.GetValue(limitOption);
+            var curves = parseResult.GetValue(curvesOption);
+            var filter = parseResult.GetValue(filterOption);
+            var describe = parseResult.GetValue(describeOption);
+            var orient = parseResult.GetValue(orientOption);
+
+            var result = await context.Client.WellboreDdms.Ddms.V3.Welllogs[recordId].Versions[version].Data.GetAsync(configuration =>
+            {
+                configuration.QueryParameters.Offset = offset;
+                configuration.QueryParameters.Limit = limit;
+                configuration.QueryParameters.Curves = curves;
+                configuration.QueryParameters.Filter = filter;
+                configuration.QueryParameters.Describe = describe;
+                if (orient is not null)
+                    configuration.QueryParameters.Orient = Enum.Parse<global::Equinor.OsduCsharpClient.WellboreDdms.Models.JSONOrient>(orient, true);
+            }, cancellationToken);
+
+            return context.Output.Write(
+                await OsduJson.ToJsonAsync(result),
+                OutputSpec.Raw);
+        }, cancellationToken));
+
+        return command;
+    }
+
+    /// <summary>Summary statistics for the curves of a WellLog record.</summary>
+    /// <remarks>GET /ddms/v3/welllogs/{record_id}/data/statistics on the WellboreDdms service.</remarks>
+    private static Command BuildWelllogDataStats()
+    {
+        var recordIdOption = new Option<string>("--id", "-id")
+        {
+            Description = "WellLog record id.",
+            Required = true,
+        };
+        var curvesOption = new Option<string>("--curves")
+        {
+            Description = "Comma-separated columns, e.g. MD,GR. Omit for all.",
+        };
+
+        var command = new Command("stats", "Summary statistics for the curves of a WellLog record.");
+        command.Options.Add(recordIdOption);
+        command.Options.Add(curvesOption);
+
+        command.SetAction((parseResult, cancellationToken) =>
+            CliRunner.RunAsync(parseResult, async (context, cancellationToken) =>
+        {
+            var recordId = parseResult.GetValue(recordIdOption)!;
+            var curves = parseResult.GetValue(curvesOption);
+
+            var result = await context.Client.WellboreDdms.Ddms.V3.Welllogs[recordId].Data.Statistics.GetAsync(configuration =>
+            {
+                configuration.QueryParameters.Curves = curves;
+            }, cancellationToken);
+
+            return context.Output.Write(
+                await OsduJson.ToJsonAsync(result),
+                OutputSpec.Raw);
+        }, cancellationToken));
+
+        return command;
+    }
+
+    /// <summary>Summary statistics for the curves of a specific WellLog version.</summary>
+    /// <remarks>GET /ddms/v3/welllogs/{record_id}/versions/{version}/data/statistics on the WellboreDdms service.</remarks>
+    private static Command BuildWelllogVersionStats()
+    {
+        var recordIdOption = new Option<string>("--id", "-id")
+        {
+            Description = "WellLog record id.",
+            Required = true,
+        };
+        var versionOption = new Option<int>("--version", "-v")
+        {
+            Description = "WellLog record version.",
+            Required = true,
+        };
+        var curvesOption = new Option<string>("--curves")
+        {
+            Description = "Comma-separated columns, e.g. MD,GR. Omit for all.",
+        };
+
+        var command = new Command("stats", "Summary statistics for the curves of a specific WellLog version.");
+        command.Options.Add(recordIdOption);
+        command.Options.Add(versionOption);
+        command.Options.Add(curvesOption);
+
+        command.SetAction((parseResult, cancellationToken) =>
+            CliRunner.RunAsync(parseResult, async (context, cancellationToken) =>
+        {
+            var recordId = parseResult.GetValue(recordIdOption)!;
+            var version = parseResult.GetValue(versionOption);
+            var curves = parseResult.GetValue(curvesOption);
+
+            var result = await context.Client.WellboreDdms.Ddms.V3.Welllogs[recordId].Versions[version].Data.Statistics.GetAsync(configuration =>
+            {
+                configuration.QueryParameters.Curves = curves;
+            }, cancellationToken);
+
+            return context.Output.Write(
+                await OsduJson.ToJsonAsync(result),
+                OutputSpec.Raw);
+        }, cancellationToken));
+
+        return command;
+    }
+
     /// <summary>Get a WellboreTrajectory record by id.</summary>
     /// <remarks>GET /ddms/v3/wellboretrajectories/{record_id} on the WellboreDdms service.</remarks>
     private static Command BuildTrajectoryGet()
@@ -654,6 +900,161 @@ public static partial class WellboreDdmsCommands
             var version = parseResult.GetValue(versionOption);
 
             var result = await context.Client.WellboreDdms.Ddms.V3.Wellboretrajectories[recordId].Versions[version].GetAsync(cancellationToken: cancellationToken);
+
+            return context.Output.Write(
+                await OsduJson.ToJsonAsync(result),
+                OutputSpec.Raw);
+        }, cancellationToken));
+
+        return command;
+    }
+
+    /// <summary>Read the bulk data of a WellboreTrajectory record.</summary>
+    /// <remarks>GET /ddms/v3/wellboretrajectories/{record_id}/data on the WellboreDdms service.</remarks>
+    private static Command BuildTrajectoryDataGet()
+    {
+        var recordIdOption = new Option<string>("--id", "-id")
+        {
+            Description = "WellboreTrajectory record id.",
+            Required = true,
+        };
+        var offsetOption = new Option<int?>("--offset")
+        {
+            Description = "Row to start at.",
+        };
+        var limitOption = new Option<int?>("--limit", "-l")
+        {
+            Description = "Maximum rows to return.",
+        };
+        var curvesOption = new Option<string>("--curves")
+        {
+            Description = "Comma-separated columns to return, e.g. MD,GR. Omit for all.",
+        };
+        var filterOption = new Option<string>("--filter")
+        {
+            Description = "Row filter as column:operator:value, e.g. MD:gte:1000. Operators: lt, lte, gt, gte, eq, neq.",
+        };
+        var describeOption = new Option<bool>("--describe")
+        {
+            Description = "Return row and column counts instead of the data.",
+        };
+        var orientOption = new Option<string>("--orient")
+        {
+            Description = "JSON shape of the response. One of: split, columns.",
+        };
+        orientOption.AcceptOnlyFromAmong("split", "columns");
+
+        var command = new Command("get", "Read the bulk data of a WellboreTrajectory record.");
+        command.Options.Add(recordIdOption);
+        command.Options.Add(offsetOption);
+        command.Options.Add(limitOption);
+        command.Options.Add(curvesOption);
+        command.Options.Add(filterOption);
+        command.Options.Add(describeOption);
+        command.Options.Add(orientOption);
+
+        command.SetAction((parseResult, cancellationToken) =>
+            CliRunner.RunAsync(parseResult, async (context, cancellationToken) =>
+        {
+            var recordId = parseResult.GetValue(recordIdOption)!;
+            var offset = parseResult.GetValue(offsetOption);
+            var limit = parseResult.GetValue(limitOption);
+            var curves = parseResult.GetValue(curvesOption);
+            var filter = parseResult.GetValue(filterOption);
+            var describe = parseResult.GetValue(describeOption);
+            var orient = parseResult.GetValue(orientOption);
+
+            var result = await context.Client.WellboreDdms.Ddms.V3.Wellboretrajectories[recordId].Data.GetAsync(configuration =>
+            {
+                configuration.QueryParameters.Offset = offset;
+                configuration.QueryParameters.Limit = limit;
+                configuration.QueryParameters.Curves = curves;
+                configuration.QueryParameters.Filter = filter;
+                configuration.QueryParameters.Describe = describe;
+                if (orient is not null)
+                    configuration.QueryParameters.Orient = Enum.Parse<global::Equinor.OsduCsharpClient.WellboreDdms.Models.JSONOrient>(orient, true);
+            }, cancellationToken);
+
+            return context.Output.Write(
+                await OsduJson.ToJsonAsync(result),
+                OutputSpec.Raw);
+        }, cancellationToken));
+
+        return command;
+    }
+
+    /// <summary>Read the bulk data of a specific WellboreTrajectory version.</summary>
+    /// <remarks>GET /ddms/v3/wellboretrajectories/{record_id}/versions/{version}/data on the WellboreDdms service.</remarks>
+    private static Command BuildTrajectoryVersionData()
+    {
+        var recordIdOption = new Option<string>("--id", "-id")
+        {
+            Description = "WellboreTrajectory record id.",
+            Required = true,
+        };
+        var versionOption = new Option<long>("--version", "-v")
+        {
+            Description = "WellboreTrajectory record version.",
+            Required = true,
+        };
+        var offsetOption = new Option<int?>("--offset")
+        {
+            Description = "Row to start at.",
+        };
+        var limitOption = new Option<int?>("--limit", "-l")
+        {
+            Description = "Maximum rows to return.",
+        };
+        var curvesOption = new Option<string>("--curves")
+        {
+            Description = "Comma-separated columns to return, e.g. MD,GR. Omit for all.",
+        };
+        var filterOption = new Option<string>("--filter")
+        {
+            Description = "Row filter as column:operator:value, e.g. MD:gte:1000. Operators: lt, lte, gt, gte, eq, neq.",
+        };
+        var describeOption = new Option<bool>("--describe")
+        {
+            Description = "Return row and column counts instead of the data.",
+        };
+        var orientOption = new Option<string>("--orient")
+        {
+            Description = "JSON shape of the response. One of: split, columns.",
+        };
+        orientOption.AcceptOnlyFromAmong("split", "columns");
+
+        var command = new Command("data", "Read the bulk data of a specific WellboreTrajectory version.");
+        command.Options.Add(recordIdOption);
+        command.Options.Add(versionOption);
+        command.Options.Add(offsetOption);
+        command.Options.Add(limitOption);
+        command.Options.Add(curvesOption);
+        command.Options.Add(filterOption);
+        command.Options.Add(describeOption);
+        command.Options.Add(orientOption);
+
+        command.SetAction((parseResult, cancellationToken) =>
+            CliRunner.RunAsync(parseResult, async (context, cancellationToken) =>
+        {
+            var recordId = parseResult.GetValue(recordIdOption)!;
+            var version = parseResult.GetValue(versionOption);
+            var offset = parseResult.GetValue(offsetOption);
+            var limit = parseResult.GetValue(limitOption);
+            var curves = parseResult.GetValue(curvesOption);
+            var filter = parseResult.GetValue(filterOption);
+            var describe = parseResult.GetValue(describeOption);
+            var orient = parseResult.GetValue(orientOption);
+
+            var result = await context.Client.WellboreDdms.Ddms.V3.Wellboretrajectories[recordId].Versions[version].Data.GetAsync(configuration =>
+            {
+                configuration.QueryParameters.Offset = offset;
+                configuration.QueryParameters.Limit = limit;
+                configuration.QueryParameters.Curves = curves;
+                configuration.QueryParameters.Filter = filter;
+                configuration.QueryParameters.Describe = describe;
+                if (orient is not null)
+                    configuration.QueryParameters.Orient = Enum.Parse<global::Equinor.OsduCsharpClient.WellboreDdms.Models.JSONOrient>(orient, true);
+            }, cancellationToken);
 
             return context.Output.Write(
                 await OsduJson.ToJsonAsync(result),
@@ -1251,6 +1652,161 @@ public static partial class WellboreDdmsCommands
         return command;
     }
 
+    /// <summary>Read the bulk data of a PPFGDataset record.</summary>
+    /// <remarks>GET /ddms/v3/ppfgdataset/{record_id}/data on the WellboreDdms service.</remarks>
+    private static Command BuildPpfgDataGet()
+    {
+        var recordIdOption = new Option<string>("--id", "-id")
+        {
+            Description = "PPFGDataset record id.",
+            Required = true,
+        };
+        var offsetOption = new Option<int?>("--offset")
+        {
+            Description = "Row to start at.",
+        };
+        var limitOption = new Option<int?>("--limit", "-l")
+        {
+            Description = "Maximum rows to return.",
+        };
+        var curvesOption = new Option<string>("--curves")
+        {
+            Description = "Comma-separated columns to return, e.g. MD,GR. Omit for all.",
+        };
+        var filterOption = new Option<string>("--filter")
+        {
+            Description = "Row filter as column:operator:value, e.g. MD:gte:1000. Operators: lt, lte, gt, gte, eq, neq.",
+        };
+        var describeOption = new Option<bool>("--describe")
+        {
+            Description = "Return row and column counts instead of the data.",
+        };
+        var orientOption = new Option<string>("--orient")
+        {
+            Description = "JSON shape of the response. One of: split, columns.",
+        };
+        orientOption.AcceptOnlyFromAmong("split", "columns");
+
+        var command = new Command("get", "Read the bulk data of a PPFGDataset record.");
+        command.Options.Add(recordIdOption);
+        command.Options.Add(offsetOption);
+        command.Options.Add(limitOption);
+        command.Options.Add(curvesOption);
+        command.Options.Add(filterOption);
+        command.Options.Add(describeOption);
+        command.Options.Add(orientOption);
+
+        command.SetAction((parseResult, cancellationToken) =>
+            CliRunner.RunAsync(parseResult, async (context, cancellationToken) =>
+        {
+            var recordId = parseResult.GetValue(recordIdOption)!;
+            var offset = parseResult.GetValue(offsetOption);
+            var limit = parseResult.GetValue(limitOption);
+            var curves = parseResult.GetValue(curvesOption);
+            var filter = parseResult.GetValue(filterOption);
+            var describe = parseResult.GetValue(describeOption);
+            var orient = parseResult.GetValue(orientOption);
+
+            var result = await context.Client.WellboreDdms.Ddms.V3.Ppfgdataset[recordId].Data.GetAsync(configuration =>
+            {
+                configuration.QueryParameters.Offset = offset;
+                configuration.QueryParameters.Limit = limit;
+                configuration.QueryParameters.Curves = curves;
+                configuration.QueryParameters.Filter = filter;
+                configuration.QueryParameters.Describe = describe;
+                if (orient is not null)
+                    configuration.QueryParameters.Orient = Enum.Parse<global::Equinor.OsduCsharpClient.WellboreDdms.Models.JSONOrient>(orient, true);
+            }, cancellationToken);
+
+            return context.Output.Write(
+                await OsduJson.ToJsonAsync(result),
+                OutputSpec.Raw);
+        }, cancellationToken));
+
+        return command;
+    }
+
+    /// <summary>Read the bulk data of a specific PPFGDataset version.</summary>
+    /// <remarks>GET /ddms/v3/ppfgdataset/{record_id}/versions/{version}/data on the WellboreDdms service.</remarks>
+    private static Command BuildPpfgVersionData()
+    {
+        var recordIdOption = new Option<string>("--id", "-id")
+        {
+            Description = "PPFGDataset record id.",
+            Required = true,
+        };
+        var versionOption = new Option<long>("--version", "-v")
+        {
+            Description = "PPFGDataset record version.",
+            Required = true,
+        };
+        var offsetOption = new Option<int?>("--offset")
+        {
+            Description = "Row to start at.",
+        };
+        var limitOption = new Option<int?>("--limit", "-l")
+        {
+            Description = "Maximum rows to return.",
+        };
+        var curvesOption = new Option<string>("--curves")
+        {
+            Description = "Comma-separated columns to return, e.g. MD,GR. Omit for all.",
+        };
+        var filterOption = new Option<string>("--filter")
+        {
+            Description = "Row filter as column:operator:value, e.g. MD:gte:1000. Operators: lt, lte, gt, gte, eq, neq.",
+        };
+        var describeOption = new Option<bool>("--describe")
+        {
+            Description = "Return row and column counts instead of the data.",
+        };
+        var orientOption = new Option<string>("--orient")
+        {
+            Description = "JSON shape of the response. One of: split, columns.",
+        };
+        orientOption.AcceptOnlyFromAmong("split", "columns");
+
+        var command = new Command("data", "Read the bulk data of a specific PPFGDataset version.");
+        command.Options.Add(recordIdOption);
+        command.Options.Add(versionOption);
+        command.Options.Add(offsetOption);
+        command.Options.Add(limitOption);
+        command.Options.Add(curvesOption);
+        command.Options.Add(filterOption);
+        command.Options.Add(describeOption);
+        command.Options.Add(orientOption);
+
+        command.SetAction((parseResult, cancellationToken) =>
+            CliRunner.RunAsync(parseResult, async (context, cancellationToken) =>
+        {
+            var recordId = parseResult.GetValue(recordIdOption)!;
+            var version = parseResult.GetValue(versionOption);
+            var offset = parseResult.GetValue(offsetOption);
+            var limit = parseResult.GetValue(limitOption);
+            var curves = parseResult.GetValue(curvesOption);
+            var filter = parseResult.GetValue(filterOption);
+            var describe = parseResult.GetValue(describeOption);
+            var orient = parseResult.GetValue(orientOption);
+
+            var result = await context.Client.WellboreDdms.Ddms.V3.Ppfgdataset[recordId].Versions[version].Data.GetAsync(configuration =>
+            {
+                configuration.QueryParameters.Offset = offset;
+                configuration.QueryParameters.Limit = limit;
+                configuration.QueryParameters.Curves = curves;
+                configuration.QueryParameters.Filter = filter;
+                configuration.QueryParameters.Describe = describe;
+                if (orient is not null)
+                    configuration.QueryParameters.Orient = Enum.Parse<global::Equinor.OsduCsharpClient.WellboreDdms.Models.JSONOrient>(orient, true);
+            }, cancellationToken);
+
+            return context.Output.Write(
+                await OsduJson.ToJsonAsync(result),
+                OutputSpec.Raw);
+        }, cancellationToken));
+
+        return command;
+    }
+
     /// <summary>Get a WellPressureTestRawMeasurement record by id.</summary>
     /// <remarks>GET /ddms/v3/wellpressuretestrawmeasurement/{record_id} on the WellboreDdms service.</remarks>
     private static Command BuildPressuretestGet()
@@ -1389,6 +1945,161 @@ public static partial class WellboreDdmsCommands
             var version = parseResult.GetValue(versionOption);
 
             var result = await context.Client.WellboreDdms.Ddms.V3.Wellpressuretestrawmeasurement[recordId].Versions[version].GetAsync(cancellationToken: cancellationToken);
+
+            return context.Output.Write(
+                await OsduJson.ToJsonAsync(result),
+                OutputSpec.Raw);
+        }, cancellationToken));
+
+        return command;
+    }
+
+    /// <summary>Read the bulk data of a WellPressureTestRawMeasurement record.</summary>
+    /// <remarks>GET /ddms/v3/wellpressuretestrawmeasurement/{record_id}/data on the WellboreDdms service.</remarks>
+    private static Command BuildPressuretestDataGet()
+    {
+        var recordIdOption = new Option<string>("--id", "-id")
+        {
+            Description = "WellPressureTestRawMeasurement record id.",
+            Required = true,
+        };
+        var offsetOption = new Option<int?>("--offset")
+        {
+            Description = "Row to start at.",
+        };
+        var limitOption = new Option<int?>("--limit", "-l")
+        {
+            Description = "Maximum rows to return.",
+        };
+        var curvesOption = new Option<string>("--curves")
+        {
+            Description = "Comma-separated columns to return, e.g. MD,GR. Omit for all.",
+        };
+        var filterOption = new Option<string>("--filter")
+        {
+            Description = "Row filter as column:operator:value, e.g. MD:gte:1000. Operators: lt, lte, gt, gte, eq, neq.",
+        };
+        var describeOption = new Option<bool>("--describe")
+        {
+            Description = "Return row and column counts instead of the data.",
+        };
+        var orientOption = new Option<string>("--orient")
+        {
+            Description = "JSON shape of the response. One of: split, columns.",
+        };
+        orientOption.AcceptOnlyFromAmong("split", "columns");
+
+        var command = new Command("get", "Read the bulk data of a WellPressureTestRawMeasurement record.");
+        command.Options.Add(recordIdOption);
+        command.Options.Add(offsetOption);
+        command.Options.Add(limitOption);
+        command.Options.Add(curvesOption);
+        command.Options.Add(filterOption);
+        command.Options.Add(describeOption);
+        command.Options.Add(orientOption);
+
+        command.SetAction((parseResult, cancellationToken) =>
+            CliRunner.RunAsync(parseResult, async (context, cancellationToken) =>
+        {
+            var recordId = parseResult.GetValue(recordIdOption)!;
+            var offset = parseResult.GetValue(offsetOption);
+            var limit = parseResult.GetValue(limitOption);
+            var curves = parseResult.GetValue(curvesOption);
+            var filter = parseResult.GetValue(filterOption);
+            var describe = parseResult.GetValue(describeOption);
+            var orient = parseResult.GetValue(orientOption);
+
+            var result = await context.Client.WellboreDdms.Ddms.V3.Wellpressuretestrawmeasurement[recordId].Data.GetAsync(configuration =>
+            {
+                configuration.QueryParameters.Offset = offset;
+                configuration.QueryParameters.Limit = limit;
+                configuration.QueryParameters.Curves = curves;
+                configuration.QueryParameters.Filter = filter;
+                configuration.QueryParameters.Describe = describe;
+                if (orient is not null)
+                    configuration.QueryParameters.Orient = Enum.Parse<global::Equinor.OsduCsharpClient.WellboreDdms.Models.JSONOrient>(orient, true);
+            }, cancellationToken);
+
+            return context.Output.Write(
+                await OsduJson.ToJsonAsync(result),
+                OutputSpec.Raw);
+        }, cancellationToken));
+
+        return command;
+    }
+
+    /// <summary>Read the bulk data of a specific WellPressureTestRawMeasurement version.</summary>
+    /// <remarks>GET /ddms/v3/wellpressuretestrawmeasurement/{record_id}/versions/{version}/data on the WellboreDdms service.</remarks>
+    private static Command BuildPressuretestVersionData()
+    {
+        var recordIdOption = new Option<string>("--id", "-id")
+        {
+            Description = "WellPressureTestRawMeasurement record id.",
+            Required = true,
+        };
+        var versionOption = new Option<long>("--version", "-v")
+        {
+            Description = "WellPressureTestRawMeasurement record version.",
+            Required = true,
+        };
+        var offsetOption = new Option<int?>("--offset")
+        {
+            Description = "Row to start at.",
+        };
+        var limitOption = new Option<int?>("--limit", "-l")
+        {
+            Description = "Maximum rows to return.",
+        };
+        var curvesOption = new Option<string>("--curves")
+        {
+            Description = "Comma-separated columns to return, e.g. MD,GR. Omit for all.",
+        };
+        var filterOption = new Option<string>("--filter")
+        {
+            Description = "Row filter as column:operator:value, e.g. MD:gte:1000. Operators: lt, lte, gt, gte, eq, neq.",
+        };
+        var describeOption = new Option<bool>("--describe")
+        {
+            Description = "Return row and column counts instead of the data.",
+        };
+        var orientOption = new Option<string>("--orient")
+        {
+            Description = "JSON shape of the response. One of: split, columns.",
+        };
+        orientOption.AcceptOnlyFromAmong("split", "columns");
+
+        var command = new Command("data", "Read the bulk data of a specific WellPressureTestRawMeasurement version.");
+        command.Options.Add(recordIdOption);
+        command.Options.Add(versionOption);
+        command.Options.Add(offsetOption);
+        command.Options.Add(limitOption);
+        command.Options.Add(curvesOption);
+        command.Options.Add(filterOption);
+        command.Options.Add(describeOption);
+        command.Options.Add(orientOption);
+
+        command.SetAction((parseResult, cancellationToken) =>
+            CliRunner.RunAsync(parseResult, async (context, cancellationToken) =>
+        {
+            var recordId = parseResult.GetValue(recordIdOption)!;
+            var version = parseResult.GetValue(versionOption);
+            var offset = parseResult.GetValue(offsetOption);
+            var limit = parseResult.GetValue(limitOption);
+            var curves = parseResult.GetValue(curvesOption);
+            var filter = parseResult.GetValue(filterOption);
+            var describe = parseResult.GetValue(describeOption);
+            var orient = parseResult.GetValue(orientOption);
+
+            var result = await context.Client.WellboreDdms.Ddms.V3.Wellpressuretestrawmeasurement[recordId].Versions[version].Data.GetAsync(configuration =>
+            {
+                configuration.QueryParameters.Offset = offset;
+                configuration.QueryParameters.Limit = limit;
+                configuration.QueryParameters.Curves = curves;
+                configuration.QueryParameters.Filter = filter;
+                configuration.QueryParameters.Describe = describe;
+                if (orient is not null)
+                    configuration.QueryParameters.Orient = Enum.Parse<global::Equinor.OsduCsharpClient.WellboreDdms.Models.JSONOrient>(orient, true);
+            }, cancellationToken);
 
             return context.Output.Write(
                 await OsduJson.ToJsonAsync(result),

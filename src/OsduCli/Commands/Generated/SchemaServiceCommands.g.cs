@@ -58,7 +58,7 @@ public static partial class SchemaServiceCommands
         {
             Description = "Filter by scope: SHARED or INTERNAL.",
         };
-        var latestversionOption = new Option<bool?>("--latest")
+        var latestversionOption = new Option<bool>("--latest")
         {
             Description = "Return only the newest version of each schema.",
         };

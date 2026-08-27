@@ -669,7 +669,46 @@ specs means the CLI will always be able to express slightly more than the platfo
 answer. Worth saying plainly in the peer test instructions, or the first 404 will be reported
 as a defect.
 
-### Wellbore DDMS widened to every record type, no bulk data
+### Bulk reads added; bulk writes deliberately not
+
+Wellbore DDMS is now **55 of 84 operations**. The four bulk-carrying types (`welllog`,
+`trajectory`, `ppfg`, `pressuretest`) gained `<noun> data get` and `<noun> version data`, and
+WellLog additionally `data stats` / `version stats`.
+
+The reads turned out to be ordinary paginated queries — `--offset`, `--limit`, `--curves`,
+`--filter` as `column:operator:value`, `--describe`, `--orient split|columns` — and needed no
+new manifest vocabulary. Verified against dev on a real log: 21,857 rows across 11 curves,
+every parameter exercised.
+
+Writes stay out, and the reason is structural rather than scheduling. `POST .../data`
+replaces an entire curve set in one call; the `sessions` endpoints are a five-call
+transactional protocol — open, send chunks, patch to commit or abandon. That is a stateful
+workflow, not a command, and pretending otherwise in a manifest would produce something that
+parses but cannot be used correctly.
+
+**The spec is FastAPI-generated, and that cost three generator fixes.** Every optional query
+parameter is spelled `anyOf: [{...}, {"type": "null"}]`, which nothing downstream sees
+through:
+
+- The generator fell through to its `string` default, so `--limit` failed to compile against
+  Kiota's `int?`. Fixed by `normalise_schema`, which unwraps a nullable `anyOf` and resolves
+  `$ref` — but only when exactly one branch is non-null, since a real union has no single C#
+  type and picking its first branch would be a guess dressed as a derivation.
+- **Kiota does not see through the wrapper either**, and degrades: `format: int64` stops
+  meaning `long`, and an array of strings collapses to one `string`. Matching the spec here
+  produces code that does not compile, so `kiota_param_type` reproduces the coarser result on
+  purpose. The generated client, not the spec, is what the emitted code has to satisfy.
+- A `$ref`'d enum lands in `Models` rather than beside the endpoint. `orient` points at
+  `JSONOrient`, so the per-endpoint name `GetOrientQueryParameterType` named a type that was
+  never generated.
+
+**Two UX defects the help output exposed, both now guarded.** `-c` for `--curves` collided
+with the global `--config` — the generator now rejects any alias that shadows a recursive
+global, which is a class of bug it could not previously see. And a boolean parameter rendered
+as `--describe <describe>`, asking the user to type `--describe true`; booleans are flags now,
+sent unconditionally because their spec default is false anyway.
+
+### Wellbore DDMS widened to every record type
 
 It was 5 operations of 84 — one resource, enough to exercise `scope:` and nothing more. It is
 now **45 of 84**: all nine typed resources (`well`, `wellbore`, `welllog`, `trajectory`,

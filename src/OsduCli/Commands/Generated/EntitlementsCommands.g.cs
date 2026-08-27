@@ -44,7 +44,7 @@ public static partial class EntitlementsCommands
     /// <remarks>GET /groups on the Entitlements service.</remarks>
     private static Command BuildGroupList()
     {
-        var rolerequiredOption = new Option<bool?>("--role-required")
+        var rolerequiredOption = new Option<bool>("--role-required")
         {
             Description = "Include the caller's role in each group.",
         };
@@ -151,7 +151,7 @@ public static partial class EntitlementsCommands
             Description = "Return only members with this role. One of: MEMBER, OWNER.",
         };
         roleOption.AcceptOnlyFromAmong("MEMBER", "OWNER");
-        var includetypeOption = new Option<bool?>("--include-type")
+        var includetypeOption = new Option<bool>("--include-type")
         {
             Description = "Include each member's type in the output.",
         };
@@ -322,7 +322,7 @@ public static partial class EntitlementsCommands
         {
             Description = "Filter to groups granted to this application id.",
         };
-        var rolerequiredOption = new Option<bool?>("--role-required")
+        var rolerequiredOption = new Option<bool>("--role-required")
         {
             Description = "Include the member's role in each group.",
         };
