@@ -93,6 +93,12 @@ src/OsduCli/Commands/Handwritten/        the Customize() partial hook   (hand-wr
 Generated commands call [`Equinor.OsduCsharpClient`](https://github.com/equinor/osdu-csharp-client),
 which is itself Kiota-generated from the same specs. The CLI adds no HTTP code of its own.
 
+Since client 2.0.0 the core package is authentication-agnostic — it bundles no identity
+library and `OsduClient` takes an `ITokenProvider` rather than defaulting to one. The CLI
+therefore also references `Equinor.OsduCsharpClient.Msal` and selects
+`MsalInteractiveTokenProvider`, which is the right answer for a tool driven by a person at a
+terminal. Sign-in is cached, OS-encrypted, under `~/.osdu`.
+
 ## The manifest is the point
 
 Three things cannot be derived from a spec, and all three live in the manifest:

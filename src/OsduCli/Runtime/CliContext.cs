@@ -4,6 +4,7 @@ using Microsoft.Kiota.Abstractions;
 using Microsoft.Kiota.Serialization.Json;
 using Microsoft.Extensions.Logging;
 using Equinor.OsduCsharpClient.Facade;
+using Equinor.OsduCsharpClient.Facade.Auth;
 
 namespace Equinor.OsduCli.Runtime;
 
@@ -53,8 +54,14 @@ public sealed class CliContext : IDisposable
                 .AddConsole(options => options.LogToStandardErrorThreshold = LogLevel.Trace))
             : null;
 
+        // Client 2.0.0 made the core package authentication-agnostic: it no longer bundles
+        // MSAL, and `OsduClient` no longer falls back to interactive sign-in. Choosing a
+        // provider is now the consumer's job, and for a CLI driven by a person at a terminal
+        // the answer is interactive — the same behaviour the old default gave, now stated
+        // rather than inherited. The provider keeps its own OS-encrypted token cache under
+        // ~/.osdu, so sign-in still survives between invocations.
         return new CliContext(
-            new OsduClient(config, loggerFactory: loggerFactory),
+            new OsduClient(config, new MsalInteractiveTokenProvider(config, loggerFactory: loggerFactory), loggerFactory),
             new OutputWriter(format, Console.Out),
             config);
     }

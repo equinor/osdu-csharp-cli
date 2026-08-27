@@ -23,12 +23,18 @@
   </ItemGroup>
 
   <!-- The client is consumed as a package, not a sibling checkout, so this repo builds on
-       its own. 1.1.9 is the first release with all three client fixes this CLI depends on:
-       an encrypted MSAL token cache (#98), a content type on bodiless requests (#101,
-       without which Storage's query endpoints answer 415), and untyped string responses
-       (#103, without which `record get` prints nothing). Do not go below it. -->
+       its own. Do not go below 2.0.0: it carries the three fixes this CLI depends on — an
+       encrypted MSAL token cache (#98), a content type on bodiless requests (#101, without
+       which Storage's query endpoints answer 415), and untyped string responses (#103,
+       without which `record get` prints nothing).
+
+       2.0.0 made the core package authentication-agnostic: it no longer bundles MSAL, and
+       `OsduClient` no longer defaults to interactive sign-in. The MSAL providers now live in
+       a separate optional package, which a CLI for humans at a terminal plainly needs. The
+       two version numbers move in lockstep upstream, so keep them equal here. -->
   <ItemGroup>
-    <PackageReference Include="Equinor.OsduCsharpClient" Version="1.1.9"/>
+    <PackageReference Include="Equinor.OsduCsharpClient" Version="2.0.0"/>
+    <PackageReference Include="Equinor.OsduCsharpClient.Msal" Version="2.0.0"/>
   </ItemGroup>
 
 </Project>

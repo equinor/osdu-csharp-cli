@@ -669,6 +669,39 @@ specs means the CLI will always be able to express slightly more than the platfo
 answer. Worth saying plainly in the peer test instructions, or the first 404 will be reported
 as a defect.
 
+### Client 2.0.0: authentication moved out of the SDK
+
+The client made its core package **authentication-agnostic**. It no longer bundles MSAL, and
+`OsduClient` no longer falls back to interactive sign-in — `ITokenProvider` is a required
+constructor argument. The three MSAL providers and the OS-encrypted token cache moved to an
+optional `Equinor.OsduCsharpClient.Msal` package.
+
+The reasoning is sound and worth recording, because it is the same trap this CLI could fall
+into: an SDK that pins an auth library forces its version on every consumer, and hands them
+its supply-chain surface. A consumer with its own MSAL version gets a duplicate install or a
+conflict that breaks auth outright.
+
+The migration cost here was **one call site**. `CliContext.Create` relied on the old default;
+it now names the provider:
+
+```csharp
+new OsduClient(config, new MsalInteractiveTokenProvider(config, loggerFactory: loggerFactory), loggerFactory)
+```
+
+Behaviour is unchanged — interactive was what the old default did — but it is now a stated
+choice rather than an inherited one, which is the point of the upstream change. The cache
+path is still `~/.osdu`, so existing sign-ins survived the upgrade; verified by a live call
+that did not re-prompt.
+
+One namespace surprise: the new package is `Equinor.OsduCsharpClient.Msal`, but its types are
+in `Equinor.OsduCsharpClient.Facade.Auth`. Package name and namespace do not match.
+
+**What this now makes cheap.** The Msal package also ships `MsalDeviceFlowTokenProvider` and
+`MsalClientCredentialsTokenProvider`. Interactive sign-in is the wrong default over SSH and
+impossible in CI, and both are now a provider swap rather than a client change. The CLI reads
+`authentication_mode` from the Python CLI's profiles and currently ignores it — that is a
+pre-existing gap, not a regression, but the upgrade is what makes closing it easy.
+
 ### Bulk reads added; bulk writes deliberately not
 
 Wellbore DDMS is now **55 of 84 operations**. The four bulk-carrying types (`welllog`,
