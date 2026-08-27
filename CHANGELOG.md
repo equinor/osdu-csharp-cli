@@ -3,18 +3,15 @@
 ## [0.4.1](https://github.com/equinor/osdu-csharp-cli/compare/v0.4.0...v0.4.1) (2026-08-27)
 
 
-### ⚠ BREAKING CHANGES
-
-* upgrade to client 2.0.0 and select the MSAL provider explicitly
-
-### Features
+### Dependencies
 
 * upgrade to client 2.0.0 and select the MSAL provider explicitly ([6fa16d4](https://github.com/equinor/osdu-csharp-cli/commit/6fa16d40e2f27e8b7dfa149a179dae39a7c40998))
 
-
-### Miscellaneous Chores
-
-* release 0.4.1 rather than 1.0.0 ([15987b5](https://github.com/equinor/osdu-csharp-cli/commit/15987b5c6c5361bb2104b85d0b6e7735b6f2858e))
+  Client 2.0.0 made its core package authentication-agnostic: it no longer bundles MSAL, and
+  `OsduClient` takes an `ITokenProvider` instead of defaulting to one. The CLI now references
+  `Equinor.OsduCsharpClient.Msal` and selects `MsalInteractiveTokenProvider`, which is what
+  the old default did. Nothing changes for users of this CLI — same commands, same flags,
+  same config, and cached sign-ins survive the upgrade.
 
 ## [0.4.0](https://github.com/equinor/osdu-csharp-cli/compare/v0.3.1...v0.4.0) (2026-08-27)
 
