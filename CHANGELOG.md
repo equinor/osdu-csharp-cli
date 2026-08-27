@@ -1,5 +1,14 @@
 # Changelog
 
+## [0.4.0](https://github.com/equinor/osdu-csharp-cli/compare/v0.3.1...v0.4.0) (2026-08-27)
+
+
+### Features
+
+* **help:** group root commands into named sections ([2f235b7](https://github.com/equinor/osdu-csharp-cli/commit/2f235b71087fcc6a0debac9b03867a41e5fd6584))
+* **wellbore:** add bulk data reads for the four bulk-carrying types ([c94d8d3](https://github.com/equinor/osdu-csharp-cli/commit/c94d8d38c2088787a3016094be6fdad58034d69f))
+* **wellbore:** cover every DDMS record type, excluding bulk data ([eb4df33](https://github.com/equinor/osdu-csharp-cli/commit/eb4df331dd10a3c1af07b3fe1682c0292d1b1c96))
+
 ## [0.3.1](https://github.com/equinor/osdu-csharp-cli/compare/v0.3.0...v0.3.1) (2026-08-26)
 
 
