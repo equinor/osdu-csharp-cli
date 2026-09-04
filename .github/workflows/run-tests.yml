@@ -128,11 +128,24 @@ jobs:
   # something that merely resembles it.
   preview:
     name: Preview ${{ matrix.rid }}
-    needs: test
+    needs: [manifests, test]
     # Only for pull requests. This workflow is also called by the release workflow, which
     # publishes these platforms itself — without this guard every release would build them
-    # twice. And never publish a binary whose tests did not pass.
-    if: ${{ github.event_name == 'pull_request' && needs.test.result == 'success' }}
+    # twice.
+    #
+    # Both validation jobs must pass, not just `test`. The release path gets this for free:
+    # its `needs: test` is the whole called workflow, so it already covers `manifests`. Here
+    # the same name means only the build-and-test job, which would have left the preview
+    # gated more weakly than the release it imitates. `manifests` is where the generated code
+    # is checked against the manifests, and a binary built from stale generated code is worth
+    # less than no binary — a reviewer would be reporting on something about to change.
+    #
+    # Spelled out with always() rather than relying on the implicit skip, matching how
+    # release.yml gates its own publish job.
+    if: >-
+      ${{ always() && github.event_name == 'pull_request'
+          && needs.manifests.result == 'success'
+          && needs.test.result == 'success' }}
     strategy:
       # One platform failing should not hide whether the others built.
       fail-fast: false
