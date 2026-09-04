@@ -114,3 +114,87 @@ jobs:
           name: test-results
           path: "**/TestResults/*.trx"
           retention-days: 5
+
+  # Binaries for a reviewer to actually run, attached to the PR.
+  #
+  # Without this there is no way to try a change before it is released: the release workflow
+  # is the only thing that produces a binary, so testing a branch meant either installing the
+  # .NET SDK and building it, or cutting a release to find out whether the change was any
+  # good. That is the wrong order, and it particularly hurts on Windows, which none of the
+  # people working on this can build for locally.
+  #
+  # Deliberately the same publish flags and archive shapes as the release job, so what a
+  # reviewer downloads is the same artifact they would get from a release rather than
+  # something that merely resembles it.
+  preview:
+    name: Preview ${{ matrix.rid }}
+    needs: test
+    # Only for pull requests. This workflow is also called by the release workflow, which
+    # publishes these platforms itself — without this guard every release would build them
+    # twice. And never publish a binary whose tests did not pass.
+    if: ${{ github.event_name == 'pull_request' && needs.test.result == 'success' }}
+    strategy:
+      # One platform failing should not hide whether the others built.
+      fail-fast: false
+      matrix:
+        include:
+          - { os: ubuntu-latest, rid: linux-x64, archive: tar.gz }
+          - { os: windows-latest, rid: win-x64, archive: zip }
+          - { os: macos-latest, rid: osx-arm64, archive: tar.gz }
+    runs-on: ${{ matrix.os }}
+    permissions:
+      contents: read
+      packages: read # Equinor.OsduCsharpClient comes from GitHub Packages
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Set up .NET
+        uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6.0.0
+        with:
+          dotnet-version: "10.x"
+
+      # GitHub Packages requires authentication even for public packages.
+      # shell: bash matters — the default on Windows runners is pwsh, where ${GITHUB_TOKEN}
+      # is PowerShell variable syntax and expands to nothing, giving a blank password and a
+      # 401 that looks like a permissions problem rather than a shell one.
+      - name: Authenticate to GitHub Packages
+        shell: bash
+        run: >
+          dotnet nuget update source equinor-github
+          --username ${{ github.actor }}
+          --password ${GITHUB_TOKEN}
+          --store-password-in-clear-text
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Publish
+        working-directory: src/OsduCli
+        run: >
+          dotnet publish --configuration Release
+          --runtime ${{ matrix.rid }}
+          --self-contained
+          -p:PublishSingleFile=true
+          -p:DebugType=none
+          --output publish
+
+      # Archived rather than uploaded raw: upload-artifact does not preserve the executable
+      # bit, so a bare Linux or macOS binary arrives needing chmod +x before it will run.
+      - name: Archive (tar.gz)
+        if: matrix.archive == 'tar.gz'
+        run: tar -czf osducs-${{ matrix.rid }}.tar.gz -C src/OsduCli/publish osducs
+
+      - name: Archive (zip)
+        if: matrix.archive == 'zip'
+        run: Compress-Archive -Path src/OsduCli/publish/osducs.exe -DestinationPath osducs-${{ matrix.rid }}.zip
+        shell: pwsh
+
+      - name: Upload
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: osducs-${{ matrix.rid }}
+          path: osducs-${{ matrix.rid }}.${{ matrix.archive }}
+          # Long enough for a review round, short enough not to accumulate.
+          retention-days: 14

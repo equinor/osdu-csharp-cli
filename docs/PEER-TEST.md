@@ -44,6 +44,22 @@ that is the single most useful thing you can tell us** — see §5.
 No browser? The [releases page](https://github.com/equinor/osdu-csharp-cli/releases/latest)
 works if you are signed in to GitHub.
 
+### Testing a change that is not released yet
+
+Every pull request builds the same three binaries and attaches them to its CI run, so a
+change can be tried before anyone commits to releasing it:
+
+```bash
+gh run download --repo equinor/osdu-csharp-cli --name osducs-win-x64 \
+  $(gh run list --repo equinor/osdu-csharp-cli --branch <branch> \
+      --workflow "Run Tests" --limit 1 --json databaseId --jq '.[0].databaseId')
+```
+
+Swap `osducs-win-x64` for `osducs-osx-arm64` or `osducs-linux-x64`. They are kept for 14
+days, and are built exactly the way release assets are — same flags, same archive, same
+runner per platform — so what you test is what would ship. The GitHub UI works too: open the
+PR's checks, click the **Run Tests** run, and the artifacts are at the bottom.
+
 ## 2. First run (1 minute)
 
 **If you already use `osducli`, there is nothing to configure.** `osducs` reads the same
