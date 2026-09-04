@@ -85,6 +85,9 @@ normal@equinor.com
 azure@equinor.com  yes
 ```
 
+Advisories from `account list` — nothing signed in, or a selected account that is not —
+go to stderr, so `--output json` stays parseable while the remark still reaches you.
+
 **With more than one account signed in and no choice made, commands stop and list them
 rather than pick one.** That is deliberate. The accounts differ in what they can see and
 change, and the difference is invisible in the output — a command that quietly ran as the

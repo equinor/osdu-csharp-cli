@@ -47,15 +47,16 @@ public static class AccountCommand
                 });
             }
 
-            // Written even when empty. WriteMessage is suppressed under --output json, so an
-            // early return for the empty case emitted nothing at all — not even `[]` — and
-            // anything parsing the output got a syntax error instead of "no accounts".
+            // Written even when empty, so that --output json always yields parseable output
+            // rather than nothing at all. The advisories below go to stderr for the same
+            // reason from the other side: they must survive JSON mode, where the rows cannot
+            // express "selected but not signed in" — every row just reads as not in use.
             context.Output.Write(rows.ToJsonString(), OutputSpec.Table(
                 null, ("Account", "account"), ("In use", "inUse")));
 
             if (cached.Count == 0)
             {
-                context.Output.WriteMessage(
+                context.Output.WriteNote(
                     "Not signed in. The next command that reaches a service will open a browser.");
             }
             else if (selected is not null
@@ -63,13 +64,13 @@ public static class AccountCommand
             {
                 // Worth saying plainly: the next command will open a browser, and if the user
                 // signs in as somebody else it will fail rather than quietly use them.
-                context.Output.WriteMessage(
+                context.Output.WriteNote(
                     $"{selected} is selected but not signed in on this machine. "
                     + "The next command that reaches a service will prompt for it.");
             }
             else if (effective is null)
             {
-                context.Output.WriteMessage(
+                context.Output.WriteNote(
                     "No account selected — commands will report the ambiguity rather than "
                     + "guess. Use --user <account>, or set `username` in your config profile.");
             }

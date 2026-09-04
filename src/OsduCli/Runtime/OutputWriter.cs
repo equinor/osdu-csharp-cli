@@ -14,9 +14,11 @@ public enum OutputFormat
 }
 
 /// <summary>Renders a command's JSON response according to its <see cref="OutputSpec"/>.</summary>
-public sealed class OutputWriter(OutputFormat format, TextWriter output)
+public sealed class OutputWriter(OutputFormat format, TextWriter output, TextWriter? error = null)
 {
     private static readonly JsonSerializerOptions Indented = new() { WriteIndented = true };
+
+    private readonly TextWriter _error = error ?? Console.Error;
 
     /// <summary>Search reports at most this many matches without trackTotalCount.</summary>
     private const long SearchCountCap = 10_000;
@@ -46,6 +48,26 @@ public sealed class OutputWriter(OutputFormat format, TextWriter output)
     public int WriteMessage(string message)
     {
         if (format == OutputFormat.Table) output.WriteLine(message);
+        return 0;
+    }
+
+    /// <summary>
+    /// Writes an advisory about the result to stderr, in every output format.
+    /// </summary>
+    /// <remarks>
+    /// <see cref="WriteMessage"/> is the *result* of a command that has no response body
+    /// ("Workflow deleted"), and belongs on stdout with the rest of the output — which is why
+    /// it is suppressed under <c>--output json</c>, where it would be a syntax error.
+    ///
+    /// This is for something else: a remark about what the output means. "The account you
+    /// selected is not signed in" has to survive <c>--output json</c>, because the JSON alone
+    /// cannot express it — every row simply reads as not in use, exactly as it would if no
+    /// account had been selected at all. stderr keeps stdout parseable and the advice
+    /// visible, which is what the stream is for.
+    /// </remarks>
+    public int WriteNote(string message)
+    {
+        _error.WriteLine(message);
         return 0;
     }
 
