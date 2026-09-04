@@ -29,7 +29,7 @@ public class AccountSelectionTests
 
     private static AccountScopedTokenProvider Provider(
         StubTokenProvider inner, string? username, params string[] cached) =>
-        new(inner, () => Task.FromResult<IReadOnlyList<string>>(cached), username);
+        new(inner, _ => Task.FromResult<IReadOnlyList<string>>(cached), username);
 
     [Fact]
     public async Task TwoAccountsAndNoChoiceIsRefused()

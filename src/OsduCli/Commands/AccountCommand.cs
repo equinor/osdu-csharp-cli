@@ -23,9 +23,9 @@ public static class AccountCommand
         var list = new Command("list", "List the accounts in this machine's token cache.");
 
         list.SetAction((parseResult, cancellationToken) =>
-            CliRunner.RunAsync(parseResult, async (context, _) =>
+            CliRunner.RunAsync(parseResult, async (context, token) =>
         {
-            var cached = await context.Msal.GetCachedUsernamesAsync();
+            var cached = await context.Msal.GetCachedUsernamesAsync(token);
             // The resolved choice, not just the flag: a `username` in the profile counts
             // too, and reading only --user here reported the wrong account as in use.
             var selected = context.Username;

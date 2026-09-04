@@ -23,18 +23,20 @@ namespace Equinor.OsduCli.Runtime;
 /// </remarks>
 /// <param name="cachedUsernames">
 /// Reads the cache. A delegate rather than the MSAL provider itself, so the rule this class
-/// exists to enforce can be tested without a browser and a live tenant.
+/// exists to enforce can be tested without a browser and a live tenant. It takes the
+/// cancellation token because reading the cache waits on the provider's registration
+/// semaphore, and a caller giving up should not be stuck behind it.
 /// </param>
 internal sealed class AccountScopedTokenProvider(
     ITokenProvider inner,
-    Func<Task<IReadOnlyList<string>>> cachedUsernames,
+    Func<CancellationToken, Task<IReadOnlyList<string>>> cachedUsernames,
     string? username) : ITokenProvider
 {
     public async Task<string> GetTokenAsync(CancellationToken cancellationToken = default)
     {
         if (username is null)
         {
-            var cached = await cachedUsernames();
+            var cached = await cachedUsernames(cancellationToken);
             if (cached.Count > 1)
             {
                 throw new OsduException(
