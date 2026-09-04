@@ -47,6 +47,10 @@ public sealed class OsduCliIniConfigurationProvider(OsduCliIniConfigurationSourc
         ["authority"] = "Osdu:Authority",
         ["client_id"] = "Osdu:ClientId",
         ["scopes"] = "Osdu:Scopes",
+        // Not a key the Python CLI writes; it sketched one out and left it
+        // commented. Read here so a default account can live beside the
+        // environment it belongs to rather than being typed every time.
+        ["username"] = "Osdu:Username",
     };
 
     public override void Load()

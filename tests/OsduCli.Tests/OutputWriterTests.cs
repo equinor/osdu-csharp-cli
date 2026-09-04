@@ -217,4 +217,50 @@ public class OutputWriterTests
     {
         Assert.Equal("", RenderTotal("""{"results":[]}"""));
     }
+
+    [Fact]
+    public void AnEmptyArrayStillProducesJson()
+    {
+        // `account list` on a machine with no cached accounts has nothing to report, but
+        // something parsing --output json must get valid JSON rather than an empty stream.
+        var buffer = new StringWriter();
+        new OutputWriter(OutputFormat.Json, buffer).Write("[]", OutputSpec.Table(
+            null, ("Account", "account")));
+
+        Assert.Equal("[]", buffer.ToString().Trim());
+    }
+
+    // ---- notes ---------------------------------------------------------------------------
+
+    [Theory]
+    [InlineData(OutputFormat.Table)]
+    [InlineData(OutputFormat.Json)]
+    public void ANoteReachesStderrInEveryFormat(OutputFormat format)
+    {
+        // "The account you selected is not signed in" cannot be expressed in the rows — every
+        // row reads as not in use, exactly as it would if nothing had been selected. So it has
+        // to survive --output json, and stdout is not the place for it.
+        var output = new StringWriter();
+        var error = new StringWriter();
+
+        new OutputWriter(format, output, error).WriteNote("not signed in");
+
+        Assert.Equal("not signed in", error.ToString().Trim());
+        Assert.Equal("", output.ToString());
+    }
+
+    [Fact]
+    public void AResultMessageStaysOnStdoutAndOutOfJson()
+    {
+        // The other kind: WriteMessage is the result of a command with no response body, so it
+        // belongs on stdout and must not corrupt JSON output.
+        var table = new StringWriter();
+        var json = new StringWriter();
+
+        new OutputWriter(OutputFormat.Table, table).WriteMessage("Workflow deleted");
+        new OutputWriter(OutputFormat.Json, json).WriteMessage("Workflow deleted");
+
+        Assert.Equal("Workflow deleted", table.ToString().Trim());
+        Assert.Equal("", json.ToString());
+    }
 }

@@ -53,6 +53,49 @@ per-service `*_url` entries in a profile are **ignored** — this CLI derives ea
 from the service's own OpenAPI spec, and honouring the profile would double the version
 segment. See [COMMAND-GRAMMAR.md](../COMMAND-GRAMMAR.md).
 
+## Signing in as a particular account
+
+If you have more than one account — a normal one and a separate privileged one is the usual
+reason — say which you mean:
+
+```bash
+osducs record search -k "osdu:wks:master-data--Well:*" --user azure@equinor.com
+```
+
+To avoid typing it every time, put it in the config profile beside the environment it belongs
+to:
+
+```ini
+[core]
+username = azure@equinor.com
+```
+
+`--user` overrides the profile. `OSDU_USERNAME` works too.
+
+To see what you are signed in as:
+
+```bash
+osducs account list
+```
+
+```
+Account            In use
+-----------------  ------
+normal@equinor.com
+azure@equinor.com  yes
+```
+
+Advisories from `account list` — nothing signed in, or a selected account that is not —
+go to stderr, so `--output json` stays parseable while the remark still reaches you.
+
+**With more than one account signed in and no choice made, commands stop and list them
+rather than pick one.** That is deliberate. The accounts differ in what they can see and
+change, and the difference is invisible in the output — a command that quietly ran as the
+wrong identity looks exactly like one that ran as the right one.
+
+The account you name does not have to be signed in yet. The browser will open on it, and if
+you sign in as somebody else the command fails rather than use them.
+
 ## Output
 
 Table by default, JSON on request:

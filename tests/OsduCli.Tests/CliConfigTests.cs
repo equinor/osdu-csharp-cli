@@ -116,4 +116,31 @@ public class CliConfigTests : IDisposable
         Assert.Contains(".osdu", CliConfig.DefaultConfigPath);
         Assert.EndsWith("config.json", CliConfig.DefaultConfigPath);
     }
+
+    // ---- username normalisation ---------------------------------------------------------
+
+    [Theory]
+    [InlineData(null)]
+    [InlineData("")]
+    [InlineData("   ")]
+    [InlineData("\t")]
+    public void ABlankUsernameIsNoSelectionAtAll(string? value)
+    {
+        // The dangerous case. `--user ""` is not null, so the ambiguity guard reads it as a
+        // choice and stands down, while the MSAL provider trims it to null and falls through
+        // to the first cached account — the silent guess coming back through the flag that
+        // exists to prevent it.
+        Assert.Null(CliConfig.NormaliseUsername(value));
+    }
+
+    [Theory]
+    [InlineData("azure@equinor.com", "azure@equinor.com")]
+    [InlineData("  azure@equinor.com  ", "azure@equinor.com")]
+    [InlineData("\tazure@equinor.com\n", "azure@equinor.com")]
+    public void PaddingIsStrippedSoEveryComparisonAgrees(string value, string expected)
+    {
+        // A padded value matches nothing in the cache, so `account list` would report the
+        // account as not signed in while the provider, which trims, uses it happily.
+        Assert.Equal(expected, CliConfig.NormaliseUsername(value));
+    }
 }

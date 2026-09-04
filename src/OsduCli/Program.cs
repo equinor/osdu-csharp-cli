@@ -15,12 +15,14 @@ CliHelp.Install(root);
 // about the tool itself are grouped here because no manifest owns them.
 CliHelp.Categorise(GeneratedCommands.Sections);
 CliHelp.Categorise("status", "CLI");
+CliHelp.Categorise("account", "CLI");
 CliHelp.Categorise("completion", "CLI");
 
 foreach (var command in GeneratedCommands.All())
     root.Subcommands.Add(command);
 
 root.Subcommands.Add(StatusCommand.Build());
+root.Subcommands.Add(AccountCommand.Build());
 
 // Added after the rest of the tree: `osducs complete` parses against this same root, so
 // everything it should be able to suggest has to be registered first.

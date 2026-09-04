@@ -49,9 +49,20 @@ public static class CliConfig
         ["OSDU_AUTHORITY"] = "Osdu:Authority",
         ["OSDU_CLIENT_ID"] = "Osdu:ClientId",
         ["OSDU_SCOPES"] = "Osdu:Scopes",
+        ["OSDU_USERNAME"] = "Osdu:Username",
     };
 
-    public static OsduConfig Load(string? config)
+    public static OsduConfig Load(string? config) => Load(config, out _);
+
+    /// <summary>
+    /// Loads the configuration, and reports the default account it names, if any.
+    /// </summary>
+    /// <remarks>
+    /// <c>username</c> is not part of <see cref="OsduConfig"/> — the client models a service
+    /// endpoint, not who is talking to it — so it comes back separately rather than being
+    /// forced into a type that has no place for it.
+    /// </remarks>
+    public static OsduConfig Load(string? config, out string? username)
     {
         var candidates = Resolve(config);
 
@@ -82,8 +93,25 @@ public static class CliConfig
         if (!configuration.GetSection(OsduConfig.DefaultSectionName).Exists())
             throw new OsduException(NothingFoundMessage(config, candidates));
 
+        username = NormaliseUsername(configuration[$"{OsduConfig.DefaultSectionName}:Username"]);
+
         return OsduConfig.FromConfiguration(configuration);
     }
+
+    /// <summary>
+    /// Reduces a username to a value or to nothing, so every part of the CLI agrees on which
+    /// is which.
+    /// </summary>
+    /// <remarks>
+    /// <c>--user ""</c> is not a selection, but it is not null either. Left alone it reads as
+    /// "a choice was made" to the ambiguity guard while the MSAL provider trims it back to
+    /// null and falls through to the first cached account — reintroducing the silent guess
+    /// this feature exists to prevent, through the flag meant to prevent it. Padding causes a
+    /// milder version: the guard and <c>account list</c> compare the padded string against
+    /// cached names and find no match.
+    /// </remarks>
+    internal static string? NormaliseUsername(string? value) =>
+        string.IsNullOrWhiteSpace(value) ? null : value.Trim();
 
     /// <summary>
     /// The files to read, lowest precedence first. Later sources win, so a native config
