@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.5.0](https://github.com/equinor/osdu-csharp-cli/compare/v0.4.1...v0.5.0) (2026-09-04)
+
+
+### Features
+
+* **auth:** add --user to choose between signed-in accounts ([22696d4](https://github.com/equinor/osdu-csharp-cli/commit/22696d410ba0ba6765893060bc876be7c58560ba))
+
 ## [0.4.1](https://github.com/equinor/osdu-csharp-cli/compare/v0.4.0...v0.4.1) (2026-08-27)
 
 
