@@ -37,7 +37,7 @@ public class AccountSelectionTests
         var inner = new StubTokenProvider();
         var provider = Provider(inner, null, "normal@equinor.com", "azure@equinor.com");
 
-        var error = await Assert.ThrowsAsync<OsduException>(() => provider.GetTokenAsync());
+        var error = await Assert.ThrowsAsync<OsduException>(() => provider.GetTokenAsync(TestContext.Current.CancellationToken));
 
         Assert.Contains("normal@equinor.com", error.Message);
         Assert.Contains("azure@equinor.com", error.Message);
@@ -50,7 +50,7 @@ public class AccountSelectionTests
         // An error that only reports a problem makes the user go looking for the fix.
         var provider = Provider(new StubTokenProvider(), null, "a@equinor.com", "b@equinor.com");
 
-        var error = await Assert.ThrowsAsync<OsduException>(() => provider.GetTokenAsync());
+        var error = await Assert.ThrowsAsync<OsduException>(() => provider.GetTokenAsync(TestContext.Current.CancellationToken));
 
         Assert.Contains("--user", error.Message);
         Assert.Contains("username", error.Message);
@@ -63,7 +63,7 @@ public class AccountSelectionTests
         var inner = new StubTokenProvider();
         var provider = Provider(inner, "azure@equinor.com", "normal@equinor.com", "azure@equinor.com");
 
-        Assert.Equal("token", await provider.GetTokenAsync());
+        Assert.Equal("token", await provider.GetTokenAsync(TestContext.Current.CancellationToken));
         Assert.True(inner.WasCalled);
     }
 
@@ -73,7 +73,7 @@ public class AccountSelectionTests
         var inner = new StubTokenProvider();
         var provider = Provider(inner, null, "normal@equinor.com");
 
-        Assert.Equal("token", await provider.GetTokenAsync());
+        Assert.Equal("token", await provider.GetTokenAsync(TestContext.Current.CancellationToken));
         Assert.True(inner.WasCalled);
     }
 
@@ -84,7 +84,7 @@ public class AccountSelectionTests
         var inner = new StubTokenProvider();
         var provider = Provider(inner, null);
 
-        Assert.Equal("token", await provider.GetTokenAsync());
+        Assert.Equal("token", await provider.GetTokenAsync(TestContext.Current.CancellationToken));
         Assert.True(inner.WasCalled);
     }
 }
