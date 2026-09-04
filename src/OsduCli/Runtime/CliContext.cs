@@ -20,11 +20,25 @@ public sealed class CliContext : IDisposable
     /// <summary>The configuration this invocation resolved, for commands that report it.</summary>
     public OsduConfig Config { get; }
 
-    private CliContext(OsduClient client, OutputWriter output, OsduConfig config)
+    /// <summary>The MSAL provider, for commands that report on sign-in state.</summary>
+    public MsalInteractiveTokenProvider Msal { get; }
+
+    /// <summary>
+    /// The account this invocation will authenticate as, from <c>--user</c> or the profile's
+    /// <c>username</c>, or null when neither said. Resolved once here so that commands
+    /// reporting on it cannot disagree with the provider actually doing the work.
+    /// </summary>
+    public string? Username { get; }
+
+    private CliContext(
+        OsduClient client, OutputWriter output, OsduConfig config,
+        MsalInteractiveTokenProvider msal, string? username)
     {
         Client = client;
         Output = output;
         Config = config;
+        Msal = msal;
+        Username = username;
     }
 
     /// <summary>
@@ -38,7 +52,10 @@ public sealed class CliContext : IDisposable
         ApiClientBuilder.RegisterDefaultSerializer<JsonSerializationWriterFactory>();
         ApiClientBuilder.RegisterDefaultDeserializer<JsonParseNodeFactory>();
 
-        var config = CliConfig.Load(parseResult.GetValue(GlobalOptions.Config));
+        var config = CliConfig.Load(parseResult.GetValue(GlobalOptions.Config), out var configuredUser);
+
+        // An explicit --user beats the profile's default, which beats no opinion at all.
+        var username = parseResult.GetValue(GlobalOptions.User) ?? configuredUser;
 
         var format = string.Equals(parseResult.GetValue(GlobalOptions.Output), "json",
             StringComparison.OrdinalIgnoreCase)
@@ -60,10 +77,15 @@ public sealed class CliContext : IDisposable
         // the answer is interactive — the same behaviour the old default gave, now stated
         // rather than inherited. The provider keeps its own OS-encrypted token cache under
         // ~/.osdu, so sign-in still survives between invocations.
+        var msal = new MsalInteractiveTokenProvider(
+            config, loggerFactory: loggerFactory, username: username);
+
         return new CliContext(
-            new OsduClient(config, new MsalInteractiveTokenProvider(config, loggerFactory: loggerFactory), loggerFactory),
+            new OsduClient(config, new AccountScopedTokenProvider(msal, msal.GetCachedUsernamesAsync, username), loggerFactory),
             new OutputWriter(format, Console.Out),
-            config);
+            config,
+            msal,
+            username);
     }
 
     /// <summary>Reads and returns the contents of a JSON file passed via a command option.</summary>

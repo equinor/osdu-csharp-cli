@@ -31,10 +31,13 @@
        2.0.0 made the core package authentication-agnostic: it no longer bundles MSAL, and
        `OsduClient` no longer defaults to interactive sign-in. The MSAL providers now live in
        a separate optional package, which a CLI for humans at a terminal plainly needs. The
-       two version numbers move in lockstep upstream, so keep them equal here. -->
+       two version numbers move in lockstep upstream, so keep them equal here.
+
+       2.1.0 adds the `username` parameter that `--user` needs, so the token cache holding
+       more than one account stops being resolved by whichever MSAL returns first. -->
   <ItemGroup>
-    <PackageReference Include="Equinor.OsduCsharpClient" Version="2.0.0"/>
-    <PackageReference Include="Equinor.OsduCsharpClient.Msal" Version="2.0.0"/>
+    <PackageReference Include="Equinor.OsduCsharpClient" Version="2.1.0"/>
+    <PackageReference Include="Equinor.OsduCsharpClient.Msal" Version="2.1.0"/>
   </ItemGroup>
 
 </Project>

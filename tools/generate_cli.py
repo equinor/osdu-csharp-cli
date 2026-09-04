@@ -693,6 +693,7 @@ def build_service(manifest_path: Path) -> Service:
 # command that reuses one of their aliases either shadows it or makes the parse ambiguous.
 # `-c` for `--curves` did exactly this: it collided with the global `--config`.
 RESERVED_ALIASES = {"--output", "-o", "--config", "-c", "--debug",
+                    "--user", "-u",
                     "--help", "-h", "-?", "/h", "/?"}
 
 
