@@ -77,8 +77,10 @@ public sealed class CliContext : IDisposable
         // the answer is interactive — the same behaviour the old default gave, now stated
         // rather than inherited. The provider keeps its own OS-encrypted token cache under
         // ~/.osdu, so sign-in still survives between invocations.
-        var msal = new MsalInteractiveTokenProvider(
-            config, loggerFactory: loggerFactory, username: username);
+        var msal = new MsalInteractiveTokenProvider(config, loggerFactory: loggerFactory)
+        {
+            Username = username,
+        };
 
         return new CliContext(
             new OsduClient(config, new AccountScopedTokenProvider(msal, msal.GetCachedUsernamesAsync, username), loggerFactory),
