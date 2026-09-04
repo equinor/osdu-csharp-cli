@@ -30,13 +30,6 @@ public static class AccountCommand
             // too, and reading only --user here reported the wrong account as in use.
             var selected = context.Username;
 
-            if (cached.Count == 0)
-            {
-                context.Output.WriteMessage(
-                    "Not signed in. The next command that reaches a service will open a browser.");
-                return 0;
-            }
-
             // Which one a command would actually use, by the same rule the provider applies:
             // an explicit --user, else the only cached account, else nothing — because more
             // than one with no choice made is exactly the case that refuses to guess.
@@ -54,10 +47,18 @@ public static class AccountCommand
                 });
             }
 
+            // Written even when empty. WriteMessage is suppressed under --output json, so an
+            // early return for the empty case emitted nothing at all — not even `[]` — and
+            // anything parsing the output got a syntax error instead of "no accounts".
             context.Output.Write(rows.ToJsonString(), OutputSpec.Table(
                 null, ("Account", "account"), ("In use", "inUse")));
 
-            if (selected is not null
+            if (cached.Count == 0)
+            {
+                context.Output.WriteMessage(
+                    "Not signed in. The next command that reaches a service will open a browser.");
+            }
+            else if (selected is not null
                 && !cached.Contains(selected, StringComparer.OrdinalIgnoreCase))
             {
                 // Worth saying plainly: the next command will open a browser, and if the user

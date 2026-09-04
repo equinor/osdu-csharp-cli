@@ -93,11 +93,25 @@ public static class CliConfig
         if (!configuration.GetSection(OsduConfig.DefaultSectionName).Exists())
             throw new OsduException(NothingFoundMessage(config, candidates));
 
-        username = configuration[$"{OsduConfig.DefaultSectionName}:Username"];
-        username = string.IsNullOrWhiteSpace(username) ? null : username.Trim();
+        username = NormaliseUsername(configuration[$"{OsduConfig.DefaultSectionName}:Username"]);
 
         return OsduConfig.FromConfiguration(configuration);
     }
+
+    /// <summary>
+    /// Reduces a username to a value or to nothing, so every part of the CLI agrees on which
+    /// is which.
+    /// </summary>
+    /// <remarks>
+    /// <c>--user ""</c> is not a selection, but it is not null either. Left alone it reads as
+    /// "a choice was made" to the ambiguity guard while the MSAL provider trims it back to
+    /// null and falls through to the first cached account — reintroducing the silent guess
+    /// this feature exists to prevent, through the flag meant to prevent it. Padding causes a
+    /// milder version: the guard and <c>account list</c> compare the padded string against
+    /// cached names and find no match.
+    /// </remarks>
+    internal static string? NormaliseUsername(string? value) =>
+        string.IsNullOrWhiteSpace(value) ? null : value.Trim();
 
     /// <summary>
     /// The files to read, lowest precedence first. Later sources win, so a native config

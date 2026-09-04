@@ -217,4 +217,16 @@ public class OutputWriterTests
     {
         Assert.Equal("", RenderTotal("""{"results":[]}"""));
     }
+
+    [Fact]
+    public void AnEmptyArrayStillProducesJson()
+    {
+        // `account list` on a machine with no cached accounts has nothing to report, but
+        // something parsing --output json must get valid JSON rather than an empty stream.
+        var buffer = new StringWriter();
+        new OutputWriter(OutputFormat.Json, buffer).Write("[]", OutputSpec.Table(
+            null, ("Account", "account")));
+
+        Assert.Equal("[]", buffer.ToString().Trim());
+    }
 }

@@ -55,7 +55,10 @@ public sealed class CliContext : IDisposable
         var config = CliConfig.Load(parseResult.GetValue(GlobalOptions.Config), out var configuredUser);
 
         // An explicit --user beats the profile's default, which beats no opinion at all.
-        var username = parseResult.GetValue(GlobalOptions.User) ?? configuredUser;
+        // Normalised through the same helper the profile value goes through, so a blank or
+        // padded flag cannot mean something different from a blank or padded config entry.
+        var username = CliConfig.NormaliseUsername(parseResult.GetValue(GlobalOptions.User))
+                       ?? configuredUser;
 
         var format = string.Equals(parseResult.GetValue(GlobalOptions.Output), "json",
             StringComparison.OrdinalIgnoreCase)
