@@ -23,6 +23,7 @@ foreach (var command in GeneratedCommands.All())
 
 root.Subcommands.Add(StatusCommand.Build());
 root.Subcommands.Add(AccountCommand.Build());
+root.Subcommands.Add(ConfigCommand.Build());
 
 // Added after the rest of the tree: `osducs complete` parses against this same root, so
 // everything it should be able to suggest has to be registered first.

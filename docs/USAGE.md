@@ -26,6 +26,23 @@ wellbore-ddms   ok      0.29
 That first line is deliberate: with a default profile in play, which environment you are
 talking to is no longer visible on the command line.
 
+### Choosing the environment
+
+```bash
+osducs config list          # every profile, with the server and partition each points at
+osducs config use test      # make one the default for every later command
+osducs config show          # what is in effect now, and which files were read
+```
+
+`config use` writes `~/.osducli/state`, the same file the Python CLI's `osdu config update`
+writes, so the two tools do not end up disagreeing about which environment you are on. Other
+keys in that file are left alone.
+
+A profile is validated before it is selected — a config that does not parse is refused at the
+moment you choose it, rather than breaking the next command you run.
+
+`-c <profile>` still overrides the default for a single command.
+
 ### Where settings come from
 
 Later sources win:

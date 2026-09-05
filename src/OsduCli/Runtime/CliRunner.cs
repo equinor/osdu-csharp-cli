@@ -18,6 +18,50 @@ namespace Equinor.OsduCli.Runtime;
 /// </remarks>
 public static class CliRunner
 {
+    /// <summary>
+    /// Runs a command that needs no service call, turning the same failures into a one-line
+    /// message rather than a stack trace.
+    /// </summary>
+    /// <remarks>
+    /// <see cref="RunAsync"/> builds a <see cref="CliContext"/>, which loads configuration and
+    /// constructs a token provider. The commands that report on configuration itself must work
+    /// when that configuration is broken — which is exactly when someone runs them — so they
+    /// cannot go through it.
+    ///
+    /// Still needs to be a wrapper rather than a try/catch in Program.cs: System.CommandLine
+    /// invokes actions itself and reports whatever escapes, so an exception thrown in an action
+    /// never reaches the code around the parse. `osducs config use nosuchprofile` printed a
+    /// full stack trace until this existed.
+    /// </remarks>
+    public static int Run(ParseResult parseResult, Func<int> body)
+    {
+        try
+        {
+            return body();
+        }
+        catch (Exception exception) when (parseResult.GetValue(GlobalOptions.Debug))
+        {
+            Console.Error.WriteLine(exception);
+            return 1;
+        }
+        catch (OsduException exception)
+        {
+            Console.Error.WriteLine($"error: {exception.Message}");
+            return 1;
+        }
+        catch (IOException exception)
+        {
+            Console.Error.WriteLine($"error: {exception.Message}");
+            return 1;
+        }
+        catch (UnauthorizedAccessException exception)
+        {
+            // Writing the state file into a directory the user cannot write.
+            Console.Error.WriteLine($"error: {exception.Message}");
+            return 1;
+        }
+    }
+
     public static async Task<int> RunAsync(
         ParseResult parseResult,
         Func<CliContext, CancellationToken, Task<int>> body,
