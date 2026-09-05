@@ -225,11 +225,18 @@ public static class CliHelp
     private static bool IsFlag(Option option) =>
         option is HelpOption or VersionOption;
 
+    /// <summary>
+    /// Whether an option belongs in "Common Options" rather than the command's own list.
+    /// </summary>
+    /// <remarks>
+    /// Derived from <see cref="GlobalOptions.All"/> rather than enumerated here. The
+    /// enumerated version fell behind the moment an option was added, and the symptom was
+    /// subtle: help still rendered, the option still parsed, it was simply filed under the
+    /// command's own flags.
+    /// </remarks>
     private static bool IsCommon(Option option) =>
         option is HelpOption or VersionOption
-        || ReferenceEquals(option, GlobalOptions.Output)
-        || ReferenceEquals(option, GlobalOptions.Config)
-        || ReferenceEquals(option, GlobalOptions.Debug);
+        || GlobalOptions.All.Any(global => ReferenceEquals(global, option));
 
     private static string Label(Option option)
     {
