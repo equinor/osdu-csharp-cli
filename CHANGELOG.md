@@ -1,5 +1,14 @@
 # Changelog
 
+## [0.5.1](https://github.com/equinor/osdu-csharp-cli/compare/v0.5.0...v0.5.1) (2026-09-05)
+
+
+### Bug Fixes
+
+* **help:** `osducs` on its own now prints the help instead of reporting a parse failure ([feafc95](https://github.com/equinor/osdu-csharp-cli/commit/feafc95348a11a212f6addd18ff96bc9812d42f6))
+* **help:** `--user` is listed under Common Options, not among each command's own flags ([8621675](https://github.com/equinor/osdu-csharp-cli/commit/86216758818e6bd6a1857404514a364aa439a495))
+* **help:** root sections are named for what they contain — `Core resources`, `Wellbore DDMS`, `The CLI itself` ([24c5cb4](https://github.com/equinor/osdu-csharp-cli/commit/24c5cb4581dc4e6c7c83e21a733627f87cfec21c))
+
 ## [0.5.0](https://github.com/equinor/osdu-csharp-cli/compare/v0.4.1...v0.5.0) (2026-09-04)
 
 
