@@ -136,7 +136,7 @@ public class CliHelpTests
 
         var help = Render(group);
 
-        Assert.Contains("Commands:", help);
+        Assert.Contains($"{CliHelp.DefaultSection}:", help);
         Assert.Contains("List records.", help);
         Assert.Contains("Get a record.", help);
     }

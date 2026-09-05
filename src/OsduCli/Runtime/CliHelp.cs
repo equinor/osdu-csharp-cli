@@ -49,8 +49,36 @@ public static class CliHelp
     /// </remarks>
     private static readonly Dictionary<string, string> Categories = new(StringComparer.Ordinal);
 
-    /// <summary>Section heading rendered last, for commands about the tool itself.</summary>
-    private const string ToolSection = "CLI";
+    /// <summary>
+    /// Heading for root entries no manifest claimed — the platform's own resources.
+    /// </summary>
+    /// <remarks>
+    /// "Commands" until it was pointed out that nothing under it is one: every entry is a
+    /// resource, and the command is a resource plus a verb. That heading was
+    /// System.CommandLine's word for a subcommand rather than this CLI's word for what the
+    /// reader is looking at, and R1 is explicit that these are nouns.
+    ///
+    /// "Core" rather than "OSDU" because the repo already uses it for exactly this set — the
+    /// command surface minus Wellbore DDMS — and because it sets up the section below as
+    /// adjacent rather than merely different.
+    /// </remarks>
+    internal const string DefaultSection = "Core resources";
+
+    /// <summary>
+    /// Heading for commands about the tool rather than the platform, rendered last.
+    /// </summary>
+    /// <remarks>
+    /// Public because <see cref="Program"/> assigns it to the hand-written commands. A second
+    /// copy of the string there is a bug waiting to happen: while these headings were being
+    /// tried out, renaming the section here left those entries stranded in a section of their
+    /// own, under the old name.
+    ///
+    /// The entries are deliberately not all of one grammatical kind — <c>account</c> takes a
+    /// verb, <c>status</c> and <c>completion</c> do not. Grouping them by what they concern
+    /// rather than by their shape is what lets every heading on the page answer the same
+    /// question.
+    /// </remarks>
+    public const string ToolSection = "The CLI itself";
 
     public static void Categorise(IReadOnlyDictionary<string, string> sections)
     {
@@ -114,11 +142,11 @@ public static class CliHelp
         // section, so the order is predictable without anyone maintaining a list.
         var named = rows.Select(row => row.Section)
             .Where(section => section is not ("Arguments" or "Options" or "Common Options"
-                or "Commands" or ToolSection))
+                or DefaultSection or ToolSection))
             .Distinct()
             .OrderBy(section => section, StringComparer.Ordinal);
 
-        var ordered = new[] { "Arguments", "Options", "Common Options", "Commands" }
+        var ordered = new[] { "Arguments", "Options", "Common Options", DefaultSection }
             .Concat(named)
             .Append(ToolSection);
 
@@ -198,7 +226,7 @@ public static class CliHelp
     /// anything nested falls into the default group, which is what a noun's own help wants.
     /// </summary>
     private static string SectionFor(Command command) =>
-        Categories.GetValueOrDefault(command.Name, "Commands");
+        Categories.GetValueOrDefault(command.Name, DefaultSection);
 
     private static Command? Parent(Command command) =>
         command.Parents.OfType<Command>().FirstOrDefault();

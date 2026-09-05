@@ -39,11 +39,19 @@ public class CliHelpSectionTests
     }
 
     [Fact]
+    public void TheDefaultHeadingNamesResourcesRatherThanCommands()
+    {
+        // The entries under it are nouns; the command is a noun plus a verb. "Commands" was
+        // System.CommandLine's word for a subcommand, not this CLI's word for what is listed.
+        Assert.Equal("Core resources", CliHelp.DefaultSection);
+    }
+
+    [Fact]
     public void UncategorisedCommandsStayInTheDefaultSection()
     {
         var help = RenderRoot(("zzrecord", null!));
 
-        Assert.Contains("Commands:", help);
+        Assert.Contains($"{CliHelp.DefaultSection}:", help);
         Assert.DoesNotContain("Wellbore DDMS:", help);
     }
 
@@ -69,12 +77,12 @@ public class CliHelpSectionTests
     public void TheToolSectionIsRenderedLast()
     {
         var help = RenderRoot(
-            ("zzstatus", "CLI"),
+            ("zzstatus", CliHelp.ToolSection),
             ("zzrecord", null!),
             ("zztrajectory", "Test DDMS"));
 
-        Assert.True(IndexOf(help, "Test DDMS:") < IndexOf(help, "CLI:"));
-        Assert.True(IndexOf(help, "zzrecord") < IndexOf(help, "CLI:"));
+        Assert.True(IndexOf(help, "Test DDMS:") < IndexOf(help, $"{CliHelp.ToolSection}:"));
+        Assert.True(IndexOf(help, "zzrecord") < IndexOf(help, $"{CliHelp.ToolSection}:"));
     }
 
     [Fact]

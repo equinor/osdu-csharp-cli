@@ -573,14 +573,21 @@ in `osducs --help`:
 section: Wellbore DDMS
 ```
 
-Without it, every noun lands in one flat `Commands:` list. That was fine at twelve entries
+Without it, every noun lands in one flat `Core resources:` list. That was fine at twelve entries
 and stopped being fine at twenty-two: widening Wellbore DDMS to all nine of its record types
 meant nine of them were DDMS resources, sorted alphabetically in among `record`, `schema` and
 `workflow` — so the three nouns most users open the tool for were the hardest to find.
 
-Ordering is fixed and needs no maintenance: the default group first, named sections
-alphabetically after it, and `CLI` — the commands about the tool itself — always last. One
-column width spans every section so descriptions stay aligned down the page.
+Ordering is fixed and needs no maintenance: `Core resources` first, named sections
+alphabetically after it, and `The CLI itself` always last. One column width spans every
+section so descriptions stay aligned down the page.
+
+The headings all answer the same question — what is this about — rather than mixing that with
+what kind of thing each entry is. `Commands:` was the original default heading and was simply
+untrue: nothing under it is a command, since a command is a resource plus a verb. It was
+System.CommandLine's word for a subcommand, not this CLI's word for what the reader is looking
+at. `The CLI itself` groups `account`, `status` and `completion` by what they concern, which
+is why it can hold both a noun that takes verbs and two commands that do not.
 
 Sections apply only to the root list. A noun's own help is a short list of verbs and gains
 nothing from headings.
