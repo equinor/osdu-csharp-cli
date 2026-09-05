@@ -153,13 +153,13 @@ exclude:
   - op: { method: post, path: /tenant-provisioning }
     reason: Provisions a new data partition. Platform operations, and irreversible.
   - op: { method: get, path: /_ah/readiness_check }
-    reason: Infrastructure probe, covered by `osdu status`.
+    reason: Infrastructure probe, covered by `osducs status`.
   - op: { method: get, path: /_ah/liveness_check }
-    reason: Infrastructure probe, covered by `osdu status`.
+    reason: Infrastructure probe, covered by `osducs status`.
 
 handwritten:
   - command: status
     op: { method: get, path: /info }
     reason: >
-      Reported by `osdu status`, which probes every service's /info in one command rather
+      Reported by `osducs status`, which probes every service's /info in one command rather
       than giving each service its own. See cli-manifest/storage.yaml for the rationale.

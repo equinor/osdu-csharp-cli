@@ -136,7 +136,7 @@ public class CliHelpTests
 
         var help = Render(group);
 
-        Assert.Contains("Commands:", help);
+        Assert.Contains($"{CliHelp.DefaultSection}:", help);
         Assert.Contains("List records.", help);
         Assert.Contains("Get a record.", help);
     }
@@ -164,5 +164,32 @@ public class CliHelpTests
         var second = lines.Single(l => l.Contains("Second line.", StringComparison.Ordinal));
 
         Assert.StartsWith("  ", second);
+    }
+
+    [Fact]
+    public void EveryGlobalOptionIsFiledUnderCommonOptions()
+    {
+        // The list of globals lived in two places and fell out of step: `--user` was added to
+        // GlobalOptions and not to CliHelp, so it rendered among a command's own flags —
+        // `--id`, `--attributes`, `--user` — which is the burial the separate section exists
+        // to prevent. It shipped that way in 0.5.0.
+        var command = new Command("get", "Get a record.");
+        command.Options.Add(new Option<string>("--id", "-id") { Description = "Record id." });
+
+        var help = Render(command);
+        var commonAt = help.IndexOf("Common Options:", StringComparison.Ordinal);
+        Assert.True(commonAt > 0, help);
+
+        var ownSection = help[..commonAt];
+        var commonSection = help[commonAt..];
+
+        foreach (var option in GlobalOptions.All)
+        {
+            Assert.Contains(option.Name, commonSection, StringComparison.Ordinal);
+            Assert.DoesNotContain(option.Name, ownSection, StringComparison.Ordinal);
+        }
+
+        // The command's own option stays where it belongs.
+        Assert.Contains("--id", ownSection, StringComparison.Ordinal);
     }
 }

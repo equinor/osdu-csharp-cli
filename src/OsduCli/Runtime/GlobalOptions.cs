@@ -47,11 +47,21 @@ public static class GlobalOptions
         Recursive = true,
     };
 
+    /// <summary>
+    /// Every option declared here, so nothing has to restate the list.
+    /// </summary>
+    /// <remarks>
+    /// <c>CliHelp</c> asks this which options are global, rather than keeping its own copy.
+    /// It kept one until <c>--user</c> was added to this class and not to that list, and the
+    /// new option was then rendered among each command's own flags — <c>--id</c>,
+    /// <c>--attributes</c>, <c>--user</c> — which is the exact burial the separate section
+    /// exists to prevent. Shipped in 0.5.0.
+    /// </remarks>
+    public static IReadOnlyList<Option> All { get; } = [Output, Config, User, Debug];
+
     public static void AddTo(RootCommand root)
     {
-        root.Options.Add(Output);
-        root.Options.Add(Config);
-        root.Options.Add(User);
-        root.Options.Add(Debug);
+        foreach (var option in All)
+            root.Options.Add(option);
     }
 }

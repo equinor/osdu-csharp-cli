@@ -119,13 +119,13 @@ exclude:
   - op: { method: delete, path: "/v1/workflow/system/{workflow_name}" }
     reason: Paired with POST /v1/workflow/system, which is excluded.
   - op: { method: get, path: /readiness_check }
-    reason: Infrastructure probe, covered by `osdu status`.
+    reason: Infrastructure probe, covered by `osducs status`.
   - op: { method: get, path: /liveness_check }
-    reason: Infrastructure probe, covered by `osdu status`.
+    reason: Infrastructure probe, covered by `osducs status`.
 
 handwritten:
   - command: status
     op: { method: get, path: /v1/info }
     reason: >
-      Reported by `osdu status`, which probes every service's /info in one command rather
+      Reported by `osducs status`, which probes every service's /info in one command rather
       than giving each service its own. See cli-manifest/storage.yaml for the rationale.

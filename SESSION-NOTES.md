@@ -170,24 +170,24 @@ was a manifest-writing exercise of 40–275 lines with no generator work at all.
 
 ### Command surface
 
-**80 commands: 79 generated across 12 services, plus the hand-written `osdu status`.**
+**80 commands: 79 generated across 12 services, plus the hand-written `osducs status`.**
 
 ```
-osdu record      list get search delete version{list,get}      storage + search
-osdu schema      list get add update                           schema
-osdu legaltag    list get add update validate delete properties  legal
-osdu group       list add delete member{list,add,delete,count} entitlements
-osdu member      delete group{list}                            entitlements
-osdu file        get add delete upload-url download-url revoke-url    file
-osdu dataset     get add delete undelete upload/download/revoke-url   dataset
-osdu crs         get transform area-of-use convert{,-geojson,-trajectory}  crs_catalog + crs_conversion
-osdu unit        list get search by-{measurement,symbol,system} maps preferred
+osducs record      list get search delete version{list,get}      storage + search
+osducs schema      list get add update                           schema
+osducs legaltag    list get add update validate delete properties  legal
+osducs group       list add delete member{list,add,delete,count} entitlements
+osducs member      delete group{list}                            entitlements
+osducs file        get add delete upload-url download-url revoke-url    file
+osducs dataset     get add delete undelete upload/download/revoke-url   dataset
+osducs crs         get transform area-of-use convert{,-geojson,-trajectory}  crs_catalog + crs_conversion
+osducs unit        list get search by-{measurement,symbol,system} maps preferred
                  catalog{get,search,map-states,last-modified} conversion{scale,abcd}   unit v3
-osdu measurement list get search maps                          unit v3
-osdu unit-system list get                                      unit v3
-osdu workflow    list get add delete run{list,get,trigger,update,latest}   workflow
-osdu wellbore    get add delete version{list,get}              wellbore_ddms (scoped)
-osdu status      [service]                                     hand-written
+osducs measurement list get search maps                          unit v3
+osducs unit-system list get                                      unit v3
+osducs workflow    list get add delete run{list,get,trigger,update,latest}   workflow
+osducs wellbore    get add delete version{list,get}              wellbore_ddms (scoped)
+osducs status      [service]                                     hand-written
 ```
 
 Coverage is enforced per service — every in-scope operation is in `commands`, `handwritten`
@@ -274,7 +274,7 @@ Re-run at the end of the session against all 12 services:
 - Regeneration byte-identical; `--check` gate green.
 - Shell completion resolves at every level — nouns, nested groups, verbs, and enum values.
 - Enum validation fires **before** config load and authentication, so a typo costs nothing.
-- `osdu status nosuch` exits 1 naming all ten probeable services, without authenticating.
+- `osducs status nosuch` exits 1 naming all ten probeable services, without authenticating.
 
 ### Five more bugs the expansion surfaced
 
@@ -309,8 +309,9 @@ pruned service, that decision is being made now in the client repo.
 
 ## 6. Command grammar, and the expansion to all core services
 
-The PoC initially mirrored the Python CLI's grammar — `osdu storage list`, i.e. **service
-first**. Questioning that produced the largest design change of the session.
+The PoC initially mirrored the Python CLI's **service first** grammar — its `osdu storage
+list`, rather than a resource-first `osducs record list`. Questioning that produced the
+largest design change of the session.
 
 ### The decision: resource-first
 
@@ -323,7 +324,7 @@ The argument against service-first is that it makes the user learn OSDU's deploy
 topology to find a command. Nothing about a record's *behaviour* explains why fetching one
 is `storage` but finding one is `search`; that split is an implementation detail of how OSDU
 is deployed. Resource-first also removes the Python CLI's ten near-identical `<service> info`
-commands, which collapse into one `osdu status`.
+commands, which collapse into one `osducs status`.
 
 Renaming Storage's group from `storage` to `record` was **a five-line manifest change** with
 no generator work — which is itself the evidence that the grammar is an editorial decision
@@ -447,7 +448,7 @@ Avoid Kiota's `--language CLI` mode: C#-only, and it emits one command per endpo
 
 ### picocli
 
-The right CLI framework, verified by building the `osdu storage` group in it. Maps close to
+The right CLI framework, verified by building the `osducs storage` group in it. Maps close to
 1:1 onto System.CommandLine (`ScopeType.INHERIT` for `Recursive`, `Callable<Integer>` for
 `SetAction`), parses `-id` style options, and gives better parse errors for free
 (`Did you mean: storage list?`).
@@ -538,7 +539,7 @@ documents in its own registry. The specs are also fresher: profiles here still n
 `crs/catalog/v2` while the vendored spec is v3.
 
 **This produced the first live run against a real OSDU instance.** With the `dev` profile,
-`osdu status` reported all ten services reachable with versions and build dates, and a
+`osducs status` reported all ten services reachable with versions and build dates, and a
 deliberately malformed `record get` returned a real `400` rendered as one line by
 `CliRunner`. That validates, against a live service rather than a stub: MSAL authentication,
 **the spec-derived base URIs for all ten services** — the part with the most room to be
@@ -553,15 +554,15 @@ instance" the biggest remaining risk is now much smaller.
 and enum values". It did not. `ParseResult.GetCompletions()` in System.CommandLine 2.0.11
 returns **option names and nothing else**: no subcommands at any depth, no enum values, and
 nothing from a hand-written `CompletionSources`. Measured, not inferred —
-`osdu complete -- record ""` returned `--config --debug --help …`.
+`osducs complete -- record ""` returned `--config --debug --help …`.
 
 So the candidate list is now built directly from the parsed command: subcommands, then
 argument completion sources, then options as a fallback. Options appear only once the user
 types `-`, or when nothing better exists at that position — otherwise `osdu <Tab>` leads
 with eleven spellings of `--help` and buries the nouns.
 
-`osdu completion bash|zsh|fish|powershell` prints a registration script; the hidden
-`osdu complete` is what those scripts call. Deliberately not `dotnet-suggest`: that means a
+`osducs completion bash|zsh|fish|powershell` prints a registration script; the hidden
+`osducs complete` is what those scripts call. Deliberately not `dotnet-suggest`: that means a
 second global tool installed and this one registered with it, which is a poor ask for an
 enterprise rollout and another executable for WDAC to allow.
 
@@ -917,7 +918,7 @@ All three are deliberate and documented in the manifests or COMMAND-GRAMMAR.md.
 - **`record get` is id-only.** The Python version accepts either `--kind` or `--id` and calls
   a different endpoint for each, which duplicates `record list` and cannot be expressed as
   one operation.
-- **Ten `<service> info` commands collapse into one `osdu status`**, which probes every
+- **Ten `<service> info` commands collapse into one `osducs status`**, which probes every
   service and reports an unreachable one as a row rather than aborting. Exits non-zero if any
   service fails.
 

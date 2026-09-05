@@ -4,7 +4,7 @@ A concrete command tree for the core OSDU services, mapping every non-deprecated
 to a command name or to a reason for not having one.
 
 **Status: the resource-first grammar (R1–R6) is adopted.** `cli-manifest/storage.yaml` and
-the hand-written `osdu status` implement it; the group is `record`, not `storage`. The
+the hand-written `osducs status` implement it; the group is `record`, not `storage`. The
 per-service trees in §2 are still proposals — names are cheap now and expensive after
 `entitlements` and `workflow` set precedent — and §3 lists what is still undecided.
 
@@ -44,8 +44,8 @@ manifest change with byte-identical machinery underneath.
 universal fallback that works for any id. `welllog`, `wellbore` are DDMS's typed views with
 bulk data. Fetching one id both ways is legitimate and useful when debugging ingestion.
 
-**R5 — service identity moves to `osdu status`.** The ten identical `<service> info`
-commands collapse into `osdu status [service]`. Implemented in
+**R5 — service identity moves to `osducs status`.** The ten identical `<service> info`
+commands collapse into `osducs status [service]`. Implemented in
 `src/OsduCli/Commands/StatusCommand.cs`: no argument probes every service, one argument
 narrows to one, and an unreachable service is reported as a row rather than aborting the
 run — that is the answer the user asked for. A service's `/info` is accounted for in its
@@ -60,7 +60,7 @@ safety feature.
 ## 2. The tree
 
 > **Status: built.** Every tree in this section is implemented — 131 generated commands
-> across 12 services plus the hand-written `osdu status`. Where the delivered shape differs
+> across 12 services plus the hand-written `osducs status`. Where the delivered shape differs
 > from the sketch below, the delivered shape is authoritative; run `osdu <noun> --help` to
 > see it. Two changes were made during implementation:
 >
@@ -75,15 +75,15 @@ safety feature.
 ### record — Storage (18 ops)
 
 ```
-osdu record list      --kind K [--limit] [--cursor]   GET  /query/records
-osdu record get       --id ID [--attributes]          GET  /records/{id}
-osdu record add       --file F                        PUT  /records            (handwritten)
-osdu record patch     --id ID --file F                PATCH /records/{id}
-osdu record delete    --id ID                         POST /records/{id}:delete
-osdu record purge     --id ID --yes                   DELETE /records/{id}
-osdu record version list  --id ID                     GET  /records/versions/{id}
-osdu record version get   --id ID --record-version V  GET  /records/{id}/{version}
-osdu record version purge --id ID --yes               DELETE /records/{id}/versions
+osducs record list      --kind K [--limit] [--cursor]   GET  /query/records
+osducs record get       --id ID [--attributes]          GET  /records/{id}
+osducs record add       --file F                        PUT  /records            (handwritten)
+osducs record patch     --id ID --file F                PATCH /records/{id}
+osducs record delete    --id ID                         POST /records/{id}:delete
+osducs record purge     --id ID --yes                   DELETE /records/{id}
+osducs record version list  --id ID                     GET  /records/versions/{id}
+osducs record version get   --id ID --record-version V  GET  /records/{id}/{version}
+osducs record version purge --id ID --yes               DELETE /records/{id}/versions
 ```
 
 | Not exposed | Reason |
@@ -109,17 +109,17 @@ express.
 ### group, member — Entitlements (12 ops)
 
 ```
-osdu group list                                    GET    /groups          (caller's groups)
-osdu group list --all                              GET    /groups/all
-osdu group create --name N --description D         POST   /groups
-osdu group update --group E                        PATCH  /groups/{group_email}
-osdu group delete --group E --yes                  DELETE /groups/{group_email}
-osdu group member list  --group E                  GET    /groups/{group_email}/members
-osdu group member count --group E                  GET    /groups/{group_email}/membersCount
-osdu group member add    --group E --member M --role R   POST /groups/{group_email}/members
-osdu group member remove --group E --member M      DELETE /groups/{group_email}/members/{member_email}
-osdu member group list --member M                  GET    /members/{member_email}/groups
-osdu member delete     --member M --yes            DELETE /members/{member_email}
+osducs group list                                    GET    /groups          (caller's groups)
+osducs group list --all                              GET    /groups/all
+osducs group create --name N --description D         POST   /groups
+osducs group update --group E                        PATCH  /groups/{group_email}
+osducs group delete --group E --yes                  DELETE /groups/{group_email}
+osducs group member list  --group E                  GET    /groups/{group_email}/members
+osducs group member count --group E                  GET    /groups/{group_email}/membersCount
+osducs group member add    --group E --member M --role R   POST /groups/{group_email}/members
+osducs group member remove --group E --member M      DELETE /groups/{group_email}/members/{member_email}
+osducs member group list --member M                  GET    /members/{member_email}/groups
+osducs member delete     --member M --yes            DELETE /members/{member_email}
 ```
 
 | Not exposed | Reason |
@@ -136,15 +136,15 @@ See §3.2.
 ### workflow, run — Workflow (11 ops)
 
 ```
-osdu workflow list                                 GET    /v1/workflow
-osdu workflow get    --name N                      GET    /v1/workflow/{workflow_name}
-osdu workflow create --file F                      POST   /v1/workflow
-osdu workflow delete --name N --yes                DELETE /v1/workflow/{workflow_name}
-osdu workflow run list    --name N                 GET    /v1/workflow/{name}/workflowRun
-osdu workflow run get     --name N --run-id R      GET    /v1/workflow/{name}/workflowRun/{runId}
-osdu workflow run trigger --name N [--file F]      POST   /v1/workflow/{name}/workflowRun
-osdu workflow run update  --name N --run-id R      PUT    /v1/workflow/{name}/workflowRun/{runId}
-osdu workflow run latest  --name N --run-id R      GET    /v1/workflow/{name}/workflowRun/{runId}/latestInfo
+osducs workflow list                                 GET    /v1/workflow
+osducs workflow get    --name N                      GET    /v1/workflow/{workflow_name}
+osducs workflow create --file F                      POST   /v1/workflow
+osducs workflow delete --name N --yes                DELETE /v1/workflow/{workflow_name}
+osducs workflow run list    --name N                 GET    /v1/workflow/{name}/workflowRun
+osducs workflow run get     --name N --run-id R      GET    /v1/workflow/{name}/workflowRun/{runId}
+osducs workflow run trigger --name N [--file F]      POST   /v1/workflow/{name}/workflowRun
+osducs workflow run update  --name N --run-id R      PUT    /v1/workflow/{name}/workflowRun/{runId}
+osducs workflow run latest  --name N --run-id R      GET    /v1/workflow/{name}/workflowRun/{runId}/latestInfo
 ```
 
 | Not exposed | Reason |
@@ -157,15 +157,15 @@ Service name and noun coincide, so this tree is identical under either grammar.
 ### legaltag — Legal (10 ops)
 
 ```
-osdu legaltag list [--valid-only]                  GET  /legaltags
-osdu legaltag get      --name N                    GET  /legaltags/{name}
-osdu legaltag create   --file F                    POST /legaltags
-osdu legaltag update   --file F                    PUT  /legaltags
-osdu legaltag delete   --name N --yes              DELETE /legaltags/{name}
-osdu legaltag validate --names N...                POST /legaltags:validate
-osdu legaltag query    --file F                    POST /legaltags:query
-osdu legaltag properties                           GET  /legaltags:properties
-osdu legaltag batch-get --names N...               POST /legaltags:batchRetrieve
+osducs legaltag list [--valid-only]                  GET  /legaltags
+osducs legaltag get      --name N                    GET  /legaltags/{name}
+osducs legaltag create   --file F                    POST /legaltags
+osducs legaltag update   --file F                    PUT  /legaltags
+osducs legaltag delete   --name N --yes              DELETE /legaltags/{name}
+osducs legaltag validate --names N...                POST /legaltags:validate
+osducs legaltag query    --file F                    POST /legaltags:query
+osducs legaltag properties                           GET  /legaltags:properties
+osducs legaltag batch-get --names N...               POST /legaltags:batchRetrieve
 ```
 
 | Not exposed | Reason |
@@ -178,10 +178,10 @@ proved.
 ### schema — Schema (5 ops)
 
 ```
-osdu schema list [--kind ...] [--status ...]       GET /schema     (searches SchemaInfo)
-osdu schema get    --id ID                         GET /schema/{id}
-osdu schema add    --file F                        POST /schema
-osdu schema update --file F                        PUT  /schema    (development status only)
+osducs schema list [--kind ...] [--status ...]       GET /schema     (searches SchemaInfo)
+osducs schema get    --id ID                         GET /schema/{id}
+osducs schema add    --file F                        POST /schema
+osducs schema update --file F                        PUT  /schema    (development status only)
 ```
 
 | Not exposed | Reason |
@@ -191,13 +191,13 @@ osdu schema update --file F                        PUT  /schema    (development 
 ### search (3 ops)
 
 ```
-osdu search --kind K --query Q [--limit] [--cursor]   POST /query
+osducs search --kind K --query Q [--limit] [--cursor]   POST /query
                                                       POST /query_with_cursor
-osdu search close-cursor --cursor C                   DELETE /query_with_cursor/{cursor}
+osducs search close-cursor --cursor C                   DELETE /query_with_cursor/{cursor}
 ```
 
 Search is a verb, not a noun — it spans kinds and returns records from anywhere. Forcing it
-to `osdu record search` would be tidier grammatically and wrong semantically. See §3.3.
+to `osducs record search` would be tidier grammatically and wrong semantically. See §3.3.
 
 `/query` and `/query_with_cursor` are the same search with and without pagination state, so
 one command with `--cursor` covers both — but that is again two endpoints behind one
@@ -206,12 +206,12 @@ command (§3.2).
 ### file — File (6 ops)
 
 ```
-osdu file upload   --file F                        GET  /v2/files/uploadURL  (+ PUT to signed URL)
-osdu file download --id ID [--output-file O]       GET  /v2/files/{id}/downloadURL
-osdu file metadata get    --id ID                  GET  /v2/files/{id}/metadata
-osdu file metadata create --file F                 POST /v2/files/metadata
-osdu file metadata delete --id ID --yes            DELETE /v2/files/{id}/metadata
-osdu file revoke-url --file F                      POST /v2/files/revokeURL
+osducs file upload   --file F                        GET  /v2/files/uploadURL  (+ PUT to signed URL)
+osducs file download --id ID [--output-file O]       GET  /v2/files/{id}/downloadURL
+osducs file metadata get    --id ID                  GET  /v2/files/{id}/metadata
+osducs file metadata create --file F                 POST /v2/files/metadata
+osducs file metadata delete --id ID --yes            DELETE /v2/files/{id}/metadata
+osducs file revoke-url --file F                      POST /v2/files/revokeURL
 ```
 
 `file upload` and `file download` are handwritten: the endpoints return signed URLs, and the
@@ -221,13 +221,13 @@ actual byte transfer is a second request the CLI must make. That is orchestratio
 ### dataset — Dataset (9 ops)
 
 ```
-osdu dataset list     --id ID...                   GET  /getDatasetRegistry
-osdu dataset register --file F                     PUT  /registerDataset
-osdu dataset delete   --id ID --yes                POST /metadataRecord/{id}/softDelete
-osdu dataset undelete --id ID                      POST /metadataRecord/{id}/undelete
-osdu dataset download-url --id ID [--expiry E]     GET  /retrievalInstructions
-osdu dataset upload-url   --kind K                 POST /storageInstructions
-osdu dataset revoke-url --file F                   POST /revokeURL
+osducs dataset list     --id ID...                   GET  /getDatasetRegistry
+osducs dataset register --file F                     PUT  /registerDataset
+osducs dataset delete   --id ID --yes                POST /metadataRecord/{id}/softDelete
+osducs dataset undelete --id ID                      POST /metadataRecord/{id}/undelete
+osducs dataset download-url --id ID [--expiry E]     GET  /retrievalInstructions
+osducs dataset upload-url   --kind K                 POST /storageInstructions
+osducs dataset revoke-url --file F                   POST /revokeURL
 ```
 
 Two batch twins fold in per §3.1 (`POST /getDatasetRegistry`, `POST /retrievalInstructions`).
@@ -235,12 +235,12 @@ Two batch twins fold in per §3.1 (`POST /getDatasetRegistry`, `POST /retrievalI
 ### crs, transformation — CRS Catalog + Conversion (8 ops)
 
 ```
-osdu crs list [--record-id R] [--data-id D]        GET  /v3/coordinate-reference-system
-osdu crs transformation list [--record-id R]       GET  /v3/coordinate-transformation
-osdu crs points-in-aou --file F                    POST /v3/points-in-aou
-osdu crs convert            --file F               POST /v4/convert
-osdu crs convert-geojson    --file F               POST /v4/convertGeoJson
-osdu crs convert-trajectory --file F               POST /v4/convertTrajectory
+osducs crs list [--record-id R] [--data-id D]        GET  /v3/coordinate-reference-system
+osducs crs transformation list [--record-id R]       GET  /v3/coordinate-transformation
+osducs crs points-in-aou --file F                    POST /v3/points-in-aou
+osducs crs convert            --file F               POST /v4/convert
+osducs crs convert-geojson    --file F               POST /v4/convertGeoJson
+osducs crs convert-trajectory --file F               POST /v4/convertTrajectory
 ```
 
 Two services, one noun, no ambiguity — `list` comes from the catalog, `convert` from the
@@ -254,25 +254,25 @@ The largest core service, and the sharpest test of curation: Python exposes one 
 (`unit list`) from these 28.
 
 ```
-osdu unit list [--offset] [--limit]                GET /v3/unit
-osdu unit get    --symbol S                        GET /v3/unit/symbol
-osdu unit list   --symbol S                        GET /v3/unit/symbols     (all namespaces)
-osdu unit search --query Q                         POST /v3/unit/search
-osdu unit maps                                     GET /v3/unit/maps
-osdu unit list --measurement A                     GET /v3/unit/measurement
-osdu unit list --measurement A --preferred         GET /v3/unit/measurement/preferred
-osdu unit get  --system S --measurement A          GET /v3/unit/unitsystem
-osdu unit convert --from F --to T [--scale]        GET /v3/conversion/abcd, /v3/conversion/scale
-osdu measurement list                              GET /v3/measurement/list
-osdu measurement get    --ancestry A               GET /v3/measurement
-osdu measurement search --query Q                  POST /v3/measurement/search
-osdu measurement maps                              GET /v3/measurement/maps
-osdu unitsystem list                               GET /v3/unitsystem/list
-osdu unitsystem get --name N                       GET /v3/unitsystem
-osdu unit catalog get                              GET /v3/catalog
-osdu unit catalog search --query Q                 POST /v3/catalog/search
-osdu unit catalog mapstates                        GET /v3/catalog/mapstates
-osdu unit catalog modified                         GET /v3/catalog/lastmodified
+osducs unit list [--offset] [--limit]                GET /v3/unit
+osducs unit get    --symbol S                        GET /v3/unit/symbol
+osducs unit list   --symbol S                        GET /v3/unit/symbols     (all namespaces)
+osducs unit search --query Q                         POST /v3/unit/search
+osducs unit maps                                     GET /v3/unit/maps
+osducs unit list --measurement A                     GET /v3/unit/measurement
+osducs unit list --measurement A --preferred         GET /v3/unit/measurement/preferred
+osducs unit get  --system S --measurement A          GET /v3/unit/unitsystem
+osducs unit convert --from F --to T [--scale]        GET /v3/conversion/abcd, /v3/conversion/scale
+osducs measurement list                              GET /v3/measurement/list
+osducs measurement get    --ancestry A               GET /v3/measurement
+osducs measurement search --query Q                  POST /v3/measurement/search
+osducs measurement maps                              GET /v3/measurement/maps
+osducs unitsystem list                               GET /v3/unitsystem/list
+osducs unitsystem get --name N                       GET /v3/unitsystem
+osducs unit catalog get                              GET /v3/catalog
+osducs unit catalog search --query Q                 POST /v3/catalog/search
+osducs unit catalog mapstates                        GET /v3/catalog/mapstates
+osducs unit catalog modified                         GET /v3/catalog/lastmodified
 ```
 
 Eight batch twins fold in per §3.1, accounting for the remaining ops.
@@ -304,10 +304,10 @@ Eight of the twelve are in Unit v3, two in CRS catalog, two in Dataset. That is 
 
 Three options:
 
-- **(a) One command, `--file` switches to the batch endpoint.** `osdu crs list --data-id X`
-  vs `osdu crs list --file ids.json`. Best UX, but it breaks R2 and the generator cannot
+- **(a) One command, `--file` switches to the batch endpoint.** `osducs crs list --data-id X`
+  vs `osducs crs list --file ids.json`. Best UX, but it breaks R2 and the generator cannot
   express it — one command maps to one `op:`. Needs a `variants:` mechanism in the manifest.
-- **(b) Two commands.** `osdu crs list` and `osdu crs list-batch`. Honest, ugly, and inflates
+- **(b) Two commands.** `osducs crs list` and `osducs crs list-batch`. Honest, ugly, and inflates
   the surface by 12 commands.
 - **(c) Expose only the GET.** Smallest surface. Loses genuine batch capability, which
   matters most exactly where it is most common — Unit lookups in a loop.
@@ -331,9 +331,9 @@ services. But it is a real cost and it should be a deliberate choice.
 Independently of §3.1, three cases want one command to reach two endpoints:
 
 ```
-osdu group list  /  group list --all       GET /groups        vs GET /groups/all
-osdu search --cursor                       POST /query        vs POST /query_with_cursor
-osdu workflow create --system              POST /v1/workflow  vs POST /v1/workflow/system
+osducs group list  /  group list --all       GET /groups        vs GET /groups/all
+osducs search --cursor                       POST /query        vs POST /query_with_cursor
+osducs workflow create --system              POST /v1/workflow  vs POST /v1/workflow/system
 ```
 
 The third is resolved by not exposing system workflows. The first two are not. Note the PoC
@@ -344,12 +344,12 @@ Same underlying gap as §3.1, and one `variants:` mechanism would close both.
 
 ### 3.3 Where search lives
 
-`osdu search` as a top-level verb, or `osdu record search`? Search returns records, which
+`osducs search` as a top-level verb, or `osducs record search`? Search returns records, which
 argues for the noun; but it spans kinds and is the primary discovery entry point, which
 argues for top level. I lean top-level. Either way, `search kind` / `search id` /
 `search query` collapse into one command with options.
 
-> **Resolved: `osdu record search`.** Search is a verb on records, and R1 says nouns come
+> **Resolved: `osducs record search`.** Search is a verb on records, and R1 says nouns come
 > first — a top-level `search` would have been the one verb-first command in the CLI. The
 > Search service contributes it to the `record` noun that Storage also feeds, which is the
 > clearest demonstration that nouns are not service names.
@@ -357,7 +357,7 @@ argues for top level. I lean top-level. Either way, `search kind` / `search id` 
 ### 3.4 File vs Dataset overlap
 
 Both services issue upload URLs, download URLs and a `revokeURL`, and File is effectively a
-specialisation of Dataset. `osdu file download --id X` and `osdu dataset download-url --id X`
+specialisation of Dataset. `osducs file download --id X` and `osducs dataset download-url --id X`
 are near-synonyms that hit different services and return different shapes.
 
 No naming scheme fixes this — it is a platform-level overlap. The options are to expose both
@@ -411,12 +411,12 @@ never enter a manifest.
 ## 5. Discoverability is a requirement, not a nice-to-have
 
 The Python CLI is self-explanatory: `-h` anywhere gives you what you need. Any restructuring
-has to preserve that, and a deeper tree raises the stakes — `osdu group member list` is three
-levels, so `osdu group --help` and `osdu group member --help` both have to be useful stops on
+has to preserve that, and a deeper tree raises the stakes — `osducs group member list` is three
+levels, so `osducs group --help` and `osducs group member --help` both have to be useful stops on
 the way.
 
 Resource-first helps here rather than hurting. Consistent verbs mean that once you have seen
-`osdu legaltag list|get|add|delete`, you can guess `osdu group ...` without reading anything.
+`osducs legaltag list|get|add|delete`, you can guess `osducs group ...` without reading anything.
 Today's `mygroups` / `listtags` / `runs` / `areas` have to be learned one at a time.
 
 Already in place, verified: `--help` at every level and without configuration; `-h`, `-?`
@@ -573,14 +573,21 @@ in `osducs --help`:
 section: Wellbore DDMS
 ```
 
-Without it, every noun lands in one flat `Commands:` list. That was fine at twelve entries
+Without it, every noun lands in one flat `Core resources:` list. That was fine at twelve entries
 and stopped being fine at twenty-two: widening Wellbore DDMS to all nine of its record types
 meant nine of them were DDMS resources, sorted alphabetically in among `record`, `schema` and
 `workflow` — so the three nouns most users open the tool for were the hardest to find.
 
-Ordering is fixed and needs no maintenance: the default group first, named sections
-alphabetically after it, and `CLI` — the commands about the tool itself — always last. One
-column width spans every section so descriptions stay aligned down the page.
+Ordering is fixed and needs no maintenance: `Core resources` first, named sections
+alphabetically after it, and `The CLI itself` always last. One column width spans every
+section so descriptions stay aligned down the page.
+
+The headings all answer the same question — what is this about — rather than mixing that with
+what kind of thing each entry is. `Commands:` was the original default heading and was simply
+untrue: nothing under it is a command, since a command is a resource plus a verb. It was
+System.CommandLine's word for a subcommand, not this CLI's word for what the reader is looking
+at. `The CLI itself` groups `account`, `status` and `completion` by what they concern, which
+is why it can hold both a noun that takes verbs and two commands that do not.
 
 Sections apply only to the root list. A noun's own help is a short list of verbs and gains
 nothing from headings.
