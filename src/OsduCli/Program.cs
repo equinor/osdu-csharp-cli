@@ -28,6 +28,21 @@ root.Subcommands.Add(AccountCommand.Build());
 foreach (var command in CompletionCommand.Build(root))
     root.Subcommands.Add(command);
 
+// `osducs` on its own is someone asking what this is, not a malformed command line.
+// System.CommandLine treats it as a parse failure and prints "Required command was not
+// provided." above the help, which reads as though something went wrong when nothing has.
+// The help alone is the answer to the question actually being asked.
+//
+// The exit code stays non-zero. Nothing was run, and `osducs $cmd` with an empty variable
+// reaches here as zero arguments — a script that silently succeeded there would be worse off
+// than one that sees the help. `--help`, which is a request rather than an omission, still
+// exits 0.
+if (args.Length == 0)
+{
+    CliHelp.Write(root, Console.Out);
+    return 1;
+}
+
 try
 {
     var parseResult = root.Parse(args);
