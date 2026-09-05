@@ -1300,7 +1300,7 @@ def group_descriptions(services: list[Service]) -> dict[str, str]:
             raise ManifestError(
                 f"group {label!r} has no description. Add it to the `groups:` map of one "
                 "of the manifests that contributes commands under it — it is what the user "
-                "sees in `osdu --help`."
+                "sees in `osducs --help`."
             )
     return described
 
@@ -1308,7 +1308,7 @@ def group_descriptions(services: list[Service]) -> dict[str, str]:
 def emit_registry(services: list[Service]) -> str:
     described = group_descriptions(services)
 
-    # Roots in manifest order, then deeper nodes, so `osdu --help` lists top-level commands
+    # Roots in manifest order, then deeper nodes, so `osducs --help` lists top-level commands
     # in the order the manifests are read rather than by whichever leaf was attached first.
     ordered = list(dict.fromkeys(
         [root for service in services for root in service.roots]

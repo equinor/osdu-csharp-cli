@@ -1,6 +1,6 @@
 # CLI manifest for the OSDU CRS Catalog service.
 #
-# `osdu crs` is contributed by TWO services: this one supplies the lookups (which coordinate
+# `osducs crs` is contributed by TWO services: this one supplies the lookups (which coordinate
 # reference systems and transformations exist), and crs_conversion.yaml supplies the
 # conversions (apply one to actual coordinates). A user asking "how do I reproject this?"
 # should not have to know that OSDU splits those across two deployments.
@@ -60,5 +60,5 @@ handwritten:
   - command: status
     op: { method: get, path: /v3/info }
     reason: >
-      Reported by `osdu status`, which probes every service's /info in one command rather
+      Reported by `osducs status`, which probes every service's /info in one command rather
       than giving each service its own. See cli-manifest/storage.yaml for the rationale.

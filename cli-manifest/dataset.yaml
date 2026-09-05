@@ -93,11 +93,11 @@ exclude:
     reason: >
       Batch form of `dataset download-url`, same GET/POST twin pattern as above.
   - op: { method: get, path: /liveness_check }
-    reason: Infrastructure probe, covered by `osdu status`.
+    reason: Infrastructure probe, covered by `osducs status`.
 
 handwritten:
   - command: status
     op: { method: get, path: /info }
     reason: >
-      Reported by `osdu status`, which probes every service's /info in one command rather
+      Reported by `osducs status`, which probes every service's /info in one command rather
       than giving each service its own. See cli-manifest/storage.yaml for the rationale.

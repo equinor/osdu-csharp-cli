@@ -1,6 +1,6 @@
 # CLI manifest for the OSDU Schema service.
 #
-# Schemas are what make `--kind` strings meaningful, so `osdu schema list` is the closest
+# Schemas are what make `--kind` strings meaningful, so `osducs schema list` is the closest
 # thing the CLI has to a discovery command: it is how a user finds out what kinds exist
 # before searching for records of one.
 
@@ -74,11 +74,11 @@ exclude:
       data users. Exposing it beside `schema update` would make it easy to write a
       system-wide schema while meaning to write a partition one.
   - op: { method: get, path: /liveness_check }
-    reason: Infrastructure probe, covered by `osdu status`.
+    reason: Infrastructure probe, covered by `osducs status`.
 
 handwritten:
   - command: status
     op: { method: get, path: /info }
     reason: >
-      Reported by `osdu status`, which probes every service's /info in one command rather
+      Reported by `osducs status`, which probes every service's /info in one command rather
       than giving each service its own. See cli-manifest/storage.yaml for the rationale.

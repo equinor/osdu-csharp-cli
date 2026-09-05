@@ -148,7 +148,7 @@ handwritten:
       Service identity is not a record verb, so it does not belong under `record`. The
       ten OSDU services each expose an identical /info; the Python CLI turns that into ten
       separate `<service> info` commands that all call the same helper. Here one
-      hand-written `osdu status` probes every configured service and reports them together.
+      hand-written `osducs status` probes every configured service and reports them together.
 
 exclude:
   - op: { method: get, path: /records }
