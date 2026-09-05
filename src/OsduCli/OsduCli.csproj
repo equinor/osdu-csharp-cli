@@ -3,7 +3,7 @@
   <PropertyGroup>
     <OutputType>Exe</OutputType>
     <AssemblyName>osducs</AssemblyName>
-    <Version>0.5.0</Version>
+    <Version>0.5.1</Version>
     <RootNamespace>Equinor.OsduCli</RootNamespace>
     <InvariantGlobalization>true</InvariantGlobalization>
   </PropertyGroup>
