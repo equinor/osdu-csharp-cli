@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.6.1](https://github.com/equinor/osdu-csharp-cli/compare/v0.6.0...v0.6.1) (2026-09-06)
+
+
+### Bug Fixes
+
+* **help:** list config under The CLI itself, not among the resources ([948b8e8](https://github.com/equinor/osdu-csharp-cli/commit/948b8e842eed55e3048ae27635fd17fd77a523a8))
+* **help:** list config under The CLI itself, not among the resources ([b646cae](https://github.com/equinor/osdu-csharp-cli/commit/b646caeddc9b69a01d4d21a8de8b95d7b8aba7df))
+
 ## [0.6.0](https://github.com/equinor/osdu-csharp-cli/compare/v0.5.1...v0.6.0) (2026-09-06)
 
 
