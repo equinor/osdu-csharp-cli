@@ -37,11 +37,11 @@
        holding more than one account stops being resolved by whichever one MSAL returns
        first.
 
-       3.0.0 moved the MSAL providers into a namespace matching their package, so that which
+       2.2.0 moved the MSAL providers into a namespace matching their package, so that which
        package a type comes from is visible at the using rather than hidden. -->
   <ItemGroup>
-    <PackageReference Include="Equinor.OsduCsharpClient" Version="3.0.0"/>
-    <PackageReference Include="Equinor.OsduCsharpClient.Msal" Version="3.0.0"/>
+    <PackageReference Include="Equinor.OsduCsharpClient" Version="2.2.0"/>
+    <PackageReference Include="Equinor.OsduCsharpClient.Msal" Version="2.2.0"/>
   </ItemGroup>
 
 </Project>
