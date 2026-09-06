@@ -97,7 +97,7 @@ osducs record version purge --id ID --yes               DELETE /records/{id}/ver
 | `POST /records/delete` | Bulk soft-delete; too easy to fire by accident |
 | `POST /replay` + `GET /replay/status/{id}` | Operator tooling; triggers a full reindex |
 
-**Change from today's PoC:** the two hard-purge endpoints move from excluded to exposed
+**Change from what is implemented today:** the two hard-purge endpoints move from excluded to exposed
 behind `--yes` (R6), and `delete`/`purge` now name the soft/hard distinction that
 `POST /records/{id}:delete` vs `DELETE /records/{id}` hides.
 
@@ -336,7 +336,7 @@ osducs search --cursor                       POST /query        vs POST /query_w
 osducs workflow create --system              POST /v1/workflow  vs POST /v1/workflow/system
 ```
 
-The third is resolved by not exposing system workflows. The first two are not. Note the PoC
+The third is resolved by not exposing system workflows. The first two are not. Note that the CLI
 already rejected exactly this pattern once, deliberately: `storage get` is id-only because
 the Python CLI's `--kind`/`--id` dispatch "cannot be expressed as one operation".
 

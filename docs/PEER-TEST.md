@@ -1,10 +1,9 @@
 # Trying osducs — a 20-minute test round
 
-`osducs` is a proof of concept: an OSDU command line whose commands are **generated from the
-OSDU OpenAPI specs**, rather than hand-written like the Python `osducli`. The question it is
-meant to answer is whether that approach produces a CLI people actually want to use, and
-whether it can be packaged for a managed Windows laptop — which is where the Python one
-struggles.
+`osducs` is an OSDU command line whose commands are **generated from the OSDU OpenAPI specs**,
+rather than hand-written like the Python `osducli`. It works and is released; what is still
+open is whether that approach produces a CLI people actually want to use, and whether it can
+be packaged for a managed Windows laptop — which is where the Python one struggles.
 
 You are being asked to use it for twenty minutes and say what is wrong with it. Rough edges
 are expected and useful; **131 of its commands were generated from a spec and most have never

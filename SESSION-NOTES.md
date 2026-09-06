@@ -4,13 +4,16 @@ Evaluating whether a rewrite of `osdu-cli` on a runtime other than Python would 
 package for enterprise Windows 11 and macOS distribution, and building a proof of concept
 for generating its command surface from OpenAPI specs.
 
-The PoC now covers **every core service the Python CLI covers except Wellbore DDMS** — 80
-commands across 12 services — under a redesigned, resource-first command grammar.
+That question is settled, and the tool outgrew the label: `osducs` is released, used against a
+live instance, and covers every core service the Python CLI covers plus the record and
+bulk-read surface of Wellbore DDMS, under a redesigned resource-first command grammar.
 
 This file records what was investigated, what was decided and why, what was built, and what
-is still open. It is a record of one session, not a design document — see [README.md](README.md)
-for how the PoC actually works, and [COMMAND-GRAMMAR.md](COMMAND-GRAMMAR.md) for the command
-grammar and the open questions on the command surface.
+is still open. It is a running record rather than a design document — see
+[README.md](README.md) for how it works and where it currently stands, and
+[COMMAND-GRAMMAR.md](COMMAND-GRAMMAR.md) for the command grammar and the open questions on the
+command surface. **The dated sections below are not revised as things change**; §10 is a
+snapshot of 2026-08-26 and the counts in it have since moved.
 
 ---
 
