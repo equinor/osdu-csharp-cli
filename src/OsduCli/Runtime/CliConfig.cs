@@ -174,6 +174,53 @@ public static class CliConfig
         return null;
     }
 
+    /// <summary>The file recording which profile is selected.</summary>
+    internal static string StatePath => Path.Combine(ProfileDirectory, "state");
+
+    /// <summary>
+    /// Records <paramref name="profilePath"/> as the selected profile.
+    /// </summary>
+    /// <remarks>
+    /// Writes the same <c>~/.osducli/state</c> the Python CLI's <c>osdu config update</c>
+    /// writes, rather than inventing a second notion of "current environment" that could
+    /// disagree with it. Reading that file was always the design; writing it only became this
+    /// tool's job when it stopped being safe to assume the Python CLI is installed to do it.
+    ///
+    /// Other keys in the file are preserved. It is not this command's business what else the
+    /// Python CLI keeps there, and dropping an unrecognised key would be a silent way to
+    /// break the other tool.
+    /// </remarks>
+    internal static void SelectProfile(string profilePath)
+    {
+        var absolute = Path.GetFullPath(profilePath);
+        var lines = File.Exists(StatePath)
+            ? File.ReadAllLines(StatePath).ToList()
+            : ["[core]"];
+
+        var written = false;
+        for (var i = 0; i < lines.Count; i++)
+        {
+            var key = lines[i].Split('=', 2)[0].Trim();
+            if (!key.Equals("default_config", StringComparison.OrdinalIgnoreCase))
+                continue;
+            lines[i] = $"default_config = {absolute}";
+            written = true;
+            break;
+        }
+
+        if (!written)
+            lines.Add($"default_config = {absolute}");
+
+        Directory.CreateDirectory(ProfileDirectory);
+        File.WriteAllLines(StatePath, lines);
+    }
+
+    /// <summary>
+    /// Every file that could supply configuration, lowest precedence first, so a command can
+    /// report what was consulted rather than leaving the user to infer it.
+    /// </summary>
+    internal static IReadOnlyList<string> Candidates(string? config) => Resolve(config);
+
     private static bool LooksLikePath(string value) =>
         value.Contains(Path.DirectorySeparatorChar) ||
         value.Contains(Path.AltDirectorySeparatorChar) ||
