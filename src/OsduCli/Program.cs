@@ -11,23 +11,35 @@ var root = new RootCommand(
 GlobalOptions.AddTo(root);
 CliHelp.Install(root);
 
-// Help sections. The generated ones come from `section:` in the manifests; the commands
-// about the tool itself are grouped here because no manifest owns them.
+// Generated commands carry their help section from `section:` in the manifests.
 CliHelp.Categorise(GeneratedCommands.Sections);
-foreach (var name in new[] { "status", "account", "completion" })
-    CliHelp.Categorise(name, CliHelp.ToolSection);
 
 foreach (var command in GeneratedCommands.All())
     root.Subcommands.Add(command);
 
-root.Subcommands.Add(StatusCommand.Build());
-root.Subcommands.Add(AccountCommand.Build());
-root.Subcommands.Add(ConfigCommand.Build());
+// Hand-written commands are added and categorised together, because doing those separately
+// is a bug waiting to happen — and did happen: `config` was added to the tree and left out of
+// the section list, so it shipped in 0.6.0 listed among `record` and `schema` as though it
+// were an OSDU resource. One loop means a command cannot be registered and then forgotten.
+foreach (var command in new[]
+         {
+             StatusCommand.Build(),
+             AccountCommand.Build(),
+             ConfigCommand.Build(),
+         })
+{
+    root.Subcommands.Add(command);
+    CliHelp.Categorise(command.Name, CliHelp.ToolSection);
+}
 
 // Added after the rest of the tree: `osducs complete` parses against this same root, so
-// everything it should be able to suggest has to be registered first.
+// everything it should be able to suggest has to be registered first. The hidden `complete`
+// never reaches help, so categorising it is harmless and keeps this the same shape.
 foreach (var command in CompletionCommand.Build(root))
+{
     root.Subcommands.Add(command);
+    CliHelp.Categorise(command.Name, CliHelp.ToolSection);
+}
 
 // `osducs` on its own is someone asking what this is, not a malformed command line.
 // System.CommandLine treats it as a parse failure and prints "Required command was not
