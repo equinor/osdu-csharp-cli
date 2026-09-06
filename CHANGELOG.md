@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.6.0](https://github.com/equinor/osdu-csharp-cli/compare/v0.5.1...v0.6.0) (2026-09-06)
+
+
+### Features
+
+* **config:** add config list, use and show ([a9dde34](https://github.com/equinor/osdu-csharp-cli/commit/a9dde3459ebd1f96f530be4417c28964050c4799))
+* **config:** add config list, use and show ([6859622](https://github.com/equinor/osdu-csharp-cli/commit/68596225c930f487f80189bfbab831e451bda729))
+
 ## [0.5.1](https://github.com/equinor/osdu-csharp-cli/compare/v0.5.0...v0.5.1) (2026-09-05)
 
 
