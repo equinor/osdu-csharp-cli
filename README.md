@@ -1,11 +1,13 @@
-# osdu-csharp-cli (proof of concept)
+# osdu-csharp-cli
 
 A C# twin of [osdu-cli](https://community.opengroup.org/osdu/platform/data-flow/data-loading/osdu-cli),
 built to answer one question: **can the CLI's command surface be generated from the OpenAPI
 specs instead of hand-written?**
 
 The answer, on this evidence, is yes for the bulk of it — with an editorial layer that has to
-stay hand-written, and which this PoC makes explicit rather than implicit.
+stay hand-written, and which this repo makes explicit rather than implicit. The question is
+settled enough that the tool is now the point rather than the experiment: it is released, it
+is used against a live instance, and the generator runs in CI.
 
 ## Install
 
@@ -214,9 +216,20 @@ Expects `osdu-csharp-client` checked out as a sibling directory.
 
 ## Status
 
-Proof of concept, covering every core service the Python CLI covers, plus the record surface
-of Wellbore DDMS: **131 generated commands across 12 services**, plus the hand-written
-`osducs status`.
+Working and released. It covers every core service the Python CLI covers, plus Wellbore
+DDMS's record types and the reads of their bulk data: **131 generated commands across 12
+services**, plus hand-written `status`, `account`, `config` and `completion`. Self-contained binaries for Linux, macOS and Windows are
+attached to each release, and every pull request builds the same three.
+
+**Not yet cleared for managed-laptop distribution**, which is the original motivation and the
+remaining work:
+
+- The binaries are **unsigned and un-notarized** — macOS quarantines them and Windows
+  SmartScreen warns. Whether WDAC blocks them outright on a managed laptop is unanswered.
+- The read surface is well exercised against a live instance; **most write commands have never
+  been run**.
+
+Neither is a code problem, and neither is in the way of using it.
 
 | Noun | Fed by |
 | --- | --- |
