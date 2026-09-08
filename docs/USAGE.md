@@ -84,10 +84,15 @@ to:
 
 ```ini
 [core]
-username = azure@equinor.com
+user = azure@equinor.com
 ```
 
-`--user` overrides the profile. `OSDU_USERNAME` works too.
+`username` is accepted as well, and `--user` overrides both. `OSDU_USER` and `OSDU_USERNAME`
+work for a shell session.
+
+The setting has to be in the profile that is **selected** — `osducs config show` lists which
+files were actually read. A default written into a profile you are not using has no effect and
+gives no sign of it.
 
 To see what you are signed in as:
 

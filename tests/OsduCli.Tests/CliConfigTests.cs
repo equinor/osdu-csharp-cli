@@ -143,4 +143,28 @@ public class CliConfigTests : IDisposable
         // account as not signed in while the provider, which trims, uses it happily.
         Assert.Equal(expected, CliConfig.NormaliseUsername(value));
     }
+
+    [Theory]
+    [InlineData("user")]
+    [InlineData("username")]
+    public void EitherSpellingOfTheDefaultAccountIsRead(string key)
+    {
+        // The flag is `--user`, so `user` is what someone writes in a profile without
+        // thinking about it. A tester did, and the setting was silently ignored.
+        var path = Path.Combine(_directory, "profile");
+        File.WriteAllLines(path,
+        [
+            "[core]",
+            "server = https://example.invalid",
+            "data_partition_id = test",
+            "authority = https://login.microsoftonline.com/tenant",
+            "client_id = client",
+            "scopes = https://example.invalid/.default",
+            $"{key} = azure@equinor.com",
+        ]);
+
+        CliConfig.Load(path, out var username);
+
+        Assert.Equal("azure@equinor.com", username);
+    }
 }

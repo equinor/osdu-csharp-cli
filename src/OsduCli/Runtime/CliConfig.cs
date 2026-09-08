@@ -50,6 +50,7 @@ public static class CliConfig
         ["OSDU_CLIENT_ID"] = "Osdu:ClientId",
         ["OSDU_SCOPES"] = "Osdu:Scopes",
         ["OSDU_USERNAME"] = "Osdu:Username",
+        ["OSDU_USER"] = "Osdu:Username",
     };
 
     public static OsduConfig Load(string? config) => Load(config, out _);
