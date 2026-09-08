@@ -186,13 +186,16 @@ def test_single_quoted_roles_are_extracted_too():
 
 
 def test_three_roles_read_as_a_list():
-    op = {"description": "Required roles: `a.b.c` or `d.e.f` or `g.h.i`"}
-    assert documented_roles(op) == "a.b.c, d.e.f or g.h.i"
+    op = {"description": "Required roles: `users.datalake.viewers` or `users.datalake.editors` "
+                         "or `users.datalake.admins`"}
+    assert documented_roles(op) == (
+        "users.datalake.viewers, users.datalake.editors or users.datalake.admins")
 
 
 def test_duplicates_are_collapsed():
-    op = {"description": "Allowed roles: `a.b.c`, `a.b.c` or `d.e.f`"}
-    assert documented_roles(op) == "a.b.c or d.e.f"
+    op = {"description": "Allowed roles: `service.storage.admin`, `service.storage.admin` "
+                         "or `users.datalake.ops`"}
+    assert documented_roles(op) == "service.storage.admin or users.datalake.ops"
 
 
 def test_an_operation_documenting_no_roles_yields_nothing():
@@ -218,4 +221,25 @@ def test_a_capitalised_dotted_identifier_is_not_a_role():
 
 def test_a_quoted_class_name_is_not_a_role():
     op = {"description": "Required roles: described by `Osdu.Config.Roles`."}
+    assert documented_roles(op) is None
+
+
+def test_prose_after_a_none_role_list_is_not_promoted_to_a_role():
+    # "Allowed roles: none" followed by any dotted identifier would otherwise tell the user to
+    # go and request `record.id`. The `service.`/`users.` prefix is what rules it out.
+    op = {"description": "Allowed roles: none. The response field is `record.id`."}
+    assert documented_roles(op) is None
+
+
+def test_roles_spread_across_sentences_are_all_kept():
+    # The File service does not write a contiguous list, so anything that stopped at the first
+    # sentence boundary would silently drop two thirds of the roles.
+    op = {"description": "Required roles: `service.file.editors`. In addition, the caller must "
+                         "belong to `users.datalake.editors` or `users.datalake.admins`."}
+    assert documented_roles(op) == (
+        "service.file.editors, users.datalake.editors or users.datalake.admins")
+
+
+def test_a_dotted_identifier_without_an_entitlement_prefix_is_not_a_role():
+    op = {"description": "Allowed roles: `storage.admin` — see the entitlements service."}
     assert documented_roles(op) is None

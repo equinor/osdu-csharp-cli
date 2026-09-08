@@ -709,15 +709,20 @@ def check_alias(flag: str, where: str, what: str) -> None:
 
 
 ROLES_PATTERN = re.compile(r"(?:Allowed|Required)\s+roles?\s*:?\s*(.+)", re.IGNORECASE)
-# Backticks in most specs, single quotes in Wellbore DDMS. Matching only backticks
-# silently missed its 54 documented operations — the largest set of the lot. The token
-# itself must be a dotted lowercase identifier, which is specific enough that a stray
-# apostrophe in prose cannot masquerade as a role.
-# Case-sensitive on purpose, unlike ROLES_PATTERN above. Every one of the 17 role tokens in
-# these specs is lowercase, and matching case-insensitively would let any quoted dotted
-# identifier in prose — `Foo.Bar`, a class name, a file name — be presented to the user as an
-# entitlement they should go and ask for.
-ROLE_TOKEN = re.compile(r"[`']([a-z][a-z0-9]*(?:\.[a-z][a-z0-9]*)+)[`']")
+# Backticks in most specs, single quotes in Wellbore DDMS. Matching only backticks silently
+# missed its 45 commands — the largest set of the lot.
+#
+# The `service.`/`users.` prefix is what makes this safe, and it is a property of OSDU
+# entitlements rather than a guess: every one of the 17 roles documented across these specs is
+# `service.<service>.<role>` or `users.<group>.<role>`. Matching any quoted dotted identifier
+# instead would promote prose to entitlement guidance — "Allowed roles: none. The response
+# field is `record.id`." would tell the user to go and ask for `record.id`.
+#
+# A shape rule rather than a position rule, deliberately. The roles are not always a
+# contiguous list: the File service writes "Required roles: `service.file.editors`. In
+# addition ... `users.datalake.editors`", so anything that stopped at the first sentence would
+# drop half of them.
+ROLE_TOKEN = re.compile(r"[`']((?:service|users)(?:\.[a-z][a-z0-9]*){2,})[`']")
 
 
 def documented_roles(operation: dict) -> str | None:
