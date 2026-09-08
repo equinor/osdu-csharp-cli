@@ -90,9 +90,23 @@ xattr -d com.apple.quarantine ./osducs
 
 ## Windows blocks or warns
 
-The binary is unsigned, so SmartScreen warns. On a managed laptop WDAC may block it outright,
-which is a policy decision rather than something the CLI can work around — raise it with your
-Windows team.
+The binary is unsigned, so Windows has no reputation for it. Two different things can happen,
+and they are worth telling apart.
+
+**SmartScreen** shows *"Windows protected your PC"* with only a **Don't run** button. Click
+**More info**, then **Run anyway**. Or clear the downloaded-from-internet mark first and avoid
+the dialog:
+
+```powershell
+Unblock-File .\osducs.exe
+```
+
+**WDAC** — application control on a managed laptop — blocks with no way through, and no
+"Run anyway" appears. That is a policy decision the CLI cannot work around; raise it with your
+Windows team, and tell us, because it changes how the tool has to be distributed.
+
+Both go away with a signed binary, which is the intended fix rather than asking every user to
+click through a warning.
 
 ## `osdu` runs the wrong tool
 

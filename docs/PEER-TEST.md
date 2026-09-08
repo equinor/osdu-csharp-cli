@@ -35,8 +35,21 @@ gh release download --repo equinor/osdu-csharp-cli --pattern "osducs-win-x64.zip
 Expand-Archive osducs-win-x64.zip -DestinationPath .
 ```
 
-SmartScreen will warn: the binary is unsigned. **If your laptop refuses to run it at all,
-that is the single most useful thing you can tell us** — see §5.
+**SmartScreen will stop it the first time**, with *"Windows protected your PC — prevented an
+unrecognised app from starting"*. The dialog shows only a **Don't run** button; the way past it
+is the **More info** link, which reveals **Run anyway**. That is expected: the binary is
+unsigned, so Windows has no reputation for it.
+
+Cleaner alternative, which avoids the dialog by clearing the downloaded-from-internet mark:
+
+```powershell
+Unblock-File .\osducs.exe
+```
+
+**If Run anyway does not appear, or the app is still blocked after clicking it, stop and tell
+us.** That is the difference between SmartScreen — a warning anyone can click through — and
+WDAC, an application-control policy that cannot be bypassed. Which of the two your laptop
+enforces is the single most valuable thing this test round can establish; see §5.
 
 **Linux** — `osducs-linux-x64.tar.gz`, same shape as macOS without the `xattr` line.
 
@@ -172,7 +185,7 @@ the code.
 | `wellbore get` / `trajectory get` → `422` | The **stored record** carries a property its schema rejects (`'WellboreIdentity' was unexpected`). A data problem on the service, not the CLI. |
 | `well get` / `markerset get` → `404` while `well version list` works | The DDMS strips the version suffix from the id and looks up the base id. Server-side; the CLI sends the id you gave it. |
 | `welllog data get` → `404 bulk for record ... not found` | The record exists but no curves were ingested for it. Most WellLogs on dev have no bulk. Try `--describe` across a few ids to find one that does. |
-| macOS quarantine, Windows SmartScreen | Not signed yet. Known, and being decided. |
+| macOS quarantine, Windows SmartScreen warning | Not signed yet. Click **More info → Run anyway**, or `Unblock-File`. Being decided. |
 
 More detail in [TROUBLESHOOTING.md](TROUBLESHOOTING.md).
 
