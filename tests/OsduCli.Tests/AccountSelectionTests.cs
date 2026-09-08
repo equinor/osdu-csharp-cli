@@ -52,8 +52,10 @@ public class AccountSelectionTests
 
         var error = await Assert.ThrowsAsync<OsduException>(() => provider.GetTokenAsync(TestContext.Current.CancellationToken));
 
-        Assert.Contains("--user", error.Message);
-        Assert.Contains("username", error.Message);
+        Assert.Contains("--user <account>", error.Message);
+        // The exact key, not just "config profile": recommending the removed `username`
+        // spelling would otherwise still pass.
+        Assert.Contains("set `user` in your config profile", error.Message);
     }
 
     [Fact]
@@ -86,5 +88,19 @@ public class AccountSelectionTests
 
         Assert.Equal("token", await provider.GetTokenAsync(TestContext.Current.CancellationToken));
         Assert.True(inner.WasCalled);
+    }
+
+    [Fact]
+    public async Task TheAmbiguityErrorPointsAtTheProfileInEffect()
+    {
+        // A tester set the default in a profile that was not the selected one, so nothing
+        // changed and the message gave no way to notice. `config show` reports which files
+        // were actually read.
+        var provider = Provider(new StubTokenProvider(), null, "a@equinor.com", "b@equinor.com");
+
+        var error = await Assert.ThrowsAsync<OsduException>(() => provider.GetTokenAsync(TestContext.Current.CancellationToken));
+
+        Assert.Contains("config show", error.Message);
+        Assert.Contains("not selected has no effect", error.Message);
     }
 }

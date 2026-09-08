@@ -26,7 +26,7 @@ public sealed class CliContext : IDisposable
 
     /// <summary>
     /// The account this invocation will authenticate as, from <c>--user</c> or the profile's
-    /// <c>username</c>, or null when neither said. Resolved once here so that commands
+    /// <c>user</c>, or null when neither said. Resolved once here so that commands
     /// reporting on it cannot disagree with the provider actually doing the work.
     /// </summary>
     public string? Username { get; }

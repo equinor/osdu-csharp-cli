@@ -50,7 +50,12 @@ public sealed class OsduCliIniConfigurationProvider(OsduCliIniConfigurationSourc
         // Not a key the Python CLI writes; it sketched one out and left it
         // commented. Read here so a default account can live beside the
         // environment it belongs to rather than being typed every time.
-        ["username"] = "Osdu:Username",
+        // `user`, matching the `--user` flag. It was `username` for four days, which is a
+        // trap: the flag says one thing and the profile wants another, and a tester duly
+        // wrote `user` and had it ignored in silence. The Python CLI has no key for this at
+        // all — its own MSAL code reads a `username` that was never added to its config — so
+        // there is no precedent to honour and no reason to carry two spellings.
+        ["user"] = "Osdu:Username",
     };
 
     public override void Load()

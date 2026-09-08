@@ -148,7 +148,7 @@ public static class ConfigCommand
                          ("authority", config.Authority),
                          ("client-id", config.ClientId),
                          ("scopes", config.Scopes),
-                         ("username", username ?? "(none — osducs will use the only signed-in account)"),
+                         ("user", username ?? "(none — osducs will use the only signed-in account)"),
                      })
             {
                 settings.Add(new JsonObject { ["setting"] = setting, ["value"] = value });

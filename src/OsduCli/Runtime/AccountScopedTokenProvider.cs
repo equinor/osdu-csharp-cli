@@ -15,7 +15,7 @@ namespace Equinor.OsduCli.Runtime;
 /// by accident.
 ///
 /// So when the caller has not said which account it means and more than one is cached, this
-/// refuses and names them. `--user` (or `username` in the profile) settles it.
+/// refuses and names them. `--user` (or `user` in the profile) settles it.
 ///
 /// The check is deferred to the first token request rather than done when the context is
 /// built, so that commands which never authenticate — `--help`, `completion` — do not pay
@@ -44,8 +44,11 @@ internal sealed class AccountScopedTokenProvider(
                     + Environment.NewLine
                     + string.Join(Environment.NewLine, cached.Select(name => "  " + name))
                     + Environment.NewLine
-                    + "Choose with --user <account>, or set `username` in your config "
-                    + "profile to make it the default.");
+                    + "Choose with --user <account>, or set `user` in your config profile "
+                    + "to make it the default."
+                    + Environment.NewLine
+                    + "`osducs config show` reports which profile is in effect — a setting in "
+                    + "a profile that is not selected has no effect.");
             }
         }
 

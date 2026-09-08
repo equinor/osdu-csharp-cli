@@ -26,7 +26,7 @@ public static class AccountCommand
             CliRunner.RunAsync(parseResult, async (context, token) =>
         {
             var cached = await context.Msal.GetCachedUsernamesAsync(token);
-            // The resolved choice, not just the flag: a `username` in the profile counts
+            // The resolved choice, not just the flag: a `user` in the profile counts
             // too, and reading only --user here reported the wrong account as in use.
             var selected = context.Username;
 
@@ -72,7 +72,7 @@ public static class AccountCommand
             {
                 context.Output.WriteNote(
                     "No account selected — commands will report the ambiguity rather than "
-                    + "guess. Use --user <account>, or set `username` in your config profile.");
+                    + "guess. Use --user <account>, or set `user` in your config profile.");
             }
 
             return 0;
