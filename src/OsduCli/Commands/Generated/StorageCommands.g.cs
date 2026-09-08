@@ -74,9 +74,11 @@ public static partial class StorageCommands
                 configuration.QueryParameters.Cursor = cursor;
             }, cancellationToken);
 
+            var json = await OsduJson.ToJsonAsync(result);
+            context.Output.WriteCursor(json, "cursor");
             return context.Output.Write(
-                await OsduJson.ToJsonAsync(result),
-                OutputSpec.Table("results", ("Id", "id"), ("Version", "version"), ("Kind", "kind")));
+                json,
+                OutputSpec.Table("results", ("Id", ".")));
         }, cancellationToken));
 
         return command;

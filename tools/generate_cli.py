@@ -481,6 +481,7 @@ class Command:
     columns: list[tuple[str, str]]
     columns_from: str | None
     total_from: str | None
+    cursor_from: str | None
     message: str | None
 
     @property
@@ -563,7 +564,7 @@ MANIFEST_KEYS = {
     "body": {"flag", "short", "required", "help", "model", "collection", "wrap-single",
              "fields"},
     "body field": {"flag", "short", "required", "help", "type", "parts"},
-    "output": {"root", "columns", "columns-from", "total-from", "message"},
+    "output": {"root", "columns", "columns-from", "total-from", "cursor-from", "message"},
     "example": {"args", "skip"},
     "handwritten": {"command", "op", "reason"},
     "exclude": {"op", "reason"},
@@ -705,11 +706,59 @@ def check_alias(flag: str, where: str, what: str) -> None:
         )
 
 
+def check_column_shape(entry: dict, operation: dict, spec: dict, where: str) -> None:
+    """Refuse property columns on a response that is an array of scalars.
+
+    `record list` declared `Id: id`, `Version: version`, `Kind: kind` over Storage's
+    `DatastoreQueryResult`, whose `results` is an array of bare record ids. Resolving a
+    property of a string yields nothing, so the command printed a header and one blank row per
+    record: the request succeeded, the data came back, and the user saw an empty table.
+
+    It survived because the endpoint needs an entitlement the author does not have, so it
+    could never be run — its manifest example is `skip:`-ped for that reason. Nothing about a
+    command being unrunnable makes its output spec unverifiable, though: the spec says what
+    comes back, and that is enough to catch this at build time.
+    """
+    output = entry.get("output")
+    if not isinstance(output, dict) or not output.get("columns"):
+        return
+
+    content = ((operation.get("responses") or {}).get("200") or {}).get("content") or {}
+    schema = resolve_ref((content.get("application/json") or {}).get("schema") or {}, spec)
+    if root := output.get("root"):
+        schema = resolve_ref((schema.get("properties") or {}).get(root) or {}, spec)
+
+    if schema.get("type") != "array":
+        return
+
+    items = resolve_ref(schema.get("items") or {}, spec)
+    if items.get("type") not in ("string", "integer", "number", "boolean"):
+        return
+
+    paths = [path for path in output["columns"].values() if path != "."]
+    if paths:
+        raise ManifestError(
+            f"{where}: the response is an array of {items['type']}, so column path(s) "
+            f"{', '.join(repr(p) for p in paths)} resolve to nothing and the command would "
+            f"print blank rows. Use '.' to render the element itself."
+        )
+
+
+def resolve_ref(node: dict, spec: dict, depth: int = 0) -> dict:
+    """Follows ``$ref`` into ``components/schemas``, with a depth guard."""
+    while isinstance(node, dict) and "$ref" in node and depth < 6:
+        name = node["$ref"].rsplit("/", 1)[-1]
+        node = ((spec.get("components") or {}).get("schemas") or {}).get(name) or {}
+        depth += 1
+    return node or {}
+
+
 def build_command(entry: dict, operation: dict, where: str, models_root: str,
                   spec: dict) -> Command:
     check_keys("command", entry, where)
     check_keys("op", entry.get("op"), where)
     check_keys("output", entry.get("output"), where)
+    check_column_shape(entry, operation, spec, where)
     for param_name, param_cfg in (entry.get("params") or {}).items():
         check_keys("param", param_cfg, f"{where}: param {param_name}")
     body_config = entry.get("body") or {}
@@ -891,6 +940,7 @@ def build_command(entry: dict, operation: dict, where: str, models_root: str,
         columns=list((output.get("columns") or {}).items()),
         columns_from=columns_from,
         total_from=output.get("total-from"),
+        cursor_from=output.get("cursor-from"),
         message=output.get("message"),
     )
 
@@ -1192,12 +1242,16 @@ def emit_command(service: Service, command: Command) -> list[str]:
 
     lines.append("")
     if command.returns:
-        if command.total_from:
+        if command.total_from or command.cursor_from:
             # Materialised, because the count and the table are read from the same response
             # and serialising twice would be wasteful and could disagree.
             lines.append("            var json = await OsduJson.ToJsonAsync(result);")
-            lines.append(f"            context.Output.WriteTotal(json, "
-                         f"{csharp_string(command.total_from)});")
+            if command.total_from:
+                lines.append(f"            context.Output.WriteTotal(json, "
+                             f"{csharp_string(command.total_from)});")
+            if command.cursor_from:
+                lines.append(f"            context.Output.WriteCursor(json, "
+                             f"{csharp_string(command.cursor_from)});")
             lines.append("            return context.Output.Write(")
             lines.append("                json,")
         else:

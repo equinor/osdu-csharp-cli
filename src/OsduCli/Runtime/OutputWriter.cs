@@ -128,9 +128,20 @@ public sealed class OutputWriter(OutputFormat format, TextWriter output, TextWri
     /// is not a scalar at the end of the path is rendered as compact JSON, so a column
     /// pointing at an object or array still prints something useful.
     /// </summary>
+    /// <summary>Path meaning the array element itself rather than a property of it.</summary>
+    internal const string SelfPath = ".";
+
     private static string Resolve(JsonElement element, string path)
     {
         var current = element;
+
+        // Some endpoints return an array of scalars rather than objects — Storage's
+        // kind-scoped query answers with a list of record ids as bare strings. Asking for a
+        // property of a string resolved to nothing, so the command printed a header and one
+        // blank row per record: data returned, nothing shown.
+        if (path == SelfPath)
+            return Render(current);
+
         foreach (var segment in path.Split('.'))
         {
             if (current.ValueKind != JsonValueKind.Object ||
@@ -138,13 +149,39 @@ public sealed class OutputWriter(OutputFormat format, TextWriter output, TextWri
                 return string.Empty;
         }
 
-        return current.ValueKind switch
-        {
-            JsonValueKind.String => current.GetString() ?? string.Empty,
-            JsonValueKind.Null or JsonValueKind.Undefined => string.Empty,
-            JsonValueKind.Number or JsonValueKind.True or JsonValueKind.False => current.ToString(),
-            _ => JsonSerializer.Serialize(current),
-        };
+        return Render(current);
+    }
+
+    private static string Render(JsonElement element) => element.ValueKind switch
+    {
+        JsonValueKind.String => element.GetString() ?? string.Empty,
+        JsonValueKind.Null or JsonValueKind.Undefined => string.Empty,
+        JsonValueKind.Number or JsonValueKind.True or JsonValueKind.False => element.ToString(),
+        _ => JsonSerializer.Serialize(element),
+    };
+
+    /// <summary>
+    /// Reports the paging cursor a response carries, so the next page can be asked for.
+    /// </summary>
+    /// <remarks>
+    /// A command that accepts <c>--cursor</c> but never shows the one it was given back is a
+    /// dead end: you can ask for page two only if something tells you how. Written as a note
+    /// rather than a column, because it describes the response rather than being one of its
+    /// rows, and it has to survive <c>--output json</c>.
+    /// </remarks>
+    public int WriteCursor(string? json, string path)
+    {
+        if (string.IsNullOrWhiteSpace(json)) return 0;
+
+        using var document = JsonDocument.Parse(json);
+        if (document.RootElement.ValueKind != JsonValueKind.Object) return 0;
+        if (!document.RootElement.TryGetProperty(path, out var cursor)) return 0;
+        if (cursor.ValueKind != JsonValueKind.String) return 0;
+
+        var value = cursor.GetString();
+        if (string.IsNullOrEmpty(value)) return 0;
+
+        return WriteNote($"More results: repeat with --cursor {value}");
     }
 
     /// <summary>

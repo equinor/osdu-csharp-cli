@@ -263,4 +263,60 @@ public class OutputWriterTests
         Assert.Equal("Workflow deleted", table.ToString().Trim());
         Assert.Equal("", json.ToString());
     }
+
+    // ---- arrays of scalars ----------------------------------------------------------------
+
+    /// <summary>Exactly what Storage's DatastoreQueryResult looks like.</summary>
+    private const string RecordIdPage = """
+        {"results":["opendes:master-data--Well:1","opendes:master-data--Well:2"],
+         "cursor":"MjAyNQ=="}
+        """;
+
+    [Fact]
+    public void AnArrayOfStringsRendersTheStringsThemselves()
+    {
+        // `record list` asked for `id`, `version` and `kind` on elements that are bare record
+        // ids, so it printed a header and one blank row per record — data returned, nothing
+        // shown. A tester found it against a kind the Python CLI listed fine.
+        var buffer = new StringWriter();
+        new OutputWriter(OutputFormat.Table, buffer)
+            .Write(RecordIdPage, OutputSpec.Table("results", ("Id", ".")));
+
+        var output = buffer.ToString();
+        Assert.Contains("opendes:master-data--Well:1", output);
+        Assert.Contains("opendes:master-data--Well:2", output);
+    }
+
+    [Fact]
+    public void AskingForAPropertyOfAStringStillYieldsNothing()
+    {
+        // The old behaviour, pinned so the difference is visible rather than assumed.
+        var buffer = new StringWriter();
+        new OutputWriter(OutputFormat.Table, buffer)
+            .Write(RecordIdPage, OutputSpec.Table("results", ("Id", "id")));
+
+        Assert.DoesNotContain("opendes:master-data--Well:1", buffer.ToString());
+    }
+
+    [Fact]
+    public void TheCursorIsReportedSoTheNextPageCanBeAskedFor()
+    {
+        var error = new StringWriter();
+        new OutputWriter(OutputFormat.Table, new StringWriter(), error)
+            .WriteCursor(RecordIdPage, "cursor");
+
+        Assert.Contains("--cursor MjAyNQ==", error.ToString());
+    }
+
+    [Theory]
+    [InlineData("""{"results":[]}""")]
+    [InlineData("""{"results":[],"cursor":""}""")]
+    public void NoCursorMeansNoNote(string json)
+    {
+        // The last page carries no cursor; inviting the user to page again would be a lie.
+        var error = new StringWriter();
+        new OutputWriter(OutputFormat.Table, new StringWriter(), error).WriteCursor(json, "cursor");
+
+        Assert.Equal("", error.ToString());
+    }
 }
