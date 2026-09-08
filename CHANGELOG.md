@@ -1,5 +1,19 @@
 # Changelog
 
+## [0.7.0](https://github.com/equinor/osdu-csharp-cli/compare/v0.6.3...v0.7.0) (2026-09-08)
+
+
+### Features
+
+* **errors:** name the missing role when an endpoint refuses ([d9ebff2](https://github.com/equinor/osdu-csharp-cli/commit/d9ebff23f1e75ef460369f8c0a43e4c98897065d))
+* **errors:** name the missing role when an endpoint refuses ([5d1a694](https://github.com/equinor/osdu-csharp-cli/commit/5d1a6947f85a5429e01577aae49da68468330e23))
+
+
+### Bug Fixes
+
+* **errors:** keep the 403 guidance under --debug and tighten role matching ([394334f](https://github.com/equinor/osdu-csharp-cli/commit/394334f530b66d8ce40ae66acf2198e743b3171f))
+* **errors:** only treat service and users prefixed tokens as roles ([c3fe8c8](https://github.com/equinor/osdu-csharp-cli/commit/c3fe8c8416bf3e3dfd3d851d045a77b2eee1ea94))
+
 ## [0.6.3](https://github.com/equinor/osdu-csharp-cli/compare/v0.6.2...v0.6.3) (2026-09-08)
 
 
