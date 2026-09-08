@@ -1,5 +1,14 @@
 # Changelog
 
+## [0.6.2](https://github.com/equinor/osdu-csharp-cli/compare/v0.6.1...v0.6.2) (2026-09-08)
+
+
+### Bug Fixes
+
+* **auth:** follow the client's MSAL namespace to 2.2.0 ([5279e7d](https://github.com/equinor/osdu-csharp-cli/commit/5279e7d07a9175f173dd1ddbdb76eaec1552eb60))
+* **auth:** follow the client's MSAL namespace to 2.2.0 ([e2ab73a](https://github.com/equinor/osdu-csharp-cli/commit/e2ab73a70a919ff0aeaa25bf982f58f503ff59ac))
+* **auth:** follow the client's MSAL namespace to 3.0.0 ([8ce5142](https://github.com/equinor/osdu-csharp-cli/commit/8ce514264053450d83baf593049d12255e53a27c))
+
 ## [0.6.1](https://github.com/equinor/osdu-csharp-cli/compare/v0.6.0...v0.6.1) (2026-09-06)
 
 
