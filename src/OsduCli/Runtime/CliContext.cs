@@ -5,6 +5,7 @@ using Microsoft.Kiota.Serialization.Json;
 using Microsoft.Extensions.Logging;
 using Equinor.OsduCsharpClient.Facade;
 using Equinor.OsduCsharpClient.Facade.Auth;
+using Equinor.OsduCsharpClient.Msal;
 
 namespace Equinor.OsduCli.Runtime;
 
