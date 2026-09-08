@@ -52,7 +52,7 @@ Later sources win:
 | `~/.osducli/config` | the Python CLI's default profile |
 | `~/.osdu/config.json` | this CLI's own file, if you have one |
 | `~/.osducli/state` → `default_config` | the profile `osdu config update` selected |
-| `OSDU_*` environment variables | `OSDU_SERVER`, `OSDU_DATA_PARTITION_ID`, `OSDU_AUTHORITY`, `OSDU_CLIENT_ID`, `OSDU_SCOPES` |
+| `OSDU_*` environment variables | `OSDU_SERVER`, `OSDU_DATA_PARTITION_ID`, `OSDU_AUTHORITY`, `OSDU_CLIENT_ID`, `OSDU_SCOPES`, `OSDU_USER` |
 | `--config` | an explicit profile name or file path |
 
 Selecting a profile in the Python CLI moves both tools together — `osducs` reads that
@@ -65,7 +65,7 @@ osducs status -c ./my.json     # a path; format detected from content, not exten
 
 `OSDUCLI_CONFIG_DIR` relocates the profile directory, the same variable the Python CLI reads.
 
-Only five values are used: server, data partition, authority, client id and scopes. The
+Only six values are used: server, data partition, authority, client id, scopes and user. The
 per-service `*_url` entries in a profile are **ignored** — this CLI derives each base path
 from the service's own OpenAPI spec, and honouring the profile would double the version
 segment. See [COMMAND-GRAMMAR.md](../COMMAND-GRAMMAR.md).

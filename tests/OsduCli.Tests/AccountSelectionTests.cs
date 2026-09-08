@@ -52,8 +52,10 @@ public class AccountSelectionTests
 
         var error = await Assert.ThrowsAsync<OsduException>(() => provider.GetTokenAsync(TestContext.Current.CancellationToken));
 
-        Assert.Contains("--user", error.Message);
-        Assert.Contains("config profile", error.Message);
+        Assert.Contains("--user <account>", error.Message);
+        // The exact key, not just "config profile": recommending the removed `username`
+        // spelling would otherwise still pass.
+        Assert.Contains("set `user` in your config profile", error.Message);
     }
 
     [Fact]

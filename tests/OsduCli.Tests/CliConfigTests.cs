@@ -17,9 +17,9 @@ public class CliConfigTests : IDisposable
     private static readonly string[] Managed =
     [
         "OSDU_SERVER", "OSDU_DATA_PARTITION_ID", "OSDU_AUTHORITY",
-        "OSDU_CLIENT_ID", "OSDU_SCOPES",
+        "OSDU_CLIENT_ID", "OSDU_SCOPES", "OSDU_USER",
         "Osdu__Server", "Osdu__DataPartitionId", "Osdu__Authority",
-        "Osdu__ClientId", "Osdu__Scopes",
+        "Osdu__ClientId", "Osdu__Scopes", "Osdu__Username",
     ];
 
     private readonly Dictionary<string, string?> _saved = new();
@@ -93,11 +93,13 @@ public class CliConfigTests : IDisposable
         Environment.SetEnvironmentVariable("OSDU_AUTHORITY", "https://login.example.com");
         Environment.SetEnvironmentVariable("OSDU_CLIENT_ID", "client");
         Environment.SetEnvironmentVariable("OSDU_SCOPES", "scope/.default");
+        Environment.SetEnvironmentVariable("OSDU_USER", "azure@equinor.com");
 
-        var config = CliConfig.Load(Path.Combine(_directory, "absent.json"));
+        var config = CliConfig.Load(Path.Combine(_directory, "absent.json"), out var username);
 
         Assert.Equal("https://from-env.example.com", config.Server);
         Assert.Equal("envpartition", config.DataPartitionId);
+        Assert.Equal("azure@equinor.com", username);
     }
 
     [Fact]
@@ -165,5 +167,27 @@ public class CliConfigTests : IDisposable
         CliConfig.Load(path, out var username);
 
         Assert.Equal("azure@equinor.com", username);
+    }
+
+    [Fact]
+    public void TheOldUsernameKeyIsNoLongerRead()
+    {
+        // Removed rather than kept as an alias, so a profile still using it reports no
+        // default — visible in `config show` rather than silently ignored.
+        var path = Path.Combine(_directory, "profile");
+        File.WriteAllLines(path,
+        [
+            "[core]",
+            "server = https://example.invalid",
+            "data_partition_id = test",
+            "authority = https://login.microsoftonline.com/tenant",
+            "client_id = client",
+            "scopes = https://example.invalid/.default",
+            "username = azure@equinor.com",
+        ]);
+
+        CliConfig.Load(path, out var username);
+
+        Assert.Null(username);
     }
 }
