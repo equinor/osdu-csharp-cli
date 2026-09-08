@@ -176,7 +176,7 @@ the code.
 
 | You see | Why |
 |---|---|
-| `record list` → `403 not authorized` | Storage's kind-scoped query needs entitlements most people lack. **Use `record search`.** |
+| `record list` → `403 not authorized` | Storage's kind-scoped query needs entitlements most people lack. **Use `record search`.** If you *do* have them, it lists record ids and reports a `--cursor` for the next page. |
 | `group member list` → `401` | Same, on Entitlements. |
 | `record headers` → `404 No static resource` | The endpoint is real but **arrives with M27**. The CLI is ahead of ADME. |
 | `GET /records` → `500 not implemented` | In the spec, absent from ADME. |

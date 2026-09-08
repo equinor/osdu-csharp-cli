@@ -37,11 +37,15 @@ commands:
           Storage's kind-scoped query needs entitlements many users lack; `record search`
           answers the same question through the Search service.
     output:
+      # `results` is an array of record ids as bare strings, not objects — see
+      # DatastoreQueryResult in the spec. Asking for `id`, `version` and `kind` on a string
+      # resolved to nothing, so this printed a header and one blank row per record. `.` is the
+      # element itself.
       root: results
       columns:
-        Id: id
-        Version: version
-        Kind: kind
+        Id: .
+      # Without this the command accepts `--cursor` and never tells you what to pass to it.
+      cursor-from: cursor
 
   # Divergence from the Python CLI, deliberate: `osdu storage get` there accepts either
   # --kind or --id and dispatches to a different endpoint for each, which duplicates
