@@ -65,7 +65,7 @@ public static partial class WorkflowCommands
             return context.Output.Write(
                 await OsduJson.ToJsonAsync(result),
                 OutputSpec.Table(null, ("Name", "workflowName"), ("Description", "description"), ("CreatedBy", "createdBy")));
-        }, cancellationToken));
+        }, cancellationToken, "service.workflow.viewer"));
 
         return command;
     }
@@ -93,7 +93,7 @@ public static partial class WorkflowCommands
             return context.Output.Write(
                 await OsduJson.ToJsonAsync(result),
                 OutputSpec.Raw);
-        }, cancellationToken));
+        }, cancellationToken, "service.workflow.viewer"));
 
         return command;
     }
@@ -123,7 +123,7 @@ public static partial class WorkflowCommands
             return context.Output.Write(
                 await OsduJson.ToJsonAsync(result),
                 OutputSpec.Table(null, ("Name", "workflowName"), ("Id", "workflowId")));
-        }, cancellationToken));
+        }, cancellationToken, "service.workflow.admin"));
 
         return command;
     }
@@ -149,7 +149,7 @@ public static partial class WorkflowCommands
             await context.Client.Workflow.V1.Workflow[workflowName].DeleteAsync(cancellationToken: cancellationToken);
 
             return context.Output.WriteMessage("Workflow deleted");
-        }, cancellationToken));
+        }, cancellationToken, "service.workflow.admin"));
 
         return command;
     }
@@ -177,7 +177,7 @@ public static partial class WorkflowCommands
             return context.Output.Write(
                 await OsduJson.ToJsonAsync(result),
                 OutputSpec.Table(null, ("RunId", "runId"), ("Status", "status"), ("StartTimeStamp", "startTimeStamp")));
-        }, cancellationToken));
+        }, cancellationToken, "service.workflow.viewer"));
 
         return command;
     }
@@ -212,7 +212,7 @@ public static partial class WorkflowCommands
             return context.Output.Write(
                 await OsduJson.ToJsonAsync(result),
                 OutputSpec.Raw);
-        }, cancellationToken));
+        }, cancellationToken, "service.workflow.viewer"));
 
         return command;
     }
@@ -249,7 +249,7 @@ public static partial class WorkflowCommands
             return context.Output.Write(
                 await OsduJson.ToJsonAsync(result),
                 OutputSpec.Table(null, ("RunId", "runId"), ("Status", "status")));
-        }, cancellationToken));
+        }, cancellationToken, "service.workflow.creator"));
 
         return command;
     }
@@ -297,7 +297,7 @@ public static partial class WorkflowCommands
             return context.Output.Write(
                 await OsduJson.ToJsonAsync(result),
                 OutputSpec.Table(null, ("RunId", "runId"), ("Status", "status")));
-        }, cancellationToken));
+        }, cancellationToken, "service.workflow.viewer"));
 
         return command;
     }
@@ -332,7 +332,7 @@ public static partial class WorkflowCommands
             return context.Output.Write(
                 await OsduJson.ToJsonAsync(result),
                 OutputSpec.Raw);
-        }, cancellationToken));
+        }, cancellationToken, "service.workflow.viewer"));
 
         return command;
     }

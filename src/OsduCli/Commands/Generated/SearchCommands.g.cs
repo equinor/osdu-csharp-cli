@@ -232,7 +232,7 @@ public static partial class SearchCommands
                 returnedfieldsValue is { Length: > 0 }
                     ? OutputSpec.FromFields("results", returnedfieldsValue)
                     : OutputSpec.Table("results", ("Id", "id"), ("Kind", "kind")));
-        }, cancellationToken));
+        }, cancellationToken, "users.datalake.viewers, users.datalake.editors, users.datalake.admins or users.datalake.ops"));
 
         return command;
     }
@@ -281,7 +281,7 @@ public static partial class SearchCommands
             return context.Output.Write(
                 await OsduJson.ToJsonAsync(result),
                 OutputSpec.Table("aggregations", ("Value", "key"), ("Count", "count")));
-        }, cancellationToken));
+        }, cancellationToken, "users.datalake.viewers, users.datalake.editors, users.datalake.admins or users.datalake.ops"));
 
         return command;
     }

@@ -62,10 +62,21 @@ public static class CliRunner
         }
     }
 
+    /// <param name="requiredRoles">
+    /// The roles the endpoint documents, used to explain a 403. Derived from the spec by the
+    /// generator, so a command whose spec says nothing simply passes null.
+    /// </param>
+    /// <param name="forbiddenHint">
+    /// What to do instead when access is refused. Editorial rather than derivable — the spec
+    /// knows `record list` needs an admin role, but not that `record search` answers the same
+    /// question for everyone else.
+    /// </param>
     public static async Task<int> RunAsync(
         ParseResult parseResult,
         Func<CliContext, CancellationToken, Task<int>> body,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        string? requiredRoles = null,
+        string? forbiddenHint = null)
     {
         try
         {
@@ -85,6 +96,18 @@ public static class CliRunner
             // stack trace above it is not.
             Console.Error.WriteLine(
                 $"error: {exception.ResponseStatusCode} from the service. {exception.Message}");
+
+            // "The user is not authorized to perform this action" does not say which
+            // authorisation, and several OSDU endpoints need an admin role a normal user will
+            // never hold. Without this the only way to find out is to read the spec.
+            if (exception.ResponseStatusCode == 403)
+            {
+                if (requiredRoles is not null)
+                    Console.Error.WriteLine($"       this endpoint requires {requiredRoles}");
+                if (forbiddenHint is not null)
+                    Console.Error.WriteLine($"       {forbiddenHint}");
+            }
+
             return 1;
         }
         catch (OsduException exception)

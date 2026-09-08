@@ -158,3 +158,51 @@ def test_a_shared_enum_resolves_to_the_models_namespace():
 
 def test_an_inline_enum_has_no_shared_type():
     assert shared_enum_type("WellboreDdms", {"type": "string", "enum": ["a"]}) is None
+
+
+# ---- roles documented in the spec --------------------------------------------------------
+
+from generate_cli import documented_roles
+
+
+def test_a_single_backticked_role_is_extracted():
+    op = {"description": "Allowed roles: `service.storage.admin`. Query records by kind."}
+    assert documented_roles(op) == "service.storage.admin"
+
+
+def test_prose_after_the_roles_is_not_swept_in():
+    # The role list runs straight into the next sentence; a naive split put half a sentence
+    # into the error message.
+    op = {"description": "Allowed roles: `service.storage.creator` or `service.storage.admin`. "
+                         "Create or Update records."}
+    assert documented_roles(op) == "service.storage.creator or service.storage.admin"
+
+
+def test_single_quoted_roles_are_extracted_too():
+    # Wellbore DDMS quotes with apostrophes rather than backticks. Matching only backticks
+    # silently missed its 45 commands — the largest set in the estate.
+    op = {"description": "Required roles: 'users.datalake.viewers' or 'users.datalake.editors'"}
+    assert documented_roles(op) == "users.datalake.viewers or users.datalake.editors"
+
+
+def test_three_roles_read_as_a_list():
+    op = {"description": "Required roles: `a.b.c` or `d.e.f` or `g.h.i`"}
+    assert documented_roles(op) == "a.b.c, d.e.f or g.h.i"
+
+
+def test_duplicates_are_collapsed():
+    op = {"description": "Allowed roles: `a.b.c`, `a.b.c` or `d.e.f`"}
+    assert documented_roles(op) == "a.b.c or d.e.f"
+
+
+def test_an_operation_documenting_no_roles_yields_nothing():
+    assert documented_roles({"description": "Query records by kind."}) is None
+
+
+def test_the_word_role_without_tokens_yields_nothing():
+    # A sentence mentioning roles without naming any must not produce an empty claim.
+    assert documented_roles({"description": "Allowed roles: see the entitlements service."}) is None
+
+
+def test_an_apostrophe_in_prose_is_not_mistaken_for_a_role():
+    assert documented_roles({"description": "Allowed roles: the caller's own group."}) is None

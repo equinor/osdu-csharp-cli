@@ -23,10 +23,20 @@ Check with `--debug`: a `← 200` and a populated `body=` with nothing printed i
 
 ## `403 The user is not authorized to perform this action`
 
-Entitlements, not the CLI. Common on `record list`, which uses Storage's kind-scoped query.
+Entitlements, not the CLI. The service's own message does not say *which* authorisation, so
+the CLI adds the role its OpenAPI spec documents, and where there is a better route, that too:
 
-**Use `record search` instead** — same question, answered through the Search service, which
-most users can reach.
+```
+error: 403 from the service. The user is not authorized to perform this action
+       this endpoint requires service.storage.admin
+       `record search` answers the same question through the Search service, which most users can reach.
+```
+
+The role line appears for any command whose endpoint documents one — 74 of the 131 do. Ask
+your OSDU administrator for the role, or take the alternative.
+
+`record list` is the common case: it uses Storage's kind-scoped query, which needs
+`service.storage.admin`. **Use `record search` instead.**
 
 ## `401 Not authorized`
 

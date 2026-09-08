@@ -482,6 +482,8 @@ class Command:
     columns_from: str | None
     total_from: str | None
     cursor_from: str | None
+    roles: str | None
+    forbidden_hint: str | None
     message: str | None
 
     @property
@@ -558,7 +560,7 @@ MANIFEST_KEYS = {
     "top": {"service", "spec", "client", "models", "description", "groups", "scope",
             "section", "commands", "handwritten", "exclude"},
     "command": {"command", "summary", "op", "builder", "params", "body", "output",
-                "examples", "require-one-of", "mutually-exclusive"},
+                "examples", "require-one-of", "mutually-exclusive", "forbidden-hint"},
     "op": {"method", "path"},
     "param": {"flag", "short", "required", "help", "type"},
     "body": {"flag", "short", "required", "help", "model", "collection", "wrap-single",
@@ -704,6 +706,42 @@ def check_alias(flag: str, where: str, what: str) -> None:
             f"{where}: {what} {flag!r} is a global option and cannot be reused. "
             f"Reserved: {', '.join(sorted(RESERVED_ALIASES))}"
         )
+
+
+ROLES_PATTERN = re.compile(r"(?:Allowed|Required)\s+roles?\s*:?\s*(.+)", re.IGNORECASE)
+# Backticks in most specs, single quotes in Wellbore DDMS. Matching only backticks
+# silently missed its 54 documented operations — the largest set of the lot. The token
+# itself must be a dotted lowercase identifier, which is specific enough that a stray
+# apostrophe in prose cannot masquerade as a role.
+ROLE_TOKEN = re.compile(r"[`']([a-z][a-z0-9]*(?:\.[a-z][a-z0-9]*)+)[`']", re.IGNORECASE)
+
+
+def documented_roles(operation: dict) -> str | None:
+    """The roles an operation's description says it needs, or None.
+
+    Half the operations across these specs carry a line like *"Allowed roles:
+    `service.storage.admin`"*. A 403 from OSDU says only "The user is not authorized to
+    perform this action", which does not say which authorisation, so the only way to find out
+    was to read the spec. Deriving it means every command that documents roles can explain its
+    own refusal.
+
+    Roles are taken from the backticked tokens rather than the rest of the sentence: the text
+    runs straight on into prose ("`service.storage.admin`. Create or Update ..."), and a naive
+    split would put half a sentence into an error message.
+    """
+    text = f"{operation.get('description') or ''} {operation.get('summary') or ''}"
+    match = ROLES_PATTERN.search(text)
+    if not match:
+        return None
+
+    roles = ROLE_TOKEN.findall(match.group(1))
+    if not roles:
+        return None
+
+    unique = list(dict.fromkeys(roles))
+    if len(unique) == 1:
+        return unique[0]
+    return ", ".join(unique[:-1]) + f" or {unique[-1]}"
 
 
 def check_column_shape(entry: dict, operation: dict, spec: dict, where: str) -> None:
@@ -941,6 +979,8 @@ def build_command(entry: dict, operation: dict, where: str, models_root: str,
         columns_from=columns_from,
         total_from=output.get("total-from"),
         cursor_from=output.get("cursor-from"),
+        roles=documented_roles(operation),
+        forbidden_hint=entry.get("forbidden-hint"),
         message=output.get("message"),
     )
 
@@ -1262,7 +1302,12 @@ def emit_command(service: Service, command: Command) -> list[str]:
         message = command.message or "Done."
         lines.append(f"            return context.Output.WriteMessage({csharp_string(message)});")
 
-    lines.append("        }, cancellationToken));")
+    trailing = ["cancellationToken"]
+    if command.roles or command.forbidden_hint:
+        trailing.append(csharp_string(command.roles) if command.roles else "null")
+    if command.forbidden_hint:
+        trailing.append(csharp_string(command.forbidden_hint))
+    lines.append(f"        }}, {', '.join(trailing)}));")
     lines.append("")
     lines.append("        return command;")
     lines.append("    }")
