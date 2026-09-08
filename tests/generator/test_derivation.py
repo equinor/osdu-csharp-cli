@@ -206,3 +206,16 @@ def test_the_word_role_without_tokens_yields_nothing():
 
 def test_an_apostrophe_in_prose_is_not_mistaken_for_a_role():
     assert documented_roles({"description": "Allowed roles: the caller's own group."}) is None
+
+
+def test_a_capitalised_dotted_identifier_is_not_a_role():
+    # `re.IGNORECASE` on the token would let any quoted dotted identifier in prose be
+    # presented as an entitlement to go and request. All 17 roles in these specs are
+    # lowercase, so the token match is case-sensitive.
+    op = {"description": "Allowed roles: see `Users.Datalake.Viewers` in the admin guide."}
+    assert documented_roles(op) is None
+
+
+def test_a_quoted_class_name_is_not_a_role():
+    op = {"description": "Required roles: described by `Osdu.Config.Roles`."}
+    assert documented_roles(op) is None

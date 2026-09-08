@@ -713,7 +713,11 @@ ROLES_PATTERN = re.compile(r"(?:Allowed|Required)\s+roles?\s*:?\s*(.+)", re.IGNO
 # silently missed its 54 documented operations — the largest set of the lot. The token
 # itself must be a dotted lowercase identifier, which is specific enough that a stray
 # apostrophe in prose cannot masquerade as a role.
-ROLE_TOKEN = re.compile(r"[`']([a-z][a-z0-9]*(?:\.[a-z][a-z0-9]*)+)[`']", re.IGNORECASE)
+# Case-sensitive on purpose, unlike ROLES_PATTERN above. Every one of the 17 role tokens in
+# these specs is lowercase, and matching case-insensitively would let any quoted dotted
+# identifier in prose — `Foo.Bar`, a class name, a file name — be presented to the user as an
+# entitlement they should go and ask for.
+ROLE_TOKEN = re.compile(r"[`']([a-z][a-z0-9]*(?:\.[a-z][a-z0-9]*)+)[`']")
 
 
 def documented_roles(operation: dict) -> str | None:
