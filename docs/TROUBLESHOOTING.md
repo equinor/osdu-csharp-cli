@@ -38,6 +38,18 @@ your OSDU administrator for the role, or take the alternative.
 `record list` is the common case: it uses Storage's kind-scoped query, which needs
 `service.storage.admin`. **Use `record search` instead.**
 
+## `400 from the service` with nothing after it
+
+Fixed. The CLI used to print the status and stop, because Kiota fills an error's `Message`
+from whatever property the spec calls `message`, and several OSDU services nest theirs one
+level down. It now reads the nested body:
+
+```
+error: 400 from the service. Validation Error: schema must not be null; status must not be null
+```
+
+At most three specific failures are shown. `--debug` prints the whole response body.
+
 ## `401 Not authorized`
 
 Also entitlements. `group member list` and `group member count` need rights on the

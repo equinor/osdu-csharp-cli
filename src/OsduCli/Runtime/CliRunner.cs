@@ -1,6 +1,7 @@
 using System.CommandLine;
 using System.Text.Json;
 using Microsoft.Kiota.Abstractions;
+using Microsoft.Kiota.Abstractions.Serialization;
 using Equinor.OsduCsharpClient.Facade;
 
 namespace Equinor.OsduCli.Runtime;
@@ -18,6 +19,94 @@ namespace Equinor.OsduCli.Runtime;
 /// </remarks>
 public static class CliRunner
 {
+    /// <summary>
+    /// The most useful text an OSDU error carries, which is not always its <c>Message</c>.
+    /// </summary>
+    /// <remarks>
+    /// Kiota generates a typed exception per error schema and overrides <c>Message</c> to
+    /// whatever property the spec called <c>message</c>. Several OSDU services nest the real
+    /// content one level down — Schema Service answers a bad request with
+    /// <c>{"error":{"code":400,"message":"Schema Id is already present","errors":[…]}}</c> —
+    /// and since the schema declares <c>message</c> at the top level, nothing matches and
+    /// <c>Message</c> is empty. The CLI printed "error: 400 from the service." and stopped,
+    /// which tells a user that they failed but not what to change.
+    ///
+    /// Unmapped body fields land in <c>AdditionalData</c>, so that is where to look. Read
+    /// reflectively because every service has its own error type and there are twelve of
+    /// them; a switch over each would rot the first time a spec changed. This is the error
+    /// path, so the cost does not matter — but it is one more thing to revisit if NativeAOT
+    /// ever becomes viable, since trimming can remove what reflection expects to find.
+    /// </remarks>
+    private static string? Describe(ApiException exception)
+    {
+        if (!string.IsNullOrWhiteSpace(exception.Message))
+            return exception.Message;
+
+        var additional = exception.GetType().GetProperty("AdditionalData")?.GetValue(exception);
+        if (additional is not IDictionary<string, object> fields)
+            return null;
+
+        // Deepest-first: the nested object holds the message, the wrapper holds a status code
+        // the caller has already been shown.
+        foreach (var value in fields.Values)
+        {
+            var text = Flatten(value);
+            if (!string.IsNullOrWhiteSpace(text))
+                return text;
+        }
+
+        return null;
+    }
+
+    /// <summary>Pulls readable text out of whatever shape the error body arrived in.</summary>
+    /// <remarks>
+    /// A summary alone is often not actionable: Schema Service answers a malformed request
+    /// with <c>"message": "Validation Error"</c> and puts what is actually wrong in a nested
+    /// <c>errors</c> array — "schema must not be null", "Schema is not a valid JSON Object".
+    /// Telling the user only that validation failed makes them go and read the raw response.
+    ///
+    /// Capped at three details. Past that it stops being a message and becomes a dump, and
+    /// <c>--debug</c> already prints the whole body for anyone who wants it.
+    /// </remarks>
+    internal static string? Flatten(object? value) => value switch
+    {
+        null => null,
+        string text => text,
+        UntypedString untyped => untyped.GetValue(),
+        UntypedObject obj => Summarise(obj),
+        UntypedArray array => array.GetValue().Select(Flatten)
+            .FirstOrDefault(text => !string.IsNullOrWhiteSpace(text)),
+        _ => null,
+    };
+
+    private static string? Summarise(UntypedObject error)
+    {
+        var fields = error.GetValue();
+
+        var summary = new[] { "message", "reason" }
+            .Select(key => fields.TryGetValue(key, out var v) ? Flatten(v) : null)
+            .FirstOrDefault(text => !string.IsNullOrWhiteSpace(text));
+
+        var details = fields.TryGetValue("errors", out var nested) && nested is UntypedArray items
+            ? items.GetValue()
+                .OfType<UntypedObject>()
+                .Select(item => item.GetValue().TryGetValue("message", out var m) ? Flatten(m) : null)
+                .Where(text => !string.IsNullOrWhiteSpace(text) && text != summary)
+                .Distinct()
+                .Take(3)
+                .ToList()
+            : [];
+
+        if (summary is null)
+            return details.Count > 0 ? string.Join("; ", details) : NestedFallback(fields);
+
+        return details.Count > 0 ? $"{summary}: {string.Join("; ", details)}" : summary;
+    }
+
+    /// <summary>Any readable text at all, when nothing is where it was expected.</summary>
+    private static string? NestedFallback(IDictionary<string, UntypedNode> fields) =>
+        fields.Values.Select(Flatten).FirstOrDefault(text => !string.IsNullOrWhiteSpace(text));
+
     /// <summary>
     /// Runs a command that needs no service call, turning the same failures into a one-line
     /// message rather than a stack trace.
@@ -93,7 +182,8 @@ public static class CliRunner
             // Non-2xx from an OSDU service. The status is what the user needs; the Kiota
             // stack trace above it is not.
             Console.Error.WriteLine(
-                $"error: {exception.ResponseStatusCode} from the service. {exception.Message}");
+                $"error: {exception.ResponseStatusCode} from the service. "
+                + (Describe(exception) ?? string.Empty));
 
             // "The user is not authorized to perform this action" does not say which
             // authorisation, and several OSDU endpoints need an admin role a normal user will
