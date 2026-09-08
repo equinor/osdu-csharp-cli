@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.6.3](https://github.com/equinor/osdu-csharp-cli/compare/v0.6.2...v0.6.3) (2026-09-08)
+
+
+### Bug Fixes
+
+* **storage:** render the record ids that record list returns ([74a4750](https://github.com/equinor/osdu-csharp-cli/commit/74a4750cc805c7a0e962e211e42665dda63cd5ed))
+* **storage:** render the record ids that record list returns ([53a31a9](https://github.com/equinor/osdu-csharp-cli/commit/53a31a93965ec0839da6709b402c72de1a6f73d8))
+
 ## [0.6.2](https://github.com/equinor/osdu-csharp-cli/compare/v0.6.1...v0.6.2) (2026-09-08)
 
 
