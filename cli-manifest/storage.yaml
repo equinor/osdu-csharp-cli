@@ -26,6 +26,10 @@ groups:
 commands:
   - command: record list
     summary: List records of a given kind.
+    # The spec supplies the role; this supplies what to do instead, which it cannot know.
+    forbidden-hint: >
+      `record search` answers the same question through the Search service, which most users
+      can reach.
     op: { method: get, path: /query/records }
     params:
       kind:   { flag: --kind,   short: -k, required: true, help: Kind of records to list. }

@@ -79,7 +79,7 @@ public static partial class StorageCommands
             return context.Output.Write(
                 json,
                 OutputSpec.Table("results", ("Id", ".")));
-        }, cancellationToken));
+        }, cancellationToken, "service.storage.admin", "`record search` answers the same question through the Search service, which most users can reach."));
 
         return command;
     }
@@ -117,7 +117,7 @@ public static partial class StorageCommands
             return context.Output.Write(
                 await OsduJson.ToJsonAsync(result),
                 OutputSpec.Table(null, ("Id", "id"), ("Version", "version"), ("Kind", "kind"), ("CreateUser", "createUser"), ("CreateTime", "createTime")));
-        }, cancellationToken));
+        }, cancellationToken, "service.storage.viewer, service.storage.creator or service.storage.admin"));
 
         return command;
     }
@@ -187,7 +187,7 @@ public static partial class StorageCommands
             await context.Client.Storage.Records.WithIdDelete(id).PostAsync(cancellationToken: cancellationToken);
 
             return context.Output.WriteMessage("1 record deleted");
-        }, cancellationToken));
+        }, cancellationToken, "service.storage.creator or service.storage.admin"));
 
         return command;
     }
@@ -215,7 +215,7 @@ public static partial class StorageCommands
             return context.Output.Write(
                 await OsduJson.ToJsonAsync(result),
                 OutputSpec.Unwrap("versions"));
-        }, cancellationToken));
+        }, cancellationToken, "service.storage.viewer, service.storage.creator or service.storage.admin"));
 
         return command;
     }
@@ -260,7 +260,7 @@ public static partial class StorageCommands
             return context.Output.Write(
                 await OsduJson.ToJsonAsync(result),
                 OutputSpec.Table(null, ("Id", "id"), ("Version", "version"), ("Kind", "kind"), ("CreateUser", "createUser"), ("CreateTime", "createTime")));
-        }, cancellationToken));
+        }, cancellationToken, "service.storage.viewer, service.storage.creator or service.storage.admin"));
 
         return command;
     }

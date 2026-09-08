@@ -158,3 +158,88 @@ def test_a_shared_enum_resolves_to_the_models_namespace():
 
 def test_an_inline_enum_has_no_shared_type():
     assert shared_enum_type("WellboreDdms", {"type": "string", "enum": ["a"]}) is None
+
+
+# ---- roles documented in the spec --------------------------------------------------------
+
+from generate_cli import documented_roles
+
+
+def test_a_single_backticked_role_is_extracted():
+    op = {"description": "Allowed roles: `service.storage.admin`. Query records by kind."}
+    assert documented_roles(op) == "service.storage.admin"
+
+
+def test_prose_after_the_roles_is_not_swept_in():
+    # The role list runs straight into the next sentence; a naive split put half a sentence
+    # into the error message.
+    op = {"description": "Allowed roles: `service.storage.creator` or `service.storage.admin`. "
+                         "Create or Update records."}
+    assert documented_roles(op) == "service.storage.creator or service.storage.admin"
+
+
+def test_single_quoted_roles_are_extracted_too():
+    # Wellbore DDMS quotes with apostrophes rather than backticks. Matching only backticks
+    # silently missed its 45 commands — the largest set in the estate.
+    op = {"description": "Required roles: 'users.datalake.viewers' or 'users.datalake.editors'"}
+    assert documented_roles(op) == "users.datalake.viewers or users.datalake.editors"
+
+
+def test_three_roles_read_as_a_list():
+    op = {"description": "Required roles: `users.datalake.viewers` or `users.datalake.editors` "
+                         "or `users.datalake.admins`"}
+    assert documented_roles(op) == (
+        "users.datalake.viewers, users.datalake.editors or users.datalake.admins")
+
+
+def test_duplicates_are_collapsed():
+    op = {"description": "Allowed roles: `service.storage.admin`, `service.storage.admin` "
+                         "or `users.datalake.ops`"}
+    assert documented_roles(op) == "service.storage.admin or users.datalake.ops"
+
+
+def test_an_operation_documenting_no_roles_yields_nothing():
+    assert documented_roles({"description": "Query records by kind."}) is None
+
+
+def test_the_word_role_without_tokens_yields_nothing():
+    # A sentence mentioning roles without naming any must not produce an empty claim.
+    assert documented_roles({"description": "Allowed roles: see the entitlements service."}) is None
+
+
+def test_an_apostrophe_in_prose_is_not_mistaken_for_a_role():
+    assert documented_roles({"description": "Allowed roles: the caller's own group."}) is None
+
+
+def test_a_capitalised_dotted_identifier_is_not_a_role():
+    # `re.IGNORECASE` on the token would let any quoted dotted identifier in prose be
+    # presented as an entitlement to go and request. All 17 roles in these specs are
+    # lowercase, so the token match is case-sensitive.
+    op = {"description": "Allowed roles: see `Users.Datalake.Viewers` in the admin guide."}
+    assert documented_roles(op) is None
+
+
+def test_a_quoted_class_name_is_not_a_role():
+    op = {"description": "Required roles: described by `Osdu.Config.Roles`."}
+    assert documented_roles(op) is None
+
+
+def test_prose_after_a_none_role_list_is_not_promoted_to_a_role():
+    # "Allowed roles: none" followed by any dotted identifier would otherwise tell the user to
+    # go and request `record.id`. The `service.`/`users.` prefix is what rules it out.
+    op = {"description": "Allowed roles: none. The response field is `record.id`."}
+    assert documented_roles(op) is None
+
+
+def test_roles_spread_across_sentences_are_all_kept():
+    # The File service does not write a contiguous list, so anything that stopped at the first
+    # sentence boundary would silently drop two thirds of the roles.
+    op = {"description": "Required roles: `service.file.editors`. In addition, the caller must "
+                         "belong to `users.datalake.editors` or `users.datalake.admins`."}
+    assert documented_roles(op) == (
+        "service.file.editors, users.datalake.editors or users.datalake.admins")
+
+
+def test_a_dotted_identifier_without_an_entitlement_prefix_is_not_a_role():
+    op = {"description": "Allowed roles: `storage.admin` — see the entitlements service."}
+    assert documented_roles(op) is None

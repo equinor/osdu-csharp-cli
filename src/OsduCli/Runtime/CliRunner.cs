@@ -62,29 +62,60 @@ public static class CliRunner
         }
     }
 
+    /// <param name="requiredRoles">
+    /// The roles the endpoint documents, used to explain a 403. Derived from the spec by the
+    /// generator, so a command whose spec says nothing simply passes null.
+    /// </param>
+    /// <param name="forbiddenHint">
+    /// What to do instead when access is refused. Editorial rather than derivable — the spec
+    /// knows `record list` needs an admin role, but not that `record search` answers the same
+    /// question for everyone else.
+    /// </param>
     public static async Task<int> RunAsync(
         ParseResult parseResult,
         Func<CliContext, CancellationToken, Task<int>> body,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        string? requiredRoles = null,
+        string? forbiddenHint = null)
     {
         try
         {
             using var context = CliContext.Create(parseResult);
             return await body(context, cancellationToken);
         }
-        catch (Exception exception) when (parseResult.GetValue(GlobalOptions.Debug))
-        {
-            // --debug: the whole exception, for diagnosing an auth or transport failure
-            // that the one-line summaries below deliberately hide.
-            Console.Error.WriteLine(exception);
-            return 1;
-        }
+        // Before the --debug catch below, deliberately. That one matches any exception, so
+        // with --debug set it took ApiException first and the 403 guidance never printed —
+        // and TROUBLESHOOTING tells people to add --debug when a call is refused, so the
+        // person actively diagnosing a 403 was the one who could not see why. Here --debug
+        // adds the full exception rather than replacing the explanation.
         catch (ApiException exception)
         {
             // Non-2xx from an OSDU service. The status is what the user needs; the Kiota
             // stack trace above it is not.
             Console.Error.WriteLine(
                 $"error: {exception.ResponseStatusCode} from the service. {exception.Message}");
+
+            // "The user is not authorized to perform this action" does not say which
+            // authorisation, and several OSDU endpoints need an admin role a normal user will
+            // never hold. Without this the only way to find out is to read the spec.
+            if (exception.ResponseStatusCode == 403)
+            {
+                if (requiredRoles is not null)
+                    Console.Error.WriteLine($"       this endpoint requires {requiredRoles}");
+                if (forbiddenHint is not null)
+                    Console.Error.WriteLine($"       {forbiddenHint}");
+            }
+
+            if (parseResult.GetValue(GlobalOptions.Debug))
+                Console.Error.WriteLine(exception);
+
+            return 1;
+        }
+        catch (Exception exception) when (parseResult.GetValue(GlobalOptions.Debug))
+        {
+            // --debug: the whole exception, for diagnosing an auth or transport failure
+            // that the one-line summaries below deliberately hide.
+            Console.Error.WriteLine(exception);
             return 1;
         }
         catch (OsduException exception)

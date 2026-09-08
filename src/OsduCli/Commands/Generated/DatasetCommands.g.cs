@@ -63,7 +63,7 @@ public static partial class DatasetCommands
             return context.Output.Write(
                 await OsduJson.ToJsonAsync(result),
                 OutputSpec.Table("datasetRegistries", ("Id", "id"), ("Kind", "kind")));
-        }, cancellationToken));
+        }, cancellationToken, "service.storage.creator, service.storage.admin or service.storage.viewer"));
 
         return command;
     }
@@ -93,7 +93,7 @@ public static partial class DatasetCommands
             return context.Output.Write(
                 await OsduJson.ToJsonAsync(result),
                 OutputSpec.Table("datasetRegistries", ("Id", "id"), ("Kind", "kind")));
-        }, cancellationToken));
+        }, cancellationToken, "service.storage.creator or service.storage.admin"));
 
         return command;
     }
@@ -119,7 +119,7 @@ public static partial class DatasetCommands
             await context.Client.Dataset.MetadataRecord[id].SoftDelete.PostAsync(cancellationToken: cancellationToken);
 
             return context.Output.WriteMessage("Dataset metadata record soft-deleted");
-        }, cancellationToken));
+        }, cancellationToken, "service.storage.creator or service.storage.admin"));
 
         return command;
     }
@@ -147,7 +147,7 @@ public static partial class DatasetCommands
             return context.Output.Write(
                 await OsduJson.ToJsonAsync(result),
                 OutputSpec.Raw);
-        }, cancellationToken));
+        }, cancellationToken, "service.storage.creator or service.storage.admin"));
 
         return command;
     }
@@ -185,7 +185,7 @@ public static partial class DatasetCommands
             return context.Output.Write(
                 await OsduJson.ToJsonAsync(result),
                 OutputSpec.Raw);
-        }, cancellationToken));
+        }, cancellationToken, "service.dataset.editors"));
 
         return command;
     }
@@ -223,7 +223,7 @@ public static partial class DatasetCommands
             return context.Output.Write(
                 await OsduJson.ToJsonAsync(result),
                 OutputSpec.Raw);
-        }, cancellationToken));
+        }, cancellationToken, "service.dataset.viewers"));
 
         return command;
     }
@@ -261,7 +261,7 @@ public static partial class DatasetCommands
             }, cancellationToken);
 
             return context.Output.WriteMessage("Dataset URLs revoked");
-        }, cancellationToken));
+        }, cancellationToken, "service.dataset.admin"));
 
         return command;
     }

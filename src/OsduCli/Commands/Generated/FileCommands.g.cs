@@ -59,7 +59,7 @@ public static partial class FileCommands
             return context.Output.Write(
                 await OsduJson.ToJsonAsync(result),
                 OutputSpec.Raw);
-        }, cancellationToken));
+        }, cancellationToken, "service.file.editors, users.datalake.editors, users.datalake.admins or users.datalake.ops"));
 
         return command;
     }
@@ -89,7 +89,7 @@ public static partial class FileCommands
             return context.Output.Write(
                 await OsduJson.ToJsonAsync(result),
                 OutputSpec.Table(null, ("Id", "id")));
-        }, cancellationToken));
+        }, cancellationToken, "service.file.editors, users.datalake.editors, users.datalake.admins or users.datalake.ops"));
 
         return command;
     }
@@ -115,7 +115,7 @@ public static partial class FileCommands
             await context.Client.File.V2.Files[id].Metadata.DeleteAsync(cancellationToken: cancellationToken);
 
             return context.Output.WriteMessage("File and metadata deleted");
-        }, cancellationToken));
+        }, cancellationToken, "users.datalake.editors or users.datalake.admins"));
 
         return command;
     }
@@ -145,7 +145,7 @@ public static partial class FileCommands
             return context.Output.Write(
                 await OsduJson.ToJsonAsync(result),
                 OutputSpec.Raw);
-        }, cancellationToken));
+        }, cancellationToken, "service.file.editors, users.datalake.editors, users.datalake.admins or users.datalake.ops"));
 
         return command;
     }
@@ -182,7 +182,7 @@ public static partial class FileCommands
             return context.Output.Write(
                 await OsduJson.ToJsonAsync(result),
                 OutputSpec.Raw);
-        }, cancellationToken));
+        }, cancellationToken, "service.file.viewers, users.datalake.viewers, users.datalake.editors, users.datalake.admins or users.datalake.ops"));
 
         return command;
     }
@@ -210,7 +210,7 @@ public static partial class FileCommands
             await context.Client.File.V2.Files.RevokeURL.PostAsync(body, cancellationToken: cancellationToken);
 
             return context.Output.WriteMessage("Signed URLs revoked");
-        }, cancellationToken));
+        }, cancellationToken, "service.file.admin"));
 
         return command;
     }
