@@ -15,7 +15,7 @@ namespace Equinor.OsduCli.Runtime;
 /// by accident.
 ///
 /// So when the caller has not said which account it means and more than one is cached, this
-/// refuses and names them. `--user` (or `username` in the profile) settles it.
+/// refuses and names them. `--user` (or `user` in the profile) settles it.
 ///
 /// The check is deferred to the first token request rather than done when the context is
 /// built, so that commands which never authenticate — `--help`, `completion` — do not pay

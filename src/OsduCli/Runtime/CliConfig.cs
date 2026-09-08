@@ -58,7 +58,7 @@ public static class CliConfig
     /// Loads the configuration, and reports the default account it names, if any.
     /// </summary>
     /// <remarks>
-    /// <c>username</c> is not part of <see cref="OsduConfig"/> — the client models a service
+    /// The profile's <c>user</c> is not part of <see cref="OsduConfig"/> — the client models a service
     /// endpoint, not who is talking to it — so it comes back separately rather than being
     /// forced into a type that has no place for it.
     /// </remarks>
