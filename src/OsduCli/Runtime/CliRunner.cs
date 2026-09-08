@@ -31,24 +31,23 @@ public static class CliRunner
     /// <c>Message</c> is empty. The CLI printed "error: 400 from the service." and stopped,
     /// which tells a user that they failed but not what to change.
     ///
-    /// Unmapped body fields land in <c>AdditionalData</c>, so that is where to look. Read
-    /// reflectively because every service has its own error type and there are twelve of
-    /// them; a switch over each would rot the first time a spec changed. This is the error
-    /// path, so the cost does not matter — but it is one more thing to revisit if NativeAOT
-    /// ever becomes viable, since trimming can remove what reflection expects to find.
+    /// Unmapped body fields land in <c>AdditionalData</c>, so that is where to look. Every
+    /// one of the 18 generated error models implements <see cref="IAdditionalDataHolder"/>,
+    /// so this is a cast rather than a per-service switch that would rot the first time a
+    /// spec changed — and rather than reflection, which trimming can quietly defeat and which
+    /// would fail silently if a model ever declared the property differently.
     /// </remarks>
     private static string? Describe(ApiException exception)
     {
         if (!string.IsNullOrWhiteSpace(exception.Message))
             return exception.Message;
 
-        var additional = exception.GetType().GetProperty("AdditionalData")?.GetValue(exception);
-        if (additional is not IDictionary<string, object> fields)
+        if (exception is not IAdditionalDataHolder holder)
             return null;
 
         // Deepest-first: the nested object holds the message, the wrapper holds a status code
         // the caller has already been shown.
-        foreach (var value in fields.Values)
+        foreach (var value in holder.AdditionalData.Values)
         {
             var text = Flatten(value);
             if (!string.IsNullOrWhiteSpace(text))
