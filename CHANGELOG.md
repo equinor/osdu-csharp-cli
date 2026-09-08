@@ -1,5 +1,18 @@
 # Changelog
 
+## [0.7.1](https://github.com/equinor/osdu-csharp-cli/compare/v0.7.0...v0.7.1) (2026-09-08)
+
+
+### Bug Fixes
+
+* **config:** accept user as well as username for the default account ([ec12d5e](https://github.com/equinor/osdu-csharp-cli/commit/ec12d5ece44a2e9be0437c358921d26ecd72bfe9))
+* **config:** finish the user rename across output, docs and tests ([9337332](https://github.com/equinor/osdu-csharp-cli/commit/9337332f978fc6e965be5633ba35d6ad45a980db))
+* **config:** read the default account from user, matching the flag ([c2f600c](https://github.com/equinor/osdu-csharp-cli/commit/c2f600c8c3213d47e59405f149639c24cb3768b2))
+* **config:** read the default account from user, matching the flag ([0825931](https://github.com/equinor/osdu-csharp-cli/commit/08259314bb1b6a2bbd7ade54b5080e4d380ea95c))
+* **errors:** read the nested body when a service error has no message ([f82f297](https://github.com/equinor/osdu-csharp-cli/commit/f82f2977310501ee5f993878541eab9cd4749cdb))
+* **schema:** send the schema on add and surface nested service errors ([14bdbb9](https://github.com/equinor/osdu-csharp-cli/commit/14bdbb9af808df6687279220da2bd1e5a9311e63))
+* **schema:** take client 2.2.1 so schema add sends the schema ([621c8b6](https://github.com/equinor/osdu-csharp-cli/commit/621c8b6e09700e3f4c5c3cc0dabbde24731caed9))
+
 ## [0.7.0](https://github.com/equinor/osdu-csharp-cli/compare/v0.6.3...v0.7.0) (2026-09-08)
 
 
