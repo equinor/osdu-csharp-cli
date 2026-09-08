@@ -87,8 +87,7 @@ to:
 user = azure@equinor.com
 ```
 
-`username` is accepted as well, and `--user` overrides both. `OSDU_USER` and `OSDU_USERNAME`
-work for a shell session.
+`--user` overrides it, and `OSDU_USER` works for a shell session.
 
 The setting has to be in the profile that is **selected** — `osducs config show` lists which
 files were actually read. A default written into a profile you are not using has no effect and

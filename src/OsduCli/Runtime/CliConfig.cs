@@ -49,7 +49,6 @@ public static class CliConfig
         ["OSDU_AUTHORITY"] = "Osdu:Authority",
         ["OSDU_CLIENT_ID"] = "Osdu:ClientId",
         ["OSDU_SCOPES"] = "Osdu:Scopes",
-        ["OSDU_USERNAME"] = "Osdu:Username",
         ["OSDU_USER"] = "Osdu:Username",
     };
 

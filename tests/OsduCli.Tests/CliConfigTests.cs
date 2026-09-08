@@ -144,13 +144,12 @@ public class CliConfigTests : IDisposable
         Assert.Equal(expected, CliConfig.NormaliseUsername(value));
     }
 
-    [Theory]
-    [InlineData("user")]
-    [InlineData("username")]
-    public void EitherSpellingOfTheDefaultAccountIsRead(string key)
+    [Fact]
+    public void TheDefaultAccountIsReadFromUser()
     {
-        // The flag is `--user`, so `user` is what someone writes in a profile without
-        // thinking about it. A tester did, and the setting was silently ignored.
+        // `user`, matching the `--user` flag. It was `username` for four days and a tester
+        // wrote `user`, which was ignored in silence — the flag saying one thing and the
+        // profile wanting another is the whole trap.
         var path = Path.Combine(_directory, "profile");
         File.WriteAllLines(path,
         [
@@ -160,7 +159,7 @@ public class CliConfigTests : IDisposable
             "authority = https://login.microsoftonline.com/tenant",
             "client_id = client",
             "scopes = https://example.invalid/.default",
-            $"{key} = azure@equinor.com",
+            "user = azure@equinor.com",
         ]);
 
         CliConfig.Load(path, out var username);
