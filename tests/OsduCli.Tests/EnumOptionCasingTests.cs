@@ -77,4 +77,41 @@ public class EnumOptionCasingTests
         Assert.Contains("MEMBER", completions);
         Assert.Contains("OWNER", completions);
     }
+
+    [Fact]
+    public void A_missing_value_is_a_parse_error_not_a_crash()
+    {
+        // Reported as an IndexOutOfRangeException waiting to happen. It is not reachable
+        // through the generated tree — these options have an arity of exactly one, so
+        // System.CommandLine reports the missing value before any parser runs — but the
+        // three routes to it are worth pinning, because the guarantee is the library's and
+        // not ours.
+        var root = BuildRoot();
+
+        var direct = root.Parse(["group", "member", "add", "--role"]);
+        Assert.Contains(direct.Errors, error => error.Message.Contains("--role"));
+
+        // The completion path parses the words as typed, trailing option and all.
+        var completions = CompletionCommand.Candidates(root, ["group", "member", "add", "--role"]);
+        Assert.NotNull(completions.ToArray());
+
+        // The repeated-value overload is covered by the same arity rule, one or more.
+        var repeated = root.Parse(["record", "headers", "--id", "x", "-a"]);
+        Assert.Contains(repeated.Errors, error => error.Message.Contains("-a"));
+    }
+
+    [Fact]
+    public void An_option_that_allows_no_value_parses_without_throwing()
+    {
+        // Makes the guard reachable: with this arity, zero tokens is legitimate input rather
+        // than something the library rejects first.
+        var option = new Option<string>("--role") { Arity = ArgumentArity.ZeroOrOne };
+        option.AcceptAnyCasingFromAmong("MEMBER", "OWNER");
+        var command = new RootCommand("probe");
+        command.Options.Add(option);
+
+        var result = command.Parse(["--role"]);
+
+        Assert.Null(result.GetValue<string>("--role"));
+    }
 }

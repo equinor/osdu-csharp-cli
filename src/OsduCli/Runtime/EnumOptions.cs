@@ -25,7 +25,13 @@ internal static class EnumOptions
     /// <summary>Accepts one value in any casing, normalised to the spec's spelling.</summary>
     public static void AcceptAnyCasingFromAmong(this Option<string> option, params string[] allowed)
     {
-        option.CustomParser = result => Canonical(result, result.Tokens[0].Value, allowed);
+        option.CustomParser = result => result.Tokens.Count > 0
+            // Unreachable through the generated tree, where every such option has an arity of
+            // exactly one and System.CommandLine reports the missing value before a parser
+            // runs. Guarded anyway: the alternative is an index that stays correct only while
+            // that arity does, and the failure would be a stack trace rather than a message.
+            ? Canonical(result, result.Tokens[0].Value, allowed)
+            : null;
         option.CompletionSources.Add(allowed);
     }
 
