@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.7.2](https://github.com/equinor/osdu-csharp-cli/compare/v0.7.1...v0.7.2) (2026-09-09)
+
+
+### Bug Fixes
+
+* **cli:** accept enum option values in any casing ([1356179](https://github.com/equinor/osdu-csharp-cli/commit/135617942a8ddb8f049147e4df9f5f51417f74fe))
+* **cli:** accept enum option values in any casing ([5f60ad2](https://github.com/equinor/osdu-csharp-cli/commit/5f60ad26905f849ae85820ba02613f01f89d5bcd))
+* fail closed on an unreadable pin and cover fetch itself with tests ([f6cab4a](https://github.com/equinor/osdu-csharp-cli/commit/f6cab4a6d69d4fc63e6d10650548744ad3e2a882))
+* **help:** document --type NONE and mark spec-required options as required ([60137ad](https://github.com/equinor/osdu-csharp-cli/commit/60137aded046ecabb051e961da42ca7002c51d02))
+* **help:** document --type NONE and mark spec-required options as required ([c8f63d0](https://github.com/equinor/osdu-csharp-cli/commit/c8f63d0dfee851ca40183f2e3be4bde435344289))
+* refuse to generate against fetched specs stamped with a different ref ([9c31a1b](https://github.com/equinor/osdu-csharp-cli/commit/9c31a1bf6c7f1be2fde4515501832d4f290d3832))
+
 ## [0.7.1](https://github.com/equinor/osdu-csharp-cli/compare/v0.7.0...v0.7.1) (2026-09-08)
 
 
