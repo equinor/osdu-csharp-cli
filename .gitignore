@@ -6,3 +6,6 @@ publish/
 # Python bytecode
 __pycache__/
 *.pyc
+
+# Fetched by tools/fetch_specs.py, pinned in spec-source.yaml.
+openapi_specs/

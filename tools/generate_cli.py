@@ -20,6 +20,7 @@ from __future__ import annotations
 import argparse
 import fnmatch
 import json
+import os
 import re
 import sys
 from dataclasses import dataclass, field
@@ -29,8 +30,76 @@ import yaml
 
 ROOT = Path(__file__).resolve().parent.parent
 MANIFEST_DIR = ROOT / "cli-manifest"
-SPECS_DIR = ROOT.parent / "osdu-csharp-client" / "openapi_specs"
 OUTPUT_DIR = ROOT / "src" / "OsduCli" / "Commands" / "Generated"
+SPEC_SOURCE = ROOT / "spec-source.yaml"
+# Written by fetch_specs.py alongside the tree it fetched.
+SPEC_STAMP = ".spec-ref"
+
+
+def specs_dir() -> tuple[Path, str]:
+    """Locate the OpenAPI specs, and say which of the three ways found them.
+
+    ``tools/fetch_specs.py`` downloads the snapshot belonging to the client version in the
+    csproj, which is the tree the coverage gate should be checking against. A sibling
+    ``osdu-csharp-client`` checkout is still honoured last, so anyone already set up that
+    way keeps working — but it is whatever branch they happen to have, which is exactly the
+    skew the pin exists to remove, so it no longer comes first.
+
+    The origin travels with the path because the two are only stale in different ways: a
+    fetched tree can be checked against the pin, and the other two cannot be.
+    """
+    override = os.environ.get("OSDU_SPECS_DIR")
+    if override:
+        return Path(override).expanduser().resolve(), "override"
+    fetched = ROOT / "openapi_specs"
+    if fetched.is_dir():
+        return fetched, "fetched"
+    return ROOT.parent / "osdu-csharp-client" / "openapi_specs", "sibling"
+
+
+SPECS_DIR, SPECS_ORIGIN = specs_dir()
+
+
+def pinned_ref() -> str | None:
+    """The ref ``spec-source.yaml`` pins, or None when it cannot be read.
+
+    Read here rather than imported from ``fetch_specs`` so the generator stays free of that
+    module's network imports; the value still has one home, which is the file.
+    """
+    try:
+        document = yaml.safe_load(SPEC_SOURCE.read_text(encoding="utf-8")) or {}
+    except (OSError, yaml.YAMLError):
+        return None
+    ref = (document.get("source") or {}).get("ref")
+    return str(ref) if ref else None
+
+
+def stale_specs() -> str | None:
+    """Describe the fetched specs being from a different ref than the pin, if they are.
+
+    Choosing that directory on existence alone would put the drift this pin removes straight
+    back, one pull later: someone fetches, the pin is bumped, and generation silently reads
+    the tree they already had. CI cannot hit this — it fetches every run — so the check
+    exists entirely for the working copy. An override or a sibling checkout carries no stamp
+    and is a deliberate choice, so neither is held to the pin.
+    """
+    if SPECS_ORIGIN != "fetched":
+        return None
+    pinned = pinned_ref()
+    if pinned is None:
+        # Fail closed. Treating an unreadable pin as agreement would let a fetched tree be
+        # used with nothing to check it against, which is the state this check exists to
+        # refuse.
+        return (f"{SPECS_DIR.name}/ is a fetched tree, but {SPEC_SOURCE.name} gives no "
+                f"readable `source.ref` to check it against. Restore that file, or set "
+                f"OSDU_SPECS_DIR to state deliberately which specs to use.")
+    stamp = SPECS_DIR / SPEC_STAMP
+    found = stamp.read_text(encoding="utf-8").strip() if stamp.is_file() else None
+    if found == pinned:
+        return None
+    held = f"specs from {found}" if found else "an unstamped tree"
+    return (f"{SPECS_DIR.name}/ holds {held}, but {SPEC_SOURCE.name} pins {pinned}. "
+            f"Run `python3 tools/fetch_specs.py` to bring it up to date.")
 
 HTTP_METHODS = ("get", "put", "post", "delete", "patch")
 
@@ -60,15 +129,10 @@ _NoTimestampLoader.yaml_implicit_resolvers = {
 def resolve_spec(name: str) -> Path:
     """Locate a service's OpenAPI document.
 
-    osdu-csharp-client keeps specs at ``openapi_specs/<service>/openapi.{yaml,json}``. The
-    older flat ``openapi_specs/<Service>.yaml`` layout is still accepted so this works
-    against either checkout while that restructuring lands — CI builds the client's default
-    branch, which is still flat.
-
-    The flat filenames are not a mechanical transform of the service name: ``crs_catalog``
-    is ``CRS_Catalog.yaml``, ``schema_service`` is ``Schema_Service.yaml``, ``unit/v3`` is
-    ``Unit_v3.yaml``. Rather than encode that, the fallback compares names with separators
-    and case removed, which matches all of them and any similar spelling.
+    Specs live at ``openapi_specs/<service>/openapi.{yaml,json}``. That layout is now a
+    property of the pinned ref in ``spec-source.yaml`` rather than of whichever checkout
+    happens to be on disk, so the fallback that also accepted the older flat
+    ``openapi_specs/<Service>.yaml`` naming is gone — no reachable ref still uses it.
     """
     candidates = [
         SPECS_DIR / name / "openapi.yaml",
@@ -79,21 +143,18 @@ def resolve_spec(name: str) -> Path:
         if candidate.is_file():
             return candidate
 
-    def normalise(value: str) -> str:
-        return re.sub(r"[^a-z0-9]", "", value.lower())
-
-    wanted = normalise(name)
-    if SPECS_DIR.is_dir():
-        for candidate in sorted(SPECS_DIR.iterdir()):
-            if (candidate.is_file()
-                    and candidate.suffix.lower() in {".yaml", ".yml", ".json"}
-                    and normalise(candidate.stem) == wanted):
-                return candidate
-
+    # Which remedy is right depends on how the directory was chosen: fetching cannot fix a
+    # wrong OSDU_SPECS_DIR, because the override keeps winning afterwards.
+    if SPECS_ORIGIN == "override":
+        remedy = ("OSDU_SPECS_DIR points there; correct it, or unset it to fall back to the "
+                  "fetched copy.")
+    else:
+        remedy = ("Run `python3 tools/fetch_specs.py` to download the specs for the client "
+                  "version this repository pins.")
     raise ManifestError(
-        f"no spec found for {name!r}. Looked for "
-        + ", ".join(str(c.relative_to(SPECS_DIR.parent)) for c in candidates)
-        + f", and any file in openapi_specs matching {wanted!r} ignoring case and separators"
+        f"no spec found for {name!r} under {SPECS_DIR}. Looked for "
+        + ", ".join(str(c.relative_to(SPECS_DIR)) for c in candidates)
+        + ". " + remedy
     )
 
 
@@ -606,8 +667,8 @@ def build_service(manifest_path: Path) -> Service:
     spec = load_spec(spec_path)
     operations = spec_operations(spec)
     deprecated = deprecated_operations(operations)
-    # Error messages name the spec by its path within openapi_specs; both layouts give
-    # something a reader can find on disk.
+    # Error messages name the spec by its path within openapi_specs, which is the same
+    # wherever that directory came from.
     spec_label = spec_path.relative_to(SPECS_DIR).as_posix()
     commands: list[Command] = []
     claimed: set[tuple[str, str]] = set()
@@ -675,10 +736,10 @@ def build_service(manifest_path: Path) -> Service:
         models=manifest.get("models", manifest["client"]),
         description=manifest.get("description", f"{name} service."),
         # The manifest's declared spec name and the spec's own version, not the on-disk
-        # path: osdu-csharp-client is mid-restructure and the same document lives at
-        # openapi_specs/storage/openapi.yaml on one branch and openapi_specs/Storage.yaml
-        # on another. Embedding the path would make generated output differ between
-        # checkouts and fail CI's `git diff --exit-code` staleness gate for no real reason.
+        # path: the specs may be a fetched copy under openapi_specs/, a sibling checkout or
+        # an OSDU_SPECS_DIR elsewhere. Embedding the path would make generated output differ
+        # between checkouts and fail CI's `git diff --exit-code` staleness gate for no real
+        # reason.
         spec_file=f"{manifest['spec']}{f' ({spec_version})' if spec_version else ''}",
         commands=commands,
         groups=manifest.get("groups") or {},
@@ -1522,6 +1583,12 @@ def main() -> int:
     parser.add_argument("--strict-scope", action="store_true",
                         help="also fail when a spec has operations outside the manifest scope")
     args = parser.parse_args()
+
+    # Before anything is read: generating against a tree from a different ref produces
+    # plausible output that is wrong, which is worse than not running.
+    if stale := stale_specs():
+        print(f"error: {stale}", file=sys.stderr)
+        return 1
 
     manifests = sorted(MANIFEST_DIR.glob("*.yaml"))
     if not manifests:

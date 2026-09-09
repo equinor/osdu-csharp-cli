@@ -83,13 +83,13 @@ This repo draws that line as a build-enforced boundary.
 ## How it fits together
 
 ```
-openapi_specs/<service>/openapi.yaml     what the service can do        (osdu-csharp-client)
-cli-manifest/<service>.yaml              what the CLI should expose     (hand-written, reviewed)
+openapi_specs/<service>/openapi.{yaml,json}  what the service can do       (fetched, pinned)
+cli-manifest/<service>.yaml                  what the CLI should expose    (hand-written, reviewed)
         │
         ├── tools/generate_cli.py
         ▼
-src/OsduCli/Commands/Generated/*.g.cs    System.CommandLine tree        (committed, never edited)
-src/OsduCli/Commands/Handwritten/        the Customize() partial hook   (hand-written)
+src/OsduCli/Commands/Generated/*.g.cs        System.CommandLine tree       (committed, never edited)
+src/OsduCli/Commands/Handwritten/            the Customize() partial hook  (hand-written)
 ```
 
 Generated commands call [`Equinor.OsduCsharpClient`](https://github.com/equinor/osdu-csharp-client),
@@ -205,6 +205,7 @@ anything fails, so it can gate a release.
 ## Running it
 
 ```bash
+python3 tools/fetch_specs.py             # download the specs the generator reads
 python3 -m pytest                        # test the generator
 UPDATE_GOLDEN=1 python3 -m pytest        # re-record emission goldens after a deliberate change
 python3 tools/generate_cli.py           # generate
@@ -212,7 +213,23 @@ python3 tools/generate_cli.py --check   # CI gate: validate, write nothing
 cd src/OsduCli && dotnet build
 ```
 
-Expects `osdu-csharp-client` checked out as a sibling directory.
+### Where the specs come from
+
+The generator needs the OpenAPI specs; the C# build does not, because the generated commands
+are committed. `tools/fetch_specs.py` downloads them into a gitignored `openapi_specs/` from
+the source declared in [`spec-source.yaml`](spec-source.yaml), pinned to the client version
+`OsduCli.csproj` references.
+
+The pin is the point. The CLI calls that client version's generated methods, so the specs the
+coverage gate validates against have to be the specs that version was generated from —
+reading a newer tree lets the gate approve endpoints the pinned client cannot call. A test
+holds the two together, so bumping the client without the specs fails, and the generator
+refuses to run against a fetched tree stamped with a different ref than the one pinned —
+otherwise a pin bump would silently generate against whatever you fetched last.
+
+Resolution order is `OSDU_SPECS_DIR` → the fetched `openapi_specs/` → an `osdu-csharp-client`
+sibling checkout. The sibling still works and no longer needs to exist; it comes last because
+it is whatever branch happens to be checked out, which is the drift the pin removes.
 
 ## Status
 
