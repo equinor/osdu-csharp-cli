@@ -17,6 +17,7 @@ from pathlib import Path
 import pytest
 import yaml
 
+import generate_cli
 from fetch_specs import FetchError, extract
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -110,3 +111,56 @@ def test_expect_specs_matches_the_fetched_tree():
     assert len(found) == SOURCE["expect_specs"], (
         f"spec-source.yaml expects {SOURCE['expect_specs']} specs, tree has {len(found)}"
     )
+
+
+class TestStaleFetchedSpecs:
+    """A fetched tree is only useful while it still matches the pin.
+
+    Selecting it because it exists put the drift back one pull later: fetch once, pull a pin
+    bump, and generation reads the old tree without saying so. CI never sees this — it
+    fetches every run — so the check exists for the working copy alone.
+    """
+
+    def prepare(self, monkeypatch, tmp_path, origin, stamped):
+        if stamped is not None:
+            (tmp_path / ".spec-ref").write_text(f"{stamped}\n", encoding="utf-8")
+        monkeypatch.setattr(generate_cli, "SPECS_DIR", tmp_path)
+        monkeypatch.setattr(generate_cli, "SPECS_ORIGIN", origin)
+
+    def test_a_stamp_matching_the_pin_passes(self, monkeypatch, tmp_path):
+        self.prepare(monkeypatch, tmp_path, "fetched", SOURCE["ref"])
+        assert generate_cli.stale_specs() is None
+
+    def test_a_stamp_from_another_ref_is_reported(self, monkeypatch, tmp_path):
+        self.prepare(monkeypatch, tmp_path, "fetched", "v0.0.1")
+        message = generate_cli.stale_specs()
+        assert message and "v0.0.1" in message and SOURCE["ref"] in message
+        assert "fetch_specs.py" in message
+
+    def test_an_unstamped_tree_is_reported(self, monkeypatch, tmp_path):
+        self.prepare(monkeypatch, tmp_path, "fetched", None)
+        assert "unstamped" in (generate_cli.stale_specs() or "")
+
+    @pytest.mark.parametrize("origin", ["override", "sibling"])
+    def test_only_the_fetched_copy_is_held_to_the_pin(self, monkeypatch, tmp_path, origin):
+        # Both are the caller saying which specs to use; neither carries a stamp, and
+        # failing them would break the setups this change promises to keep working.
+        self.prepare(monkeypatch, tmp_path, origin, None)
+        assert generate_cli.stale_specs() is None
+
+
+class TestMissingSpecRemedy:
+    """The way out of "no spec found" depends on how the directory was chosen."""
+
+    def test_an_override_is_told_to_fix_the_override(self, monkeypatch, tmp_path):
+        # Fetching cannot help here: OSDU_SPECS_DIR would keep winning afterwards.
+        monkeypatch.setattr(generate_cli, "SPECS_DIR", tmp_path)
+        monkeypatch.setattr(generate_cli, "SPECS_ORIGIN", "override")
+        with pytest.raises(generate_cli.ManifestError, match="OSDU_SPECS_DIR"):
+            generate_cli.resolve_spec("storage")
+
+    def test_otherwise_the_remedy_is_to_fetch(self, monkeypatch, tmp_path):
+        monkeypatch.setattr(generate_cli, "SPECS_DIR", tmp_path)
+        monkeypatch.setattr(generate_cli, "SPECS_ORIGIN", "sibling")
+        with pytest.raises(generate_cli.ManifestError, match="fetch_specs.py"):
+            generate_cli.resolve_spec("storage")

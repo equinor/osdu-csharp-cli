@@ -205,7 +205,7 @@ anything fails, so it can gate a release.
 ## Running it
 
 ```bash
-python3 tools/fetch_specs.py             # download the specs the generator reads (once)
+python3 tools/fetch_specs.py             # download the specs the generator reads
 python3 -m pytest                        # test the generator
 UPDATE_GOLDEN=1 python3 -m pytest        # re-record emission goldens after a deliberate change
 python3 tools/generate_cli.py           # generate
@@ -223,7 +223,9 @@ the source declared in [`spec-source.yaml`](spec-source.yaml), pinned to the cli
 The pin is the point. The CLI calls that client version's generated methods, so the specs the
 coverage gate validates against have to be the specs that version was generated from —
 reading a newer tree lets the gate approve endpoints the pinned client cannot call. A test
-holds the two together, so bumping the client without the specs fails.
+holds the two together, so bumping the client without the specs fails, and the generator
+refuses to run against a fetched tree stamped with a different ref than the one pinned —
+otherwise a pin bump would silently generate against whatever you fetched last.
 
 Resolution order is `OSDU_SPECS_DIR` → the fetched `openapi_specs/` → an `osdu-csharp-client`
 sibling checkout. The sibling still works and no longer needs to exist; it comes last because
