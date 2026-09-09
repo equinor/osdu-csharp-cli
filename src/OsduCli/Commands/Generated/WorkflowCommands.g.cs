@@ -273,7 +273,7 @@ public static partial class WorkflowCommands
             Description = "New status for the run. One of: submitted, running, finished, failed, success, queued.",
             Required = true,
         };
-        statusBodyOption.AcceptOnlyFromAmong("submitted", "running", "finished", "failed", "success", "queued");
+        statusBodyOption.AcceptAnyCasingFromAmong("submitted", "running", "finished", "failed", "success", "queued");
 
         var command = new Command("update", "Update the status of a workflow run.");
         command.Options.Add(workflowNameOption);

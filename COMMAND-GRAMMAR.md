@@ -520,6 +520,20 @@ produces `{"sort":{"field":["id"],"order":["DESC"]}}`. The schema is resolved th
 dots too, so `sort.order` still inherits its `ASC`/`DESC` enum from `SortQuery` two levels
 down and the CLI rejects anything else locally.
 
+## Enum casing
+
+An option constrained to an enum accepts its value in any casing, and sends the spec's own
+spelling.
+
+The specs do not agree with one another. Entitlements and Search spell their values `MEMBER`
+and `ASC`; Storage, Workflow and Wellbore DDMS spell theirs `version` and `running`. Nothing
+on the command line says which convention the option being typed follows, so `--role member`
+was refused for a reason that belonged to the spec rather than to the caller.
+
+Only casing is forgiven. A value wrong in any other way is still rejected at parse time with
+the alternatives listed, so the local-validation principle above is unchanged — and what
+reaches the service is always the spelling the service parses.
+
 ## `mutually-exclusive`
 
 Options that contradict each other, rejected at parse time:

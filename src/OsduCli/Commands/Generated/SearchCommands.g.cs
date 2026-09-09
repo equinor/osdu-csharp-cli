@@ -66,7 +66,7 @@ public static partial class SearchCommands
             Description = "Sort direction per --sort-by field. Defaults to ASC upstream when omitted. One of: ASC, DESC.",
             AllowMultipleArgumentsPerToken = true,
         };
-        sortOrderBodyOption.AcceptOnlyFromAmong("ASC", "DESC");
+        sortOrderBodyOption.AcceptAnyCasingFromAmong("ASC", "DESC");
         var tracktotalcountBodyOption = new Option<bool?>("--track-total-count")
         {
             Description = "Report the true match count. Without it the count is capped at 10000, which silently understates any large kind.",
