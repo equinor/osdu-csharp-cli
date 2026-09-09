@@ -1,0 +1,29 @@
+# Where the OpenAPI specs the generator reads come from.
+#
+# The specs are not this repository's to own. Each is a copy of a file its OSDU service
+# publishes, vendored by osdu-csharp-client and recorded with upstream provenance in that
+# repo's spec_sources.yaml. This CLI validates its manifests against them.
+#
+# It reads the snapshot belonging to the *pinned client version* — not upstream HEAD, and
+# not the client's default branch. The CLI calls that client version's generated methods, so
+# the specs the coverage gate checks against must be the specs that version was generated
+# from. Reading a newer tree lets the gate approve endpoints the pinned client cannot call.
+# `ref` is therefore held to the Equinor.OsduCsharpClient PackageReference in
+# src/OsduCli/OsduCli.csproj by tests/generator/test_spec_source.py; bump them together.
+#
+# `archive` is a tag-archive URL template. GitHub and GitLab both serve one anonymously, so
+# if the client moves to community.opengroup.org this line changes and nothing else does:
+#   https://community.opengroup.org/<project>/-/archive/{ref}/x.tar.gz?path=openapi_specs
+# What that move does not guarantee is the *content*: the client vendors these specs
+# precisely because it lives outside the OSDU GitLab, and a client that moves inside it may
+# reasonably stop. `expect_specs` is what turns that into one loud failure here rather than
+# eighteen confusing "no spec found" errors.
+
+version: 1
+
+source:
+  name: osdu-csharp-client
+  ref: v2.2.1
+  archive: https://github.com/equinor/osdu-csharp-client/archive/refs/tags/{ref}.tar.gz
+  specs_path: openapi_specs
+  expect_specs: 18

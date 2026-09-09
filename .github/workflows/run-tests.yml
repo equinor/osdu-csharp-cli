@@ -23,45 +23,38 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-          path: osdu-csharp-cli
-
-      # The generator reads the specs from the client repo. Only this job needs them —
-      # the generated commands are committed, so building does not.
-      - name: Checkout the client for its specs
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          persist-credentials: false
-          repository: equinor/osdu-csharp-client
-          path: osdu-csharp-client
 
       - name: Set up Python
         uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
         with:
           python-version: "3.13"
 
-      - run: pip install -r osdu-csharp-cli/requirements-dev.txt
+      - run: pip install -r requirements-dev.txt
+
+      # The generator reads the specs from the client, pinned in spec-source.yaml to the
+      # client version the csproj references — the tree that client was generated from, not
+      # its default branch. Only this job needs them: the generated commands are committed,
+      # so building does not.
+      - name: Fetch the pinned specs
+        run: python3 tools/fetch_specs.py
 
       # The generator enforces coverage, require-one-of, mutually-exclusive, parts arity and
       # unknown manifest keys. All of that is Python, and none of it was covered by the C#
-      # suite that tests what it produces.
+      # suite that tests what it produces. It also holds the spec pin to the csproj.
       - name: Test the generator
-        working-directory: osdu-csharp-cli
         run: python3 -m pytest
 
       # Fails when an upstream endpoint is neither mapped, hand-written nor excluded, so a
       # new OSDU endpoint surfaces here by name instead of silently going missing.
       - name: Check manifests against specs
-        working-directory: osdu-csharp-cli
         run: python3 tools/generate_cli.py --check
 
       # The command reference is generated from the manifests too, so it cannot drift.
       - name: Check the command reference is up to date
-        working-directory: osdu-csharp-cli
         run: python3 tools/generate_docs.py --check
 
       # Fails when the committed generated commands are stale.
       - name: Check generated code is up to date
-        working-directory: osdu-csharp-cli
         run: |
           python3 tools/generate_cli.py
           git diff --exit-code -- src/OsduCli/Commands/Generated
