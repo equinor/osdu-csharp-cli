@@ -87,7 +87,12 @@ def stale_specs() -> str | None:
         return None
     pinned = pinned_ref()
     if pinned is None:
-        return None
+        # Fail closed. Treating an unreadable pin as agreement would let a fetched tree be
+        # used with nothing to check it against, which is the state this check exists to
+        # refuse.
+        return (f"{SPECS_DIR.name}/ is a fetched tree, but {SPEC_SOURCE.name} gives no "
+                f"readable `source.ref` to check it against. Restore that file, or set "
+                f"OSDU_SPECS_DIR to state deliberately which specs to use.")
     stamp = SPECS_DIR / SPEC_STAMP
     found = stamp.read_text(encoding="utf-8").strip() if stamp.is_file() else None
     if found == pinned:

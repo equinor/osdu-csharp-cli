@@ -83,13 +83,13 @@ This repo draws that line as a build-enforced boundary.
 ## How it fits together
 
 ```
-openapi_specs/<service>/openapi.yaml     what the service can do        (fetched, pinned)
-cli-manifest/<service>.yaml              what the CLI should expose     (hand-written, reviewed)
+openapi_specs/<service>/openapi.{yaml,json}  what the service can do       (fetched, pinned)
+cli-manifest/<service>.yaml                  what the CLI should expose    (hand-written, reviewed)
         │
         ├── tools/generate_cli.py
         ▼
-src/OsduCli/Commands/Generated/*.g.cs    System.CommandLine tree        (committed, never edited)
-src/OsduCli/Commands/Handwritten/        the Customize() partial hook   (hand-written)
+src/OsduCli/Commands/Generated/*.g.cs        System.CommandLine tree       (committed, never edited)
+src/OsduCli/Commands/Handwritten/            the Customize() partial hook  (hand-written)
 ```
 
 Generated commands call [`Equinor.OsduCsharpClient`](https://github.com/equinor/osdu-csharp-client),

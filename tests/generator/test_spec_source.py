@@ -17,6 +17,7 @@ from pathlib import Path
 import pytest
 import yaml
 
+import fetch_specs
 import generate_cli
 from fetch_specs import FetchError, extract
 
@@ -164,3 +165,93 @@ class TestMissingSpecRemedy:
         monkeypatch.setattr(generate_cli, "SPECS_ORIGIN", "sibling")
         with pytest.raises(generate_cli.ManifestError, match="fetch_specs.py"):
             generate_cli.resolve_spec("storage")
+
+
+def write_config(path, ref, expect=2):
+    path.write_text(yaml.safe_dump({"version": 1, "source": {
+        "name": "client", "ref": ref,
+        "archive": "https://example.invalid/{ref}.tar.gz",
+        "specs_path": "openapi_specs", "expect_specs": expect}}), encoding="utf-8")
+
+
+class TestFetch:
+    """`fetch()` itself — the no-op, the re-fetch, and what a bad tree does to a good one."""
+
+    def prepare(self, monkeypatch, tmp_path, ref="v9.9.9", expect=2, payload=None):
+        config = tmp_path / "spec-source.yaml"
+        write_config(config, ref, expect)
+        target = tmp_path / "openapi_specs"
+        monkeypatch.setattr(fetch_specs, "CONFIG", config)
+        monkeypatch.setattr(fetch_specs, "TARGET", target)
+        calls = []
+
+        def download(url):
+            calls.append(url)
+            if payload is not None:
+                return payload
+            # Build from the ref in the URL, so a re-pin produces a matching tree.
+            fetched = url.rsplit("/", 1)[-1].removesuffix(".tar.gz")
+            return make_archive([f"c-{fetched}/openapi_specs/storage/openapi.yaml",
+                                 f"c-{fetched}/openapi_specs/legal/openapi.yaml"])
+
+        monkeypatch.setattr(fetch_specs, "download", download)
+        return calls, config, target
+
+    def test_a_first_fetch_writes_the_tree_and_stamps_it(self, monkeypatch, tmp_path):
+        calls, _, target = self.prepare(monkeypatch, tmp_path)
+        assert fetch_specs.fetch() == 0
+        assert len(calls) == 1
+        assert (target / "storage" / "openapi.yaml").is_file()
+        assert (target / fetch_specs.STAMP_NAME).read_text(encoding="utf-8").strip() == "v9.9.9"
+
+    def test_a_matching_stamp_is_a_no_op(self, monkeypatch, tmp_path):
+        calls, _, _ = self.prepare(monkeypatch, tmp_path)
+        fetch_specs.fetch()
+        fetch_specs.fetch()
+        assert len(calls) == 1, "a tree already at the pinned ref should not be downloaded again"
+
+    def test_force_refetches(self, monkeypatch, tmp_path):
+        calls, _, _ = self.prepare(monkeypatch, tmp_path)
+        fetch_specs.fetch()
+        fetch_specs.fetch(force=True)
+        assert len(calls) == 2
+
+    def test_a_changed_pin_refetches(self, monkeypatch, tmp_path):
+        # The reason the stamp exists: bumping the pin must not leave the old tree in place.
+        calls, config, target = self.prepare(monkeypatch, tmp_path, ref="v1.0.0")
+        fetch_specs.fetch()
+        write_config(config, "v2.0.0")
+        fetch_specs.fetch()
+        assert len(calls) == 2
+        assert (target / fetch_specs.STAMP_NAME).read_text(encoding="utf-8").strip() == "v2.0.0"
+
+    def test_a_wrong_spec_count_leaves_the_previous_tree_intact(self, monkeypatch, tmp_path):
+        # Unpacking into a staging directory means a client that stopped shipping specs
+        # fails without also destroying the working tree it was replacing.
+        _, config, target = self.prepare(monkeypatch, tmp_path, ref="v1.0.0")
+        fetch_specs.fetch()
+        write_config(config, "v2.0.0", expect=99)
+        with pytest.raises(FetchError, match="expected 99 spec files"):
+            fetch_specs.fetch()
+        assert (target / "storage" / "openapi.yaml").is_file()
+        assert (target / fetch_specs.STAMP_NAME).read_text(encoding="utf-8").strip() == "v1.0.0"
+
+    def test_a_response_that_is_not_a_tar_is_reported_cleanly(self, monkeypatch, tmp_path):
+        # A forge can answer 200 with an error page; that must not surface as a traceback.
+        self.prepare(monkeypatch, tmp_path, payload=b"<html>not found</html>")
+        with pytest.raises(FetchError, match="did not parse as a gzipped tar"):
+            fetch_specs.fetch()
+
+
+def test_the_stamp_filename_agrees_across_the_two_tools():
+    # fetch_specs writes it, generate_cli reads it, and they spell it separately so the
+    # generator stays free of the fetcher's network imports.
+    assert fetch_specs.STAMP_NAME == generate_cli.SPEC_STAMP
+
+
+def test_an_unreadable_pin_fails_rather_than_passes(monkeypatch, tmp_path):
+    # Fail closed: with no readable ref there is nothing to check a fetched tree against.
+    monkeypatch.setattr(generate_cli, "SPECS_DIR", tmp_path)
+    monkeypatch.setattr(generate_cli, "SPECS_ORIGIN", "fetched")
+    monkeypatch.setattr(generate_cli, "SPEC_SOURCE", tmp_path / "absent.yaml")
+    assert "no readable" in (generate_cli.stale_specs() or "")

@@ -35,8 +35,9 @@ ROOT = Path(__file__).resolve().parent.parent
 CONFIG = ROOT / "spec-source.yaml"
 TARGET = ROOT / "openapi_specs"
 # Records which ref the tree came from, so a checkout left over from an earlier pin is
-# re-fetched instead of silently validated against.
-STAMP = TARGET / ".spec-ref"
+# re-fetched instead of silently validated against. generate_cli.py reads it back; a test
+# holds the two spellings together.
+STAMP_NAME = ".spec-ref"
 
 SPEC_SUFFIXES = {".yaml", ".yml", ".json"}
 
@@ -92,7 +93,16 @@ def extract(archive: bytes, specs_path: str, target: Path) -> list[Path]:
     """
     written: list[Path] = []
     marker = f"/{specs_path.strip('/')}/"
-    with tarfile.open(fileobj=io.BytesIO(archive), mode="r:gz") as tar:
+    try:
+        tar = tarfile.open(fileobj=io.BytesIO(archive), mode="r:gz")
+    except tarfile.TarError as error:
+        # A forge can answer 200 with an error page, a redirect stub or a truncated body.
+        # Without this the traceback replaces the fetcher's own diagnosis.
+        raise FetchError(
+            f"the download did not parse as a gzipped tar ({error}). The URL may no longer "
+            f"point at a tag archive."
+        ) from error
+    with tar:
         for member in tar.getmembers():
             if not member.isfile():
                 continue
@@ -122,7 +132,8 @@ def fetch(force: bool = False) -> int:
     url = str(source["archive"]).format(ref=ref)
     expected = int(source["expect_specs"])
 
-    if not force and STAMP.is_file() and STAMP.read_text(encoding="utf-8").strip() == ref:
+    stamp = TARGET / STAMP_NAME
+    if not force and stamp.is_file() and stamp.read_text(encoding="utf-8").strip() == ref:
         print(f"openapi_specs/ is already at {ref}; nothing to do (--force to re-fetch)")
         return 0
 
@@ -144,13 +155,19 @@ def fetch(force: bool = False) -> int:
                 f"found {len(specs)}. If the client's spec layout changed deliberately, "
                 f"update `specs_path`/`expect_specs` in {CONFIG.name}."
             )
-        (staging / STAMP.name).write_text(f"{ref}\n", encoding="utf-8")
+        (staging / STAMP_NAME).write_text(f"{ref}\n", encoding="utf-8")
         shutil.rmtree(TARGET, ignore_errors=True)
         staging.replace(TARGET)
     finally:
         shutil.rmtree(staging, ignore_errors=True)
 
-    print(f"Wrote {len(specs)} spec(s) to {TARGET.relative_to(ROOT)}/")
+    # Relative when it sits under the repo, which is every real run; absolute otherwise,
+    # rather than raising on the success path.
+    try:
+        where = TARGET.relative_to(ROOT)
+    except ValueError:
+        where = TARGET
+    print(f"Wrote {len(specs)} spec(s) to {where}/")
     return 0
 
 
