@@ -120,3 +120,24 @@ class TestParamValidation:
         entry = base(params={"kindName": {"flag": "--kind"}})
         with pytest.raises(ManifestError, match="kindName"):
             build(entry)
+
+    def test_a_spec_required_param_must_say_so_in_the_manifest(self):
+        # docs/COMMANDS.md is rendered from the manifest alone, so inheriting required-ness
+        # from the spec made the reference advertise a mandatory option as optional while
+        # the CLI refused the command without it. `member group list --type` was that.
+        operation = {"parameters": [{"name": "type", "in": "query", "required": True,
+                                     "schema": {"type": "string"}}],
+                     "responses": {"200": {"content": {"application/json": {
+                         "schema": {"type": "object"}}}}}}
+        entry = {"command": "member group list", "op": {"method": "get", "path": "/groups"},
+                 "params": {"type": {"flag": "--type"}}, "output": "raw"}
+        with pytest.raises(ManifestError, match="required: true"):
+            build(entry, operation)
+
+        entry["params"]["type"]["required"] = True
+        assert build(entry, operation).params[0].required
+
+    def test_the_manifest_may_require_what_the_spec_leaves_optional(self):
+        # The CLI is allowed to be the stricter of the two; only the reverse is a lie.
+        entry = base(params={"recordId": {"flag": "--record-id", "required": True}})
+        assert build(entry).params[0].required

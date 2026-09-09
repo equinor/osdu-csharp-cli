@@ -177,7 +177,7 @@ Get instructions for writing a new dataset's bytes.
 
 | Option | Required | Description |
 |---|---|---|
-| `--kind-subtype` |  | Dataset sub-type, e.g. dataset--File.Generic. |
+| `--kind-subtype` | yes | Dataset sub-type, e.g. dataset--File.Generic. |
 | `--expiry` |  | How long the instructions stay valid, e.g. 5M or 2H. |
 
 ## file
@@ -628,7 +628,7 @@ List the groups a member belongs to.
 | Option | Required | Description |
 |---|---|---|
 | `-m`, `--member` | yes | Member email address. |
-| `--type` |  | Filter by group type: DATA, SERVICE or USER. |
+| `--type` | yes | Group type: NONE for all groups, or DATA, SERVICE or USER to filter. |
 | `--appid` |  | Filter to groups granted to this application id. |
 | `--role-required` |  | Include the member's role in each group. |
 
@@ -1162,7 +1162,7 @@ Get the ABCD rational-function coefficients converting one unit to another.
 
 | Option | Required | Description |
 |---|---|---|
-| `--namespace` |  | Namespace to resolve the symbols in, e.g. Energistics_UoM. |
+| `--namespace` | yes | Namespace to resolve the symbols in, e.g. Energistics_UoM. |
 | `--from` | yes | Symbol to convert from. |
 | `--to` | yes | Symbol to convert to. |
 
@@ -1174,7 +1174,7 @@ Get the scale and offset that convert one unit to another.
 
 | Option | Required | Description |
 |---|---|---|
-| `--namespace` |  | Namespace to resolve the symbols in, e.g. Energistics_UoM. |
+| `--namespace` | yes | Namespace to resolve the symbols in, e.g. Energistics_UoM. |
 | `--from` | yes | Symbol to convert from, e.g. ft. |
 | `--to` | yes | Symbol to convert to, e.g. m. |
 
@@ -1186,7 +1186,7 @@ Get one unit by namespace and symbol.
 
 | Option | Required | Description |
 |---|---|---|
-| `--namespace` |  | Namespace to look in, e.g. Energistics_UoM. |
+| `--namespace` | yes | Namespace to look in, e.g. Energistics_UoM. |
 | `-s`, `--symbol` | yes | Unit symbol, e.g. m or ft. |
 
 ### `osducs unit list`

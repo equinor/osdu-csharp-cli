@@ -45,7 +45,7 @@ commands:
     summary: Get one unit by namespace and symbol.
     op: { method: get, path: /v3/unit/symbol }
     params:
-      namespaces: { flag: --namespace, help: "Namespace to look in, e.g. Energistics_UoM." }
+      namespaces: { flag: --namespace, required: true, help: "Namespace to look in, e.g. Energistics_UoM." }
       symbol:     { flag: --symbol, short: -s, required: true, help: "Unit symbol, e.g. m or ft." }
     output: raw
 
@@ -128,7 +128,7 @@ commands:
     summary: Get the scale and offset that convert one unit to another.
     op: { method: get, path: /v3/conversion/scale }
     params:
-      namespaces: { flag: --namespace, help: "Namespace to resolve the symbols in, e.g. Energistics_UoM." }
+      namespaces: { flag: --namespace, required: true, help: "Namespace to resolve the symbols in, e.g. Energistics_UoM." }
       fromSymbol: { flag: --from, required: true, help: "Symbol to convert from, e.g. ft." }
       toSymbol:   { flag: --to,   required: true, help: "Symbol to convert to, e.g. m." }
     output: raw
@@ -137,7 +137,7 @@ commands:
     summary: Get the ABCD rational-function coefficients converting one unit to another.
     op: { method: get, path: /v3/conversion/abcd }
     params:
-      namespaces: { flag: --namespace, help: "Namespace to resolve the symbols in, e.g. Energistics_UoM." }
+      namespaces: { flag: --namespace, required: true, help: "Namespace to resolve the symbols in, e.g. Energistics_UoM." }
       fromSymbol: { flag: --from, required: true, help: Symbol to convert from. }
       toSymbol:   { flag: --to,   required: true, help: Symbol to convert to. }
     output: raw

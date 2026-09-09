@@ -57,7 +57,7 @@ commands:
     summary: Get instructions for writing a new dataset's bytes.
     op: { method: post, path: /storageInstructions }
     params:
-      kindSubType: { flag: --kind-subtype, help: "Dataset sub-type, e.g. dataset--File.Generic." }
+      kindSubType: { flag: --kind-subtype, required: true, help: "Dataset sub-type, e.g. dataset--File.Generic." }
       expiryTime:  { flag: --expiry, help: "How long the instructions stay valid, e.g. 5M or 2H." }
     output: raw
 
