@@ -1119,9 +1119,12 @@ def option_declaration(flag: str, short: str | None, cs_type: str, help_text: st
     lines += ["        };"]
     if allowed:
         # Rejects a bad value at parse time with the alternatives listed, and completes them
-        # on TAB — neither needs the network or a token.
+        # on TAB — neither needs the network or a token. Casing is not part of what is being
+        # checked: the specs disagree about it (MEMBER and ASC against version and running)
+        # and the command line gives no clue which applies, so EnumOptions normalises the
+        # token to the spec's spelling first. See Runtime/EnumOptions.cs.
         values = ", ".join(csharp_string(value) for value in allowed)
-        lines.append(f"        {var}.AcceptOnlyFromAmong({values});")
+        lines.append(f"        {var}.AcceptAnyCasingFromAmong({values});")
 
     if parts:
         # System.CommandLine splits on spaces, not commas, and a failed conversion throws

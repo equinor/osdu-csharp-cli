@@ -137,7 +137,7 @@ public static partial class StorageCommands
             Description = "Header fields to return. Omit for all of them; 'id' is always included. One of: version, kind, acl, legal, ancestry, tags, createUser, createTime, modifyUser, modifyTime.",
             AllowMultipleArgumentsPerToken = true,
         };
-        attributesBodyOption.AcceptOnlyFromAmong("version", "kind", "acl", "legal", "ancestry", "tags", "createUser", "createTime", "modifyUser", "modifyTime");
+        attributesBodyOption.AcceptAnyCasingFromAmong("version", "kind", "acl", "legal", "ancestry", "tags", "createUser", "createTime", "modifyUser", "modifyTime");
 
         var command = new Command("headers", "Fetch record headers by id, without the data payload.");
         command.Options.Add(recordsBodyOption);

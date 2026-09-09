@@ -559,7 +559,7 @@ public static partial class WellboreDdmsCommands
         {
             Description = "JSON shape of the response. One of: split, columns.",
         };
-        orientOption.AcceptOnlyFromAmong("split", "columns");
+        orientOption.AcceptAnyCasingFromAmong("split", "columns");
 
         var command = new Command("get", "Read the bulk data of a WellLog record.");
         command.Options.Add(recordIdOption);
@@ -638,7 +638,7 @@ public static partial class WellboreDdmsCommands
         {
             Description = "JSON shape of the response. One of: split, columns.",
         };
-        orientOption.AcceptOnlyFromAmong("split", "columns");
+        orientOption.AcceptAnyCasingFromAmong("split", "columns");
 
         var command = new Command("data", "Read the bulk data of a specific WellLog version.");
         command.Options.Add(recordIdOption);
@@ -942,7 +942,7 @@ public static partial class WellboreDdmsCommands
         {
             Description = "JSON shape of the response. One of: split, columns.",
         };
-        orientOption.AcceptOnlyFromAmong("split", "columns");
+        orientOption.AcceptAnyCasingFromAmong("split", "columns");
 
         var command = new Command("get", "Read the bulk data of a WellboreTrajectory record.");
         command.Options.Add(recordIdOption);
@@ -1021,7 +1021,7 @@ public static partial class WellboreDdmsCommands
         {
             Description = "JSON shape of the response. One of: split, columns.",
         };
-        orientOption.AcceptOnlyFromAmong("split", "columns");
+        orientOption.AcceptAnyCasingFromAmong("split", "columns");
 
         var command = new Command("data", "Read the bulk data of a specific WellboreTrajectory version.");
         command.Options.Add(recordIdOption);
@@ -1685,7 +1685,7 @@ public static partial class WellboreDdmsCommands
         {
             Description = "JSON shape of the response. One of: split, columns.",
         };
-        orientOption.AcceptOnlyFromAmong("split", "columns");
+        orientOption.AcceptAnyCasingFromAmong("split", "columns");
 
         var command = new Command("get", "Read the bulk data of a PPFGDataset record.");
         command.Options.Add(recordIdOption);
@@ -1764,7 +1764,7 @@ public static partial class WellboreDdmsCommands
         {
             Description = "JSON shape of the response. One of: split, columns.",
         };
-        orientOption.AcceptOnlyFromAmong("split", "columns");
+        orientOption.AcceptAnyCasingFromAmong("split", "columns");
 
         var command = new Command("data", "Read the bulk data of a specific PPFGDataset version.");
         command.Options.Add(recordIdOption);
@@ -1987,7 +1987,7 @@ public static partial class WellboreDdmsCommands
         {
             Description = "JSON shape of the response. One of: split, columns.",
         };
-        orientOption.AcceptOnlyFromAmong("split", "columns");
+        orientOption.AcceptAnyCasingFromAmong("split", "columns");
 
         var command = new Command("get", "Read the bulk data of a WellPressureTestRawMeasurement record.");
         command.Options.Add(recordIdOption);
@@ -2066,7 +2066,7 @@ public static partial class WellboreDdmsCommands
         {
             Description = "JSON shape of the response. One of: split, columns.",
         };
-        orientOption.AcceptOnlyFromAmong("split", "columns");
+        orientOption.AcceptAnyCasingFromAmong("split", "columns");
 
         var command = new Command("data", "Read the bulk data of a specific WellPressureTestRawMeasurement version.");
         command.Options.Add(recordIdOption);

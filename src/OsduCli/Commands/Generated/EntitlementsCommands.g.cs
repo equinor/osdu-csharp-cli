@@ -150,7 +150,7 @@ public static partial class EntitlementsCommands
         {
             Description = "Return only members with this role. One of: MEMBER, OWNER.",
         };
-        roleOption.AcceptOnlyFromAmong("MEMBER", "OWNER");
+        roleOption.AcceptAnyCasingFromAmong("MEMBER", "OWNER");
         var includetypeOption = new Option<bool>("--include-type")
         {
             Description = "Include each member's type in the output.",
@@ -202,7 +202,7 @@ public static partial class EntitlementsCommands
             Description = "Role to grant the member. One of: MEMBER, OWNER.",
             Required = true,
         };
-        roleBodyOption.AcceptOnlyFromAmong("MEMBER", "OWNER");
+        roleBodyOption.AcceptAnyCasingFromAmong("MEMBER", "OWNER");
 
         var command = new Command("add", "Add a member to a group.");
         command.Options.Add(groupEmailOption);
@@ -278,7 +278,7 @@ public static partial class EntitlementsCommands
         {
             Description = "Count only members with this role. One of: MEMBER, OWNER.",
         };
-        roleOption.AcceptOnlyFromAmong("MEMBER", "OWNER");
+        roleOption.AcceptAnyCasingFromAmong("MEMBER", "OWNER");
 
         var command = new Command("count", "Count the members of a group.");
         command.Options.Add(groupEmailOption);

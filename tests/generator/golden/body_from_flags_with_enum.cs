@@ -17,7 +17,7 @@
             Description = "Order. One of: ASC, DESC.",
             AllowMultipleArgumentsPerToken = true,
         };
-        sortOrderBodyOption.AcceptOnlyFromAmong("ASC", "DESC");
+        sortOrderBodyOption.AcceptAnyCasingFromAmong("ASC", "DESC");
 
         var command = new Command("search", "Search records.");
         command.Options.Add(kindBodyOption);
