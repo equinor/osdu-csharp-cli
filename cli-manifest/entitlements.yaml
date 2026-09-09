@@ -121,7 +121,11 @@ commands:
     op: { method: get, path: "/members/{member_email}/groups" }
     params:
       member_email: { flag: --member, short: -m, required: true, help: Member email address. }
-      type:         { flag: --type, help: "Filter by group type: DATA, SERVICE or USER." }
+      # The service requires this — Spring's @RequestParam has no `required = false` — but
+      # NONE is its "do not filter" value, not a fourth kind of group: ListGroupOnBehalfOfService
+      # returns every group unfiltered for NONE. Leading with that, because a reader who wants
+      # them all has no other way to guess it from a list of the three real types.
+      type:         { flag: --type, required: true, help: "Group type: NONE for all groups, or DATA, SERVICE or USER to filter." }
       appid:        { flag: --appid, help: Filter to groups granted to this application id. }
       roleRequired: { flag: --role-required, type: bool, help: Include the member's role in each group. }
     output:

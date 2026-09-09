@@ -315,7 +315,7 @@ public static partial class EntitlementsCommands
         };
         var typeOption = new Option<string>("--type")
         {
-            Description = "Filter by group type: DATA, SERVICE or USER.",
+            Description = "Group type: NONE for all groups, or DATA, SERVICE or USER to filter.",
             Required = true,
         };
         var appidOption = new Option<string>("--appid")

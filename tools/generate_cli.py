@@ -836,6 +836,16 @@ def build_command(entry: dict, operation: dict, where: str, models_root: str,
                 f"{where}: parameter {name!r} is `in: {location}` — only path and query "
                 f"parameters can be mapped to options"
             )
+        # Required-ness must be restated here, not just inherited from the spec.
+        # docs/COMMANDS.md is generated from the manifest alone, so a param the spec makes
+        # required renders there as optional while the CLI refuses the command without it —
+        # one question with two answers. `member group list --type` was exactly that.
+        if spec_param.get("required") and not cfg.get("required"):
+            raise ManifestError(
+                f"{where}: parameter {name!r} is required by the spec, so the manifest must "
+                f"also say `required: true`. Inheriting it silently makes "
+                f"docs/COMMANDS.md advertise the option as optional."
+            )
         raw_schema = spec_param.get("schema") or {}
         schema = normalise_schema(raw_schema, spec)
         wrapped = bool(raw_schema.get("anyOf") or raw_schema.get("oneOf"))
