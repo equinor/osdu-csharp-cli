@@ -103,9 +103,17 @@ jobs:
           sha256() {
             if command -v sha256sum >/dev/null 2>&1; then sha256sum "$1"; else shasum -a 256 "$1"; fi
           }
+          # Assigned rather than substituted straight into printf: printf succeeds whatever
+          # the substitution did, so a failed hash would publish an empty digest. In an
+          # assignment the failure is the assignment's, and -e stops the release.
+          archive_sha="$(sha256 "$archive" | cut -d' ' -f1)"
+          bin_sha="$(sha256 "src/OsduCli/publish/$bin" | cut -d' ' -f1)"
+          for sha in "$archive_sha" "$bin_sha"; do
+            [[ $sha =~ ^[0-9a-f]{64}$ ]] || { echo "not a sha256 digest: '$sha'" >&2; exit 1; }
+          done
           {
-            printf '%s  %s\n' "$(sha256 "$archive" | cut -d' ' -f1)" "$archive"
-            printf '%s  %s\n' "$(sha256 "src/OsduCli/publish/$bin" | cut -d' ' -f1)" "$bin"
+            printf '%s  %s\n' "$archive_sha" "$archive"
+            printf '%s  %s\n' "$bin_sha" "$bin"
           } > "$archive.sha256"
           cat "$archive.sha256"
 

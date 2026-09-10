@@ -58,7 +58,7 @@ if ($user -notlike "*$dir*") {
 On macOS and Linux the equivalent is somewhere already on `PATH`, such as
 `~/.local/bin/osducs`.
 
-### Checking a download is ours
+### Checking a download against the release
 
 Every asset ships a `.sha256` beside it, holding two lines: the archive's hash and the hash of
 the binary inside it. The second is the one Windows tooling reports, and the one to compare
@@ -73,8 +73,10 @@ shasum -a 256 ./osducs        # macOS
 sha256sum ./osducs            # Linux
 ```
 
-Until the binaries are signed, that hash is the only evidence a downloaded file is the one we
-published.
+That catches a truncated download, a corrupted extract, or the wrong version — the file not
+matching the release entry. It is not proof of origin: the checksum is published beside the
+asset, so whoever could replace one could replace the other. Establishing origin needs a
+signature, and the binaries are not signed yet.
 
 The command is `osducs`, not `osdu`, so it sits alongside the Python
 [`osducli`](https://community.opengroup.org/osdu/platform/data-flow/data-loading/osdu-cli)
