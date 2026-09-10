@@ -37,9 +37,9 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - { os: ubuntu-latest, rid: linux-x64, archive: tar.gz }
-          - { os: windows-latest, rid: win-x64, archive: zip }
-          - { os: macos-latest, rid: osx-arm64, archive: tar.gz }
+          - { os: ubuntu-latest, rid: linux-x64, archive: tar.gz, bin: osducs }
+          - { os: windows-latest, rid: win-x64, archive: zip, bin: osducs.exe }
+          - { os: macos-latest, rid: osx-arm64, archive: tar.gz, bin: osducs }
     runs-on: ${{ matrix.os }}
     permissions:
       contents: write # Required to attach assets to the release
@@ -90,6 +90,25 @@ jobs:
         run: Compress-Archive -Path src/OsduCli/publish/osducs.exe -DestinationPath osducs-${{ matrix.rid }}.zip
         shell: pwsh
 
+      # The binaries are unsigned, so a hash is the only way someone who has downloaded one
+      # can tell it is ours. Both are recorded: the archive's, and the binary's inside it —
+      # the latter because that is what a Windows audit reports, and comparing it meant
+      # rebuilding the archive by hand until now.
+      - name: Checksums
+        shell: bash
+        run: |
+          archive="osducs-${{ matrix.rid }}.${{ matrix.archive }}"
+          bin="${{ matrix.bin }}"
+          # sha256sum on Linux and Git Bash, shasum on macOS. Neither is on all three.
+          sha256() {
+            if command -v sha256sum >/dev/null 2>&1; then sha256sum "$1"; else shasum -a 256 "$1"; fi
+          }
+          {
+            printf '%s  %s\n' "$(sha256 "$archive" | cut -d' ' -f1)" "$archive"
+            printf '%s  %s\n' "$(sha256 "src/OsduCli/publish/$bin" | cut -d' ' -f1)" "$bin"
+          } > "$archive.sha256"
+          cat "$archive.sha256"
+
       # equinor/ops-actions exposes `path_tag_names` — a JSON object of path -> tag — and
       # no plain `tag_name`. Reading the wrong key gave an empty tag and a "release not
       # found" upload against a release that had just been created successfully.
@@ -110,7 +129,10 @@ jobs:
 
       - name: Attach to release
         shell: bash
-        run: gh release upload "${TAG}" osducs-${{ matrix.rid }}.${{ matrix.archive }} --clobber
+        run: |
+          gh release upload "${TAG}" \
+            "osducs-${{ matrix.rid }}.${{ matrix.archive }}" \
+            "osducs-${{ matrix.rid }}.${{ matrix.archive }}.sha256" --clobber
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           TAG: ${{ steps.release.outputs.tag }}
