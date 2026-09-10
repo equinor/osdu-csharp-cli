@@ -27,14 +27,36 @@ xattr -d com.apple.quarantine ./osducs
 `osducs-linux-x64.tar.gz` and `osducs-win-x64.zip` are the other two. Around 30 MB
 compressed; nothing else is needed, since the .NET runtime is inside the binary.
 
-On Windows, the download carries a `Zone.Identifier` stream — the Mark of the Web — which is
-what SmartScreen reacts to. Clearing it needs no administrator:
+### Windows
+
+The download carries a `Zone.Identifier` stream — the Mark of the Web — which is what
+SmartScreen reacts to. Clearing it needs no administrator:
 
 ```powershell
 Unblock-File .\osducs.exe    # or tick Unblock in the file's Properties dialog
+.\osducs --version           # note the .\ — see below
 ```
 
 Unblocking the `.zip` before extracting saves doing it per file.
+
+The leading `.\` is not optional. PowerShell does not run programs from the current directory,
+so a bare `osducs` reports `CommandNotFoundException` even though the file is right there. That
+is PowerShell's rule about the current directory, not anything about this binary or about it
+being unsigned.
+
+To use it as `osducs` from anywhere, put its directory on your user PATH — no administrator,
+and it applies to shells opened afterwards:
+
+```powershell
+$dir  = "C:\Appl\osducs-win-x64"
+$user = [Environment]::GetEnvironmentVariable("Path", "User")
+if ($user -notlike "*$dir*") {
+    [Environment]::SetEnvironmentVariable("Path", "$user;$dir".Trim(';'), "User")
+}
+```
+
+On macOS and Linux the equivalent is somewhere already on `PATH`, such as
+`~/.local/bin/osducs`.
 
 ### Checking a download is ours
 
