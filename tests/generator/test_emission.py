@@ -101,6 +101,17 @@ CASES = {
                     "total-from": "totalCount", "columns": {"Id": "id"}}},
         operation(body={"$ref": "#/components/schemas/QueryRequest"}),
     ),
+    # Fixed values are written before the option-driven fields, including through a nested
+    # parent, and never behind a guard: they are sent on every call.
+    "body_with_fixed_values": (
+        {"command": "record aggregate", "summary": "Count values.",
+         "op": {"method": "post", "path": "/query"},
+         "body": {"fixed": {"limit": 1, "spatialFilter.field": "data.Location"},
+                  "fields": {
+                      "kind": {"flag": "--kind", "required": True, "help": "Kind."}}},
+         "output": {"root": "aggregations", "columns": {"Value": "key", "Count": "count"}}},
+        operation(body={"$ref": "#/components/schemas/QueryRequest"}),
+    ),
     "parts_and_validators": (
         {"command": "record geo", "summary": "Spatial search.",
          "op": {"method": "post", "path": "/query"},

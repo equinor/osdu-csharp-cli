@@ -396,7 +396,7 @@ commands as mapped above, or ~6 for the parts anyone uses.
 | `entitlements mygroups` | `group list` |
 | `legal listtags` | `legaltag list` |
 | `search kind|id|query` | `search` |
-| `list` | `record list --count` or dropped |
+| `list records` | `record aggregate --kind '*:*:*:*' --by kind` |
 | `crs areas|summary|transforms` | `crs points-in-aou`, `crs transformation list` |
 | `workflow runs` | `workflow run list` |
 
@@ -519,6 +519,27 @@ body:
 produces `{"sort":{"field":["id"],"order":["DESC"]}}`. The schema is resolved through the
 dots too, so `sort.order` still inherits its `ASC`/`DESC` enum from `SortQuery` two levels
 down and the CLI rejects anything else locally.
+
+## `fixed` body values
+
+A value the command always sends, which no option can change:
+
+```yaml
+body:
+  fixed:
+    limit: 1
+  fields:
+    kind: { flag: --kind, required: true }
+```
+
+`record aggregate` is the case. The Search query behind it returns records as well as the
+counts, ten by default, and the table discards them. `limit: 1` is the least the service
+honours — it reads `limit: 0` as "not given" and sends ten anyway, whatever the spec's
+`minimum: 0` says.
+
+The generator checks each value against the body schema: the name must be a property of the
+request body, the value a single one of the spec's type, and not also exposed as an option.
+A misspelt key would otherwise be sent as an unknown property the service silently ignores.
 
 ## Enum casing
 

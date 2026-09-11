@@ -145,6 +145,12 @@ commands:
     summary: Count distinct values of a field across matching records.
     op: { method: post, path: /query }
     body:
+      # The same query also returns records — ten unless told otherwise — and the table
+      # discards them. One is the least the service will send: it reads `limit: 0` as "not
+      # given" and returns ten, despite the spec's `minimum: 0`. The Python CLI's
+      # `osdu list records` sent `limit: 1` for the same reason.
+      fixed:
+        limit: 1
       fields:
         kind:
           flag: --kind

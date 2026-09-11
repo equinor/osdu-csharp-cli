@@ -141,3 +141,65 @@ class TestParamValidation:
         # The CLI is allowed to be the stricter of the two; only the reverse is a lie.
         entry = base(params={"recordId": {"flag": "--record-id", "required": True}})
         assert build(entry).params[0].required
+
+
+class TestFixedBodyValues:
+    """`body: fixed:` — values sent on every call that no option can change."""
+
+    FIXED_SPEC = {"components": {"schemas": {
+        "QueryRequest": {"properties": {
+            "kind": {"type": "string"},
+            "limit": {"type": "integer"},
+            "trackTotalCount": {"type": "boolean"},
+            "sort": {"$ref": "#/components/schemas/SortQuery"},
+        }},
+        "SortQuery": {"properties": {"field": {"type": "string"}}},
+    }}}
+
+    def entry(self, fixed, fields=None, **body):
+        return {"command": "record aggregate", "op": {"method": "post", "path": "/query"},
+                "body": {**body, "fixed": fixed,
+                         **({"fields": fields} if fields is not None else {})},
+                "output": "raw"}
+
+    def build(self, entry):
+        return build_command(entry, BODY_OPERATION, "here", "Models", self.FIXED_SPEC)
+
+    KIND = {"kind": {"flag": "--kind", "required": True}}
+
+    def test_a_valid_value_is_carried_onto_the_body(self):
+        body = self.build(self.entry({"limit": 1}, self.KIND)).body
+        assert body.fixed == [("limit", 1)]
+
+    def test_a_dotted_name_reaches_the_nested_schema(self):
+        body = self.build(self.entry({"sort.field": "id"}, self.KIND)).body
+        assert body.fixed == [("sort.field", "id")]
+
+    def test_a_name_the_body_does_not_have_is_rejected(self):
+        # The case worth the check: a typo would otherwise ship as a property the service
+        # ignores, and the command would quietly not do what the manifest says.
+        with pytest.raises(ManifestError, match="not a property"):
+            self.build(self.entry({"limt": 1}, self.KIND))
+
+    def test_a_value_cannot_also_be_an_option(self):
+        with pytest.raises(ManifestError, match="both fixed and an option"):
+            self.build(self.entry({"kind": "x"}, self.KIND))
+
+    def test_a_body_read_from_a_file_cannot_have_fixed_values(self):
+        with pytest.raises(ManifestError, match="needs `fields:`"):
+            self.build(self.entry({"limit": 1}, flag="--file"))
+
+    @pytest.mark.parametrize("value", ["1", True, 1.5])
+    def test_the_value_must_match_the_spec_type(self, value):
+        # True is the subtle one: Python treats it as an int, the spec does not.
+        with pytest.raises(ManifestError, match="`integer` in the spec"):
+            self.build(self.entry({"limit": value}, self.KIND))
+
+    def test_a_boolean_field_takes_a_boolean(self):
+        body = self.build(self.entry({"trackTotalCount": False}, self.KIND)).body
+        assert body.fixed == [("trackTotalCount", False)]
+
+    @pytest.mark.parametrize("value", [[1], {"a": 1}, None])
+    def test_the_value_must_be_a_single_value(self, value):
+        with pytest.raises(ManifestError, match="single value"):
+            self.build(self.entry({"limit": value}, self.KIND))

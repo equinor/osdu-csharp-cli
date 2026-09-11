@@ -214,6 +214,28 @@ def pascal(name: str) -> str:
     return "".join(p[:1].upper() + p[1:] for p in parts)
 
 
+def csharp_literal(value: object) -> str:
+    """A scalar from a manifest as a C# literal. Checked for bool first: it is an int too."""
+    if isinstance(value, bool):
+        return "true" if value else "false"
+    if isinstance(value, (int, float)):
+        return repr(value)
+    return csharp_string(str(value))
+
+
+def body_slot(dotted_name: str) -> str:
+    """The C# indexer that writes ``dotted_name`` into ``bodyNode``, creating parents.
+
+    ``sort.order`` becomes ``CliContext.Child(bodyNode, "sort")["order"]``. One place for
+    it, because flag fields, ``parts`` and fixed values all write the same way.
+    """
+    *parents, leaf = dotted_name.split(".")
+    target = "bodyNode"
+    for parent in parents:
+        target = f"CliContext.Child({target}, {csharp_string(parent)})"
+    return f"{target}[{csharp_string(leaf)}]"
+
+
 def csharp_string(value: str) -> str:
     return '"' + value.replace("\\", "\\\\").replace('"', '\\"').replace("\n", " ").strip() + '"'
 
@@ -518,6 +540,8 @@ class Body:
     collection: bool
     wrap_single: bool
     fields: list[BodyField] = field(default_factory=list)
+    # Values the command always sends and no option can change: (dotted name, value).
+    fixed: list[tuple[str, object]] = field(default_factory=list)
     var: str = "fileOption"
 
     @property
@@ -625,7 +649,7 @@ MANIFEST_KEYS = {
     "op": {"method", "path"},
     "param": {"flag", "short", "required", "help", "type"},
     "body": {"flag", "short", "required", "help", "model", "collection", "wrap-single",
-             "fields"},
+             "fields", "fixed"},
     "body field": {"flag", "short", "required", "help", "type", "parts"},
     "output": {"root", "columns", "columns-from", "total-from", "cursor-from", "message"},
     "example": {"args", "skip"},
@@ -861,6 +885,53 @@ def resolve_ref(node: dict, spec: dict, depth: int = 0) -> dict:
     return node or {}
 
 
+def fixed_body_values(fixed_cfg, fields_cfg: dict, field_schemas: dict, spec: dict,
+                      where: str) -> list[tuple[str, object]]:
+    """Body values a command always sends, which no option can change.
+
+    ``record aggregate`` wants counts, not records, but the Search query behind it also
+    returns ten records by default, which the table then throws away. ``limit: 1`` cuts
+    that to one — the smallest the service honours, since it reads ``0`` as "not given"
+    and returns ten, whatever the spec's ``minimum: 0`` says.
+
+    Every value is checked against the body schema, because a misspelt key here would
+    otherwise be sent as an unknown property the service silently ignores.
+    """
+    if not fixed_cfg:
+        return []
+    if not isinstance(fixed_cfg, dict):
+        raise ManifestError(f"{where}: body `fixed:` must map field names to values")
+    if not fields_cfg:
+        raise ManifestError(
+            f"{where}: body `fixed:` needs `fields:`. A body read from a file carries its "
+            f"own values.")
+
+    kinds = {"integer": int, "number": (int, float), "boolean": bool, "string": str}
+    fixed = []
+    for name, value in fixed_cfg.items():
+        if name in fields_cfg:
+            raise ManifestError(
+                f"{where}: body field {name!r} is both fixed and an option. A fixed value "
+                f"cannot also be the caller's to choose.")
+        schema = resolve_field_schema(field_schemas, name, spec)
+        if not schema:
+            raise ManifestError(
+                f"{where}: fixed body field {name!r} is not a property of the request body.")
+        if value is None or isinstance(value, (list, dict)):
+            raise ManifestError(
+                f"{where}: fixed body field {name!r} must be a single value, "
+                f"not {type(value).__name__}.")
+        expected = kinds.get(schema.get("type"))
+        # bool is an int in Python, so it has to be ruled out for the numeric types by hand.
+        if expected is not None and (not isinstance(value, expected)
+                                     or (isinstance(value, bool) and expected is not bool)):
+            raise ManifestError(
+                f"{where}: fixed body field {name!r} is `{schema['type']}` in the spec, but "
+                f"the manifest gives {value!r}.")
+        fixed.append((name, value))
+    return fixed
+
+
 def build_command(entry: dict, operation: dict, where: str, models_root: str,
                   spec: dict) -> Command:
     check_keys("command", entry, where)
@@ -977,6 +1048,9 @@ def build_command(entry: dict, operation: dict, where: str, models_root: str,
                 parts=[str(part) for part in (field_cfg.get("parts") or [])],
             ))
 
+        fixed = fixed_body_values(body_cfg.get("fixed"), fields_cfg, field_schemas, spec,
+                                  where)
+
         body = Body(
             flag=body_cfg.get("flag", ""),
             short=body_cfg.get("short"),
@@ -986,6 +1060,7 @@ def build_command(entry: dict, operation: dict, where: str, models_root: str,
             collection=body_cfg.get("collection", collection),
             wrap_single=bool(body_cfg.get("wrap-single", False)),
             fields=fields,
+            fixed=fixed,
         )
 
     # `require-one-of` names params of which at least one must be supplied. The spec cannot
@@ -1267,6 +1342,9 @@ def emit_command(service: Service, command: Command) -> list[str]:
             # put through the same Kiota deserialiser as a file body, so the request is
             # identical either way and the model stays the single source of truth for shape.
             lines.append("            var bodyNode = new JsonObject();")
+            for name, value in command.body.fixed:
+                lines.append(f"            {body_slot(name)} = "
+                             f"JsonValue.Create({csharp_literal(value)});")
             for bodyfield in command.body.fields:
                 value = (f"parseResult.GetValue({bodyfield.option_var})"
                          f"{'!' if bodyfield.required and not bodyfield.is_value_type else ''}")
@@ -1279,11 +1357,7 @@ def emit_command(service: Service, command: Command) -> list[str]:
                     lines.append(f"            if ({bodyfield.var} is {{ Length: > 0 }})")
                     lines.append("            {")
                     for index, path in enumerate(bodyfield.parts):
-                        *parents, leaf = path.split(".")
-                        target = "bodyNode"
-                        for parent in parents:
-                            target = f"CliContext.Child({target}, {csharp_string(parent)})"
-                        lines.append(f"                {target}[{csharp_string(leaf)}] = "
+                        lines.append(f"                {body_slot(path)} = "
                                      f"JsonValue.Create({bodyfield.var}[{index}]);")
                     lines.append("            }")
                     continue
@@ -1293,14 +1367,7 @@ def emit_command(service: Service, command: Command) -> list[str]:
                               f".Select(item => (JsonNode)JsonValue.Create(item)!).ToArray())")
                 else:
                     assign = f"JsonValue.Create({bodyfield.var})"
-                if "." in bodyfield.name:
-                    *parents, leaf = bodyfield.name.split(".")
-                    target = "bodyNode"
-                    for parent in parents:
-                        target = f"CliContext.Child({target}, {csharp_string(parent)})"
-                    slot = f"{target}[{csharp_string(leaf)}]"
-                else:
-                    slot = f"bodyNode[{csharp_string(bodyfield.name)}]"
+                slot = body_slot(bodyfield.name)
 
                 if bodyfield.required:
                     lines.append(f"            {slot} = {assign};")
