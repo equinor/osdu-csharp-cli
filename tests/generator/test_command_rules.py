@@ -152,6 +152,9 @@ class TestFixedBodyValues:
             "limit": {"type": "integer"},
             "trackTotalCount": {"type": "boolean"},
             "sort": {"$ref": "#/components/schemas/SortQuery"},
+            "score": {"type": "number"},
+            "offset": {"anyOf": [{"type": "integer"}, {"type": "null"}]},
+            "order": {"type": "string", "enum": ["ASC", "DESC"]},
         }},
         "SortQuery": {"properties": {"field": {"type": "string"}}},
     }}}
@@ -182,8 +185,48 @@ class TestFixedBodyValues:
             self.build(self.entry({"limt": 1}, self.KIND))
 
     def test_a_value_cannot_also_be_an_option(self):
-        with pytest.raises(ManifestError, match="both fixed and an option"):
+        with pytest.raises(ManifestError, match="collides with 'kind'"):
             self.build(self.entry({"kind": "x"}, self.KIND))
+
+    def test_a_value_under_an_option_is_rejected(self):
+        # The emitter writes fixed values first, so an option on the parent replaces the
+        # whole object and the fixed child is never sent.
+        fields = {**self.KIND, "sort": {"flag": "--sort"}}
+        with pytest.raises(ManifestError, match="collides with 'sort'"):
+            self.build(self.entry({"sort.field": "id"}, fields))
+
+    def test_a_value_on_a_path_an_option_spreads_to_is_rejected(self):
+        # `parts` writes to paths other than the option's own name, so those count too.
+        fields = {**self.KIND, "box": {"flag": "--box", "type": "double[]",
+                                       "parts": ["sort.field"]}}
+        with pytest.raises(ManifestError, match="collides with 'sort.field'"):
+            self.build(self.entry({"sort.field": "id"}, fields))
+
+    @pytest.mark.parametrize("declared", [None, [], False, "", {}])
+    def test_a_declared_fixed_must_hold_something(self, declared):
+        # Read as absence, each of these would pass review looking like a deliberate choice.
+        with pytest.raises(ManifestError, match="at least one field name"):
+            self.build(self.entry(declared, self.KIND))
+
+    @pytest.mark.parametrize("value", [float("nan"), float("inf"), float("-inf")])
+    def test_a_number_must_be_finite(self, value):
+        # YAML reads `.nan` and `.inf` as floats; neither has a C# literal to emit.
+        with pytest.raises(ManifestError, match="not a finite number"):
+            self.build(self.entry({"score": value}, self.KIND))
+
+    def test_a_nullable_wrapper_is_seen_through(self):
+        with pytest.raises(ManifestError, match="`integer` in the spec"):
+            self.build(self.entry({"offset": "1"}, self.KIND))
+        assert self.build(self.entry({"offset": 1}, self.KIND)).body.fixed == [("offset", 1)]
+
+    def test_an_object_field_cannot_be_fixed(self):
+        with pytest.raises(ManifestError, match="string, integer, number and boolean"):
+            self.build(self.entry({"sort": "x"}, self.KIND))
+
+    def test_an_enum_value_must_be_one_the_spec_allows(self):
+        with pytest.raises(ManifestError, match="must be one of"):
+            self.build(self.entry({"order": "UP"}, self.KIND))
+        assert self.build(self.entry({"order": "ASC"}, self.KIND)).body.fixed == [("order", "ASC")]
 
     def test_a_body_read_from_a_file_cannot_have_fixed_values(self):
         with pytest.raises(ManifestError, match="needs `fields:`"):

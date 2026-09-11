@@ -537,9 +537,18 @@ counts, ten by default, and the table discards them. `limit: 1` is the least the
 honours — it reads `limit: 0` as "not given" and sends ten anyway, whatever the spec's
 `minimum: 0` says.
 
-The generator checks each value against the body schema: the name must be a property of the
-request body, the value a single one of the spec's type, and not also exposed as an option.
-A misspelt key would otherwise be sent as an unknown property the service silently ignores.
+A fixed value is only worth having if it is sent as written, so the generator refuses each
+way it might not be:
+
+- a name the request body does not have — it would ship as a property the service ignores;
+- a value of the wrong type, outside the field's `enum`, or a non-finite number like `.nan`,
+  which has no literal to send. Types are read through nullable `anyOf` wrappers and `$ref`s,
+  and only string, integer, number and boolean fields can be fixed;
+- a path that any option also writes — the same field, a parent or a child, including the
+  paths an option's `parts` spread across. Fixed values are written first, so the option
+  would replace them;
+- a `fixed:` that is present but empty, or not a mapping, which would do nothing while
+  looking deliberate.
 
 ## Enum casing
 

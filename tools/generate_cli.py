@@ -20,6 +20,7 @@ from __future__ import annotations
 import argparse
 import fnmatch
 import json
+import math
 import os
 import re
 import sys
@@ -885,7 +886,15 @@ def resolve_ref(node: dict, spec: dict, depth: int = 0) -> dict:
     return node or {}
 
 
-def fixed_body_values(fixed_cfg, fields_cfg: dict, field_schemas: dict, spec: dict,
+def paths_overlap(first: str, second: str) -> bool:
+    """True when two dotted body paths are the same, or one contains the other."""
+    return first == second or first.startswith(second + ".") or second.startswith(first + ".")
+
+
+FIXED_SCALAR_TYPES = {"integer": int, "number": (int, float), "boolean": bool, "string": str}
+
+
+def fixed_body_values(body_cfg: dict, fields_cfg: dict, field_schemas: dict, spec: dict,
                       where: str) -> list[tuple[str, object]]:
     """Body values a command always sends, which no option can change.
 
@@ -894,40 +903,72 @@ def fixed_body_values(fixed_cfg, fields_cfg: dict, field_schemas: dict, spec: di
     that to one — the smallest the service honours, since it reads ``0`` as "not given"
     and returns ten, whatever the spec's ``minimum: 0`` says.
 
-    Every value is checked against the body schema, because a misspelt key here would
-    otherwise be sent as an unknown property the service silently ignores.
+    A fixed value is only as good as the guarantee that it is sent as written, so each is
+    checked for the ways it could silently not be: a name the body does not have, a value of
+    the wrong type or outside its enum, a number with no literal, and an option that would
+    overwrite it.
     """
-    if not fixed_cfg:
+    if "fixed" not in body_cfg:
         return []
-    if not isinstance(fixed_cfg, dict):
-        raise ManifestError(f"{where}: body `fixed:` must map field names to values")
+    fixed_cfg = body_cfg["fixed"]
+    # Present but empty, or not a mapping at all, is a declaration that does nothing. Reading
+    # it as absence would let `fixed: []` or a bare `fixed:` pass review looking deliberate.
+    if not isinstance(fixed_cfg, dict) or not fixed_cfg:
+        raise ManifestError(
+            f"{where}: body `fixed:` must map at least one field name to a value, "
+            f"not {fixed_cfg!r}.")
     if not fields_cfg:
         raise ManifestError(
             f"{where}: body `fixed:` needs `fields:`. A body read from a file carries its "
             f"own values.")
 
-    kinds = {"integer": int, "number": (int, float), "boolean": bool, "string": str}
+    # Every path an option writes to: its own name, or each path its `parts` spread across.
+    written = [path for name, cfg in fields_cfg.items()
+               for path in ((cfg or {}).get("parts") or [name])]
+
     fixed = []
     for name, value in fixed_cfg.items():
-        if name in fields_cfg:
-            raise ManifestError(
-                f"{where}: body field {name!r} is both fixed and an option. A fixed value "
-                f"cannot also be the caller's to choose.")
-        schema = resolve_field_schema(field_schemas, name, spec)
-        if not schema:
+        # Exact, parent or child: whichever is written second replaces the other, and the
+        # emitter writes fixed values first, so the option would win and drop the value.
+        for path in written:
+            if paths_overlap(name, path):
+                raise ManifestError(
+                    f"{where}: fixed body field {name!r} collides with {path!r}, which an "
+                    f"option writes. One would replace the other, so the fixed value could "
+                    f"not be relied on to be sent.")
+        raw = resolve_field_schema(field_schemas, name, spec)
+        if not raw:
             raise ManifestError(
                 f"{where}: fixed body field {name!r} is not a property of the request body.")
         if value is None or isinstance(value, (list, dict)):
             raise ManifestError(
                 f"{where}: fixed body field {name!r} must be a single value, "
                 f"not {type(value).__name__}.")
-        expected = kinds.get(schema.get("type"))
-        # bool is an int in Python, so it has to be ruled out for the numeric types by hand.
-        if expected is not None and (not isinstance(value, expected)
-                                     or (isinstance(value, bool) and expected is not bool)):
+
+        # Seen through a nullable anyOf and a $ref, the same as parameters are, so a wrapped
+        # integer is held to being an integer rather than escaping the check altogether.
+        schema = normalise_schema(raw, spec)
+        kind = schema.get("type")
+        expected = FIXED_SCALAR_TYPES.get(kind)
+        if expected is None:
+            described = f"`{kind}`" if kind else "not a single scalar type"
             raise ManifestError(
-                f"{where}: fixed body field {name!r} is `{schema['type']}` in the spec, but "
-                f"the manifest gives {value!r}.")
+                f"{where}: fixed body field {name!r} is {described} in the spec. Fixed values "
+                f"support string, integer, number and boolean fields only.")
+        # bool is an int in Python, so it has to be ruled out for the numeric types by hand.
+        if not isinstance(value, expected) or (isinstance(value, bool) and expected is not bool):
+            raise ManifestError(
+                f"{where}: fixed body field {name!r} is `{kind}` in the spec, but the "
+                f"manifest gives {value!r}.")
+        # YAML reads `.nan` and `.inf` as floats. Neither has a C# or a JSON literal.
+        if isinstance(value, float) and not math.isfinite(value):
+            raise ManifestError(
+                f"{where}: fixed body field {name!r} is {value!r}, which is not a finite "
+                f"number and has no literal to send.")
+        if (allowed := schema.get("enum")) and value not in allowed:
+            raise ManifestError(
+                f"{where}: fixed body field {name!r} must be one of {allowed}, "
+                f"not {value!r}.")
         fixed.append((name, value))
     return fixed
 
@@ -1048,8 +1089,7 @@ def build_command(entry: dict, operation: dict, where: str, models_root: str,
                 parts=[str(part) for part in (field_cfg.get("parts") or [])],
             ))
 
-        fixed = fixed_body_values(body_cfg.get("fixed"), fields_cfg, field_schemas, spec,
-                                  where)
+        fixed = fixed_body_values(body_cfg, fields_cfg, field_schemas, spec, where)
 
         body = Body(
             flag=body_cfg.get("flag", ""),
