@@ -50,7 +50,9 @@ and it applies to shells opened afterwards:
 ```powershell
 $dir  = "C:\Appl\osducs-win-x64"
 $user = [Environment]::GetEnvironmentVariable("Path", "User")
-if ($user -notlike "*$dir*") {
+# Whole entries, not a substring match — "*$dir*" would also match ...\osducs-win-x64-old
+$have = @("$user" -split ';' | ForEach-Object { $_.TrimEnd('\') })
+if ($have -notcontains $dir.TrimEnd('\')) {
     [Environment]::SetEnvironmentVariable("Path", "$user;$dir".Trim(';'), "User")
 }
 ```

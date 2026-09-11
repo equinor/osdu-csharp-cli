@@ -90,9 +90,11 @@ jobs:
         run: Compress-Archive -Path src/OsduCli/publish/osducs.exe -DestinationPath osducs-${{ matrix.rid }}.zip
         shell: pwsh
 
-      # The binaries are unsigned, so a hash is the only way someone who has downloaded one
-      # can tell it is ours. Both are recorded: the archive's, and the binary's inside it —
-      # the latter because that is what a Windows audit reports, and comparing it meant
+      # Lets someone who has downloaded a binary check it matches this release entry: not
+      # truncated, not corrupted, not another version. It does not show the file came from
+      # us — whoever could replace the asset could replace this beside it — which needs a
+      # signature. Both hashes are recorded: the archive's, and the binary's inside it, the
+      # latter because that is what a Windows audit reports, and comparing it meant
       # rebuilding the archive by hand until now.
       - name: Checksums
         shell: bash
