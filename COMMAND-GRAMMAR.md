@@ -396,7 +396,7 @@ commands as mapped above, or ~6 for the parts anyone uses.
 | `entitlements mygroups` | `group list` |
 | `legal listtags` | `legaltag list` |
 | `search kind|id|query` | `search` |
-| `list` | `record list --count` or dropped |
+| `list records` | `record aggregate --kind '*:*:*:*' --by kind` |
 | `crs areas|summary|transforms` | `crs points-in-aou`, `crs transformation list` |
 | `workflow runs` | `workflow run list` |
 
@@ -519,6 +519,41 @@ body:
 produces `{"sort":{"field":["id"],"order":["DESC"]}}`. The schema is resolved through the
 dots too, so `sort.order` still inherits its `ASC`/`DESC` enum from `SortQuery` two levels
 down and the CLI rejects anything else locally.
+
+## `fixed` body values
+
+A value the command always sends, which no option can change:
+
+```yaml
+body:
+  fixed:
+    limit: 1
+  fields:
+    kind: { flag: --kind, required: true }
+```
+
+`record aggregate` is the case. The Search query behind it returns records as well as the
+counts, ten by default, and the table discards them. `limit: 1` is the least the service
+honours — it reads `limit: 0` as "not given" and sends ten anyway, whatever the spec's
+`minimum: 0` says.
+
+A fixed value is only worth having if it is sent as written, so the generator refuses each
+way it might not be:
+
+- a name the request body does not have — it would ship as a property the service ignores;
+- a value of the wrong type, outside the field's `enum`, or a non-finite number like `.nan`,
+  which has no literal to send. Types are read through nullable `anyOf` wrappers and `$ref`s,
+  and only string, integer, number and boolean fields can be fixed;
+- an integer outside the type the client deserialises it into — `int`, or `long` for
+  `format: int64` — which would fail at run time even where the literal compiled;
+- a path that any option also writes — the same field, a parent or a child, including the
+  paths an option's `parts` spread across. Fixed values are written first, so the option
+  would replace them;
+- a `fixed:` that is present but empty, or not a mapping, which would do nothing while
+  looking deliberate.
+
+Strings are emitted exactly, whitespace and control characters included — not through the
+tidying used for help text, which trims and folds newlines.
 
 ## Enum casing
 

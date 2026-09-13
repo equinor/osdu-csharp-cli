@@ -141,3 +141,132 @@ class TestParamValidation:
         # The CLI is allowed to be the stricter of the two; only the reverse is a lie.
         entry = base(params={"recordId": {"flag": "--record-id", "required": True}})
         assert build(entry).params[0].required
+
+
+class TestFixedBodyValues:
+    """`body: fixed:` — values sent on every call that no option can change."""
+
+    FIXED_SPEC = {"components": {"schemas": {
+        "QueryRequest": {"properties": {
+            "kind": {"type": "string"},
+            "limit": {"type": "integer"},
+            "trackTotalCount": {"type": "boolean"},
+            "sort": {"$ref": "#/components/schemas/SortQuery"},
+            "score": {"type": "number"},
+            "offset": {"anyOf": [{"type": "integer"}, {"type": "null"}]},
+            "version": {"type": "integer", "format": "int64"},
+            "order": {"type": "string", "enum": ["ASC", "DESC"]},
+        }},
+        "SortQuery": {"properties": {"field": {"type": "string"}}},
+    }}}
+
+    def entry(self, fixed, fields=None, **body):
+        return {"command": "record aggregate", "op": {"method": "post", "path": "/query"},
+                "body": {**body, "fixed": fixed,
+                         **({"fields": fields} if fields is not None else {})},
+                "output": "raw"}
+
+    def build(self, entry):
+        return build_command(entry, BODY_OPERATION, "here", "Models", self.FIXED_SPEC)
+
+    KIND = {"kind": {"flag": "--kind", "required": True}}
+
+    def test_a_valid_value_is_carried_onto_the_body(self):
+        body = self.build(self.entry({"limit": 1}, self.KIND)).body
+        assert body.fixed == [("limit", 1)]
+
+    def test_a_dotted_name_reaches_the_nested_schema(self):
+        body = self.build(self.entry({"sort.field": "id"}, self.KIND)).body
+        assert body.fixed == [("sort.field", "id")]
+
+    def test_a_name_the_body_does_not_have_is_rejected(self):
+        # The case worth the check: a typo would otherwise ship as a property the service
+        # ignores, and the command would quietly not do what the manifest says.
+        with pytest.raises(ManifestError, match="not a property"):
+            self.build(self.entry({"limt": 1}, self.KIND))
+
+    def test_a_value_cannot_also_be_an_option(self):
+        with pytest.raises(ManifestError, match="collides with 'kind'"):
+            self.build(self.entry({"kind": "x"}, self.KIND))
+
+    def test_a_value_under_an_option_is_rejected(self):
+        # The emitter writes fixed values first, so an option on the parent replaces the
+        # whole object and the fixed child is never sent.
+        fields = {**self.KIND, "sort": {"flag": "--sort"}}
+        with pytest.raises(ManifestError, match="collides with 'sort'"):
+            self.build(self.entry({"sort.field": "id"}, fields))
+
+    def test_a_value_on_a_path_an_option_spreads_to_is_rejected(self):
+        # `parts` writes to paths other than the option's own name, so those count too.
+        fields = {**self.KIND, "box": {"flag": "--box", "type": "double[]",
+                                       "parts": ["sort.field"]}}
+        with pytest.raises(ManifestError, match="collides with 'sort.field'"):
+            self.build(self.entry({"sort.field": "id"}, fields))
+
+    @pytest.mark.parametrize("declared", [None, [], False, "", {}])
+    def test_a_declared_fixed_must_hold_something(self, declared):
+        # Read as absence, each of these would pass review looking like a deliberate choice.
+        with pytest.raises(ManifestError, match="at least one field name"):
+            self.build(self.entry(declared, self.KIND))
+
+    @pytest.mark.parametrize("value", [float("nan"), float("inf"), float("-inf")])
+    def test_a_number_must_be_finite(self, value):
+        # YAML reads `.nan` and `.inf` as floats; neither has a C# literal to emit.
+        with pytest.raises(ManifestError, match="not a finite number"):
+            self.build(self.entry({"score": value}, self.KIND))
+
+    def test_a_nullable_wrapper_is_seen_through(self):
+        with pytest.raises(ManifestError, match="`integer` in the spec"):
+            self.build(self.entry({"offset": "1"}, self.KIND))
+        assert self.build(self.entry({"offset": 1}, self.KIND)).body.fixed == [("offset", 1)]
+
+    def test_an_object_field_cannot_be_fixed(self):
+        with pytest.raises(ManifestError, match="string, integer, number and boolean"):
+            self.build(self.entry({"sort": "x"}, self.KIND))
+
+    def test_an_enum_value_must_be_one_the_spec_allows(self):
+        with pytest.raises(ManifestError, match="must be one of"):
+            self.build(self.entry({"order": "UP"}, self.KIND))
+        assert self.build(self.entry({"order": "ASC"}, self.KIND)).body.fixed == [("order", "ASC")]
+
+    def test_a_body_read_from_a_file_cannot_have_fixed_values(self):
+        with pytest.raises(ManifestError, match="needs `fields:`"):
+            self.build(self.entry({"limit": 1}, flag="--file"))
+
+    @pytest.mark.parametrize("value", ["1", True, 1.5])
+    def test_the_value_must_match_the_spec_type(self, value):
+        # True is the subtle one: Python treats it as an int, the spec does not.
+        with pytest.raises(ManifestError, match="`integer` in the spec"):
+            self.build(self.entry({"limit": value}, self.KIND))
+
+    def test_a_boolean_field_takes_a_boolean(self):
+        body = self.build(self.entry({"trackTotalCount": False}, self.KIND)).body
+        assert body.fixed == [("trackTotalCount", False)]
+
+    @pytest.mark.parametrize("value", [[1], {"a": 1}, None])
+    def test_the_value_must_be_a_single_value(self, value):
+        with pytest.raises(ManifestError, match="single value"):
+            self.build(self.entry({"limit": value}, self.KIND))
+
+    @pytest.mark.parametrize("value", [2**31 - 1, -2**31])
+    def test_an_integer_at_the_int32_bounds_is_accepted(self, value):
+        assert self.build(self.entry({"limit": value}, self.KIND)).body.fixed == [("limit", value)]
+
+    @pytest.mark.parametrize("value", [2**31, -2**31 - 1, 10**100])
+    def test_an_integer_outside_int32_is_rejected(self, value):
+        # Kiota types an unformatted integer as `int?`, and the body is deserialised into
+        # that model before it is sent — so this fails at run time even where the literal
+        # would compile, and 10**100 has no C# literal at all.
+        with pytest.raises(ManifestError, match="outside `int`"):
+            self.build(self.entry({"limit": value}, self.KIND))
+
+    def test_an_int64_field_takes_the_long_range(self):
+        assert self.build(self.entry({"version": 2**40}, self.KIND)).body.fixed == [("version", 2**40)]
+        with pytest.raises(ManifestError, match="outside `long`"):
+            self.build(self.entry({"version": 2**63}, self.KIND))
+
+    def test_a_number_is_sent_as_a_double(self):
+        assert self.build(self.entry({"score": 2}, self.KIND)).body.fixed == [("score", 2.0)]
+        # Too large for a double: refused here, not left to a C# literal that cannot parse.
+        with pytest.raises(ManifestError, match="not a finite number"):
+            self.build(self.entry({"score": 10**400}, self.KIND))

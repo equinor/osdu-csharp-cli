@@ -20,6 +20,7 @@ from __future__ import annotations
 import argparse
 import fnmatch
 import json
+import math
 import os
 import re
 import sys
@@ -212,6 +213,40 @@ def camel(name: str) -> str:
 def pascal(name: str) -> str:
     parts = re.split(r"[_\-\s]+", name)
     return "".join(p[:1].upper() + p[1:] for p in parts)
+
+
+def csharp_literal(value: object) -> str:
+    """A validated scalar from a manifest as a C# literal that means exactly that value.
+
+    Not ``csharp_string``: that one is for help text and labels, and trims, folds newlines
+    into spaces and leaves carriage returns raw — fine for a description, wrong for a value
+    that must be sent as written. A JSON string literal is used instead, because every
+    escape JSON produces (``\\"``, ``\\\\``, ``\\b``, ``\\f``, ``\\n``, ``\\r``, ``\\t``, ``\\uXXXX``)
+    is also a C# escape, and ``ensure_ascii`` turns U+0085, U+2028 and U+2029 — which C#
+    counts as line breaks inside a literal — into ``\\u`` escapes too.
+
+    Numbers arrive range-checked by :func:`fixed_body_values`, so ``repr`` is a C# literal:
+    an ``int`` or ``long`` for integers and a finite double for numbers. Bool is checked
+    first because Python counts it as an int.
+    """
+    if isinstance(value, bool):
+        return "true" if value else "false"
+    if isinstance(value, (int, float)):
+        return repr(value)
+    return json.dumps(value)
+
+
+def body_slot(dotted_name: str) -> str:
+    """The C# indexer that writes ``dotted_name`` into ``bodyNode``, creating parents.
+
+    ``sort.order`` becomes ``CliContext.Child(bodyNode, "sort")["order"]``. One place for
+    it, because flag fields, ``parts`` and fixed values all write the same way.
+    """
+    *parents, leaf = dotted_name.split(".")
+    target = "bodyNode"
+    for parent in parents:
+        target = f"CliContext.Child({target}, {csharp_string(parent)})"
+    return f"{target}[{csharp_string(leaf)}]"
 
 
 def csharp_string(value: str) -> str:
@@ -518,6 +553,8 @@ class Body:
     collection: bool
     wrap_single: bool
     fields: list[BodyField] = field(default_factory=list)
+    # Values the command always sends and no option can change: (dotted name, value).
+    fixed: list[tuple[str, object]] = field(default_factory=list)
     var: str = "fileOption"
 
     @property
@@ -625,7 +662,7 @@ MANIFEST_KEYS = {
     "op": {"method", "path"},
     "param": {"flag", "short", "required", "help", "type"},
     "body": {"flag", "short", "required", "help", "model", "collection", "wrap-single",
-             "fields"},
+             "fields", "fixed"},
     "body field": {"flag", "short", "required", "help", "type", "parts"},
     "output": {"root", "columns", "columns-from", "total-from", "cursor-from", "message"},
     "example": {"args", "skip"},
@@ -861,6 +898,112 @@ def resolve_ref(node: dict, spec: dict, depth: int = 0) -> dict:
     return node or {}
 
 
+def paths_overlap(first: str, second: str) -> bool:
+    """True when two dotted body paths are the same, or one contains the other."""
+    return first == second or first.startswith(second + ".") or second.startswith(first + ".")
+
+
+FIXED_SCALAR_TYPES = {"integer": int, "number": (int, float), "boolean": bool, "string": str}
+
+# The C# type Kiota generates for an integer property, by format: `long?` for int64 and
+# `int?` for everything else. The body is deserialised into that model before it is sent,
+# so a value outside it fails at run time even when its literal would compile.
+INTEGER_RANGES = {"int64": ("long", -2**63, 2**63 - 1)}
+DEFAULT_INTEGER_RANGE = ("int", -2**31, 2**31 - 1)
+
+
+def fixed_body_values(body_cfg: dict, fields_cfg: dict, field_schemas: dict, spec: dict,
+                      where: str) -> list[tuple[str, object]]:
+    """Body values a command always sends, which no option can change.
+
+    ``record aggregate`` wants counts, not records, but the Search query behind it also
+    returns ten records by default, which the table then throws away. ``limit: 1`` cuts
+    that to one — the smallest the service honours, since it reads ``0`` as "not given"
+    and returns ten, whatever the spec's ``minimum: 0`` says.
+
+    A fixed value is only as good as the guarantee that it is sent as written, so each is
+    checked for the ways it could silently not be: a name the body does not have, a value of
+    the wrong type or outside its enum, a number with no literal, and an option that would
+    overwrite it.
+    """
+    if "fixed" not in body_cfg:
+        return []
+    fixed_cfg = body_cfg["fixed"]
+    # Present but empty, or not a mapping at all, is a declaration that does nothing. Reading
+    # it as absence would let `fixed: []` or a bare `fixed:` pass review looking deliberate.
+    if not isinstance(fixed_cfg, dict) or not fixed_cfg:
+        raise ManifestError(
+            f"{where}: body `fixed:` must map at least one field name to a value, "
+            f"not {fixed_cfg!r}.")
+    if not fields_cfg:
+        raise ManifestError(
+            f"{where}: body `fixed:` needs `fields:`. A body read from a file carries its "
+            f"own values.")
+
+    # Every path an option writes to: its own name, or each path its `parts` spread across.
+    written = [path for name, cfg in fields_cfg.items()
+               for path in ((cfg or {}).get("parts") or [name])]
+
+    fixed = []
+    for name, value in fixed_cfg.items():
+        # Exact, parent or child: whichever is written second replaces the other, and the
+        # emitter writes fixed values first, so the option would win and drop the value.
+        for path in written:
+            if paths_overlap(name, path):
+                raise ManifestError(
+                    f"{where}: fixed body field {name!r} collides with {path!r}, which an "
+                    f"option writes. One would replace the other, so the fixed value could "
+                    f"not be relied on to be sent.")
+        raw = resolve_field_schema(field_schemas, name, spec)
+        if not raw:
+            raise ManifestError(
+                f"{where}: fixed body field {name!r} is not a property of the request body.")
+        if value is None or isinstance(value, (list, dict)):
+            raise ManifestError(
+                f"{where}: fixed body field {name!r} must be a single value, "
+                f"not {type(value).__name__}.")
+
+        # Seen through a nullable anyOf and a $ref, the same as parameters are, so a wrapped
+        # integer is held to being an integer rather than escaping the check altogether.
+        schema = normalise_schema(raw, spec)
+        kind = schema.get("type")
+        expected = FIXED_SCALAR_TYPES.get(kind)
+        if expected is None:
+            described = f"`{kind}`" if kind else "not a single scalar type"
+            raise ManifestError(
+                f"{where}: fixed body field {name!r} is {described} in the spec. Fixed values "
+                f"support string, integer, number and boolean fields only.")
+        # bool is an int in Python, so it has to be ruled out for the numeric types by hand.
+        if not isinstance(value, expected) or (isinstance(value, bool) and expected is not bool):
+            raise ManifestError(
+                f"{where}: fixed body field {name!r} is `{kind}` in the spec, but the "
+                f"manifest gives {value!r}.")
+        if kind == "integer":
+            cs_type, low, high = INTEGER_RANGES.get(schema.get("format"), DEFAULT_INTEGER_RANGE)
+            if not low <= value <= high:
+                raise ManifestError(
+                    f"{where}: fixed body field {name!r} is {value}, outside `{cs_type}`, "
+                    f"the type the client deserialises it into ({low} to {high}).")
+        if kind == "number":
+            # A number is a double on the client, so it is sent as one. An integer too large
+            # for a double overflows here rather than as a literal C# cannot parse; YAML's
+            # `.nan` and `.inf` already are floats, and neither has a C# or JSON literal.
+            try:
+                value = float(value)
+            except OverflowError:
+                value = math.inf
+            if not math.isfinite(value):
+                raise ManifestError(
+                    f"{where}: fixed body field {name!r} is not a finite number and has no "
+                    f"literal to send.")
+        if (allowed := schema.get("enum")) and value not in allowed:
+            raise ManifestError(
+                f"{where}: fixed body field {name!r} must be one of {allowed}, "
+                f"not {value!r}.")
+        fixed.append((name, value))
+    return fixed
+
+
 def build_command(entry: dict, operation: dict, where: str, models_root: str,
                   spec: dict) -> Command:
     check_keys("command", entry, where)
@@ -977,6 +1120,8 @@ def build_command(entry: dict, operation: dict, where: str, models_root: str,
                 parts=[str(part) for part in (field_cfg.get("parts") or [])],
             ))
 
+        fixed = fixed_body_values(body_cfg, fields_cfg, field_schemas, spec, where)
+
         body = Body(
             flag=body_cfg.get("flag", ""),
             short=body_cfg.get("short"),
@@ -986,6 +1131,7 @@ def build_command(entry: dict, operation: dict, where: str, models_root: str,
             collection=body_cfg.get("collection", collection),
             wrap_single=bool(body_cfg.get("wrap-single", False)),
             fields=fields,
+            fixed=fixed,
         )
 
     # `require-one-of` names params of which at least one must be supplied. The spec cannot
@@ -1267,6 +1413,9 @@ def emit_command(service: Service, command: Command) -> list[str]:
             # put through the same Kiota deserialiser as a file body, so the request is
             # identical either way and the model stays the single source of truth for shape.
             lines.append("            var bodyNode = new JsonObject();")
+            for name, value in command.body.fixed:
+                lines.append(f"            {body_slot(name)} = "
+                             f"JsonValue.Create({csharp_literal(value)});")
             for bodyfield in command.body.fields:
                 value = (f"parseResult.GetValue({bodyfield.option_var})"
                          f"{'!' if bodyfield.required and not bodyfield.is_value_type else ''}")
@@ -1279,11 +1428,7 @@ def emit_command(service: Service, command: Command) -> list[str]:
                     lines.append(f"            if ({bodyfield.var} is {{ Length: > 0 }})")
                     lines.append("            {")
                     for index, path in enumerate(bodyfield.parts):
-                        *parents, leaf = path.split(".")
-                        target = "bodyNode"
-                        for parent in parents:
-                            target = f"CliContext.Child({target}, {csharp_string(parent)})"
-                        lines.append(f"                {target}[{csharp_string(leaf)}] = "
+                        lines.append(f"                {body_slot(path)} = "
                                      f"JsonValue.Create({bodyfield.var}[{index}]);")
                     lines.append("            }")
                     continue
@@ -1293,14 +1438,7 @@ def emit_command(service: Service, command: Command) -> list[str]:
                               f".Select(item => (JsonNode)JsonValue.Create(item)!).ToArray())")
                 else:
                     assign = f"JsonValue.Create({bodyfield.var})"
-                if "." in bodyfield.name:
-                    *parents, leaf = bodyfield.name.split(".")
-                    target = "bodyNode"
-                    for parent in parents:
-                        target = f"CliContext.Child({target}, {csharp_string(parent)})"
-                    slot = f"{target}[{csharp_string(leaf)}]"
-                else:
-                    slot = f"bodyNode[{csharp_string(bodyfield.name)}]"
+                slot = body_slot(bodyfield.name)
 
                 if bodyfield.required:
                     lines.append(f"            {slot} = {assign};")

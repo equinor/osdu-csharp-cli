@@ -265,6 +265,7 @@ public static partial class SearchCommands
             CliRunner.RunAsync(parseResult, async (context, cancellationToken) =>
         {
             var bodyNode = new JsonObject();
+            bodyNode["limit"] = JsonValue.Create(1);
             var kindValue = parseResult.GetValue(kindBodyOption)!;
             bodyNode["kind"] = JsonValue.Create(kindValue);
             var aggregatebyValue = parseResult.GetValue(aggregatebyBodyOption)!;
