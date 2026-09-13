@@ -216,12 +216,24 @@ def pascal(name: str) -> str:
 
 
 def csharp_literal(value: object) -> str:
-    """A scalar from a manifest as a C# literal. Checked for bool first: it is an int too."""
+    """A validated scalar from a manifest as a C# literal that means exactly that value.
+
+    Not ``csharp_string``: that one is for help text and labels, and trims, folds newlines
+    into spaces and leaves carriage returns raw — fine for a description, wrong for a value
+    that must be sent as written. A JSON string literal is used instead, because every
+    escape JSON produces (``\\"``, ``\\\\``, ``\\b``, ``\\f``, ``\\n``, ``\\r``, ``\\t``, ``\\uXXXX``)
+    is also a C# escape, and ``ensure_ascii`` turns U+0085, U+2028 and U+2029 — which C#
+    counts as line breaks inside a literal — into ``\\u`` escapes too.
+
+    Numbers arrive range-checked by :func:`fixed_body_values`, so ``repr`` is a C# literal:
+    an ``int`` or ``long`` for integers and a finite double for numbers. Bool is checked
+    first because Python counts it as an int.
+    """
     if isinstance(value, bool):
         return "true" if value else "false"
     if isinstance(value, (int, float)):
         return repr(value)
-    return csharp_string(str(value))
+    return json.dumps(value)
 
 
 def body_slot(dotted_name: str) -> str:
@@ -893,6 +905,12 @@ def paths_overlap(first: str, second: str) -> bool:
 
 FIXED_SCALAR_TYPES = {"integer": int, "number": (int, float), "boolean": bool, "string": str}
 
+# The C# type Kiota generates for an integer property, by format: `long?` for int64 and
+# `int?` for everything else. The body is deserialised into that model before it is sent,
+# so a value outside it fails at run time even when its literal would compile.
+INTEGER_RANGES = {"int64": ("long", -2**63, 2**63 - 1)}
+DEFAULT_INTEGER_RANGE = ("int", -2**31, 2**31 - 1)
+
 
 def fixed_body_values(body_cfg: dict, fields_cfg: dict, field_schemas: dict, spec: dict,
                       where: str) -> list[tuple[str, object]]:
@@ -960,11 +978,24 @@ def fixed_body_values(body_cfg: dict, fields_cfg: dict, field_schemas: dict, spe
             raise ManifestError(
                 f"{where}: fixed body field {name!r} is `{kind}` in the spec, but the "
                 f"manifest gives {value!r}.")
-        # YAML reads `.nan` and `.inf` as floats. Neither has a C# or a JSON literal.
-        if isinstance(value, float) and not math.isfinite(value):
-            raise ManifestError(
-                f"{where}: fixed body field {name!r} is {value!r}, which is not a finite "
-                f"number and has no literal to send.")
+        if kind == "integer":
+            cs_type, low, high = INTEGER_RANGES.get(schema.get("format"), DEFAULT_INTEGER_RANGE)
+            if not low <= value <= high:
+                raise ManifestError(
+                    f"{where}: fixed body field {name!r} is {value}, outside `{cs_type}`, "
+                    f"the type the client deserialises it into ({low} to {high}).")
+        if kind == "number":
+            # A number is a double on the client, so it is sent as one. An integer too large
+            # for a double overflows here rather than as a literal C# cannot parse; YAML's
+            # `.nan` and `.inf` already are floats, and neither has a C# or JSON literal.
+            try:
+                value = float(value)
+            except OverflowError:
+                value = math.inf
+            if not math.isfinite(value):
+                raise ManifestError(
+                    f"{where}: fixed body field {name!r} is not a finite number and has no "
+                    f"literal to send.")
         if (allowed := schema.get("enum")) and value not in allowed:
             raise ManifestError(
                 f"{where}: fixed body field {name!r} must be one of {allowed}, "

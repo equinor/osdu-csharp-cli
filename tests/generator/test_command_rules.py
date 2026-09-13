@@ -154,6 +154,7 @@ class TestFixedBodyValues:
             "sort": {"$ref": "#/components/schemas/SortQuery"},
             "score": {"type": "number"},
             "offset": {"anyOf": [{"type": "integer"}, {"type": "null"}]},
+            "version": {"type": "integer", "format": "int64"},
             "order": {"type": "string", "enum": ["ASC", "DESC"]},
         }},
         "SortQuery": {"properties": {"field": {"type": "string"}}},
@@ -246,3 +247,26 @@ class TestFixedBodyValues:
     def test_the_value_must_be_a_single_value(self, value):
         with pytest.raises(ManifestError, match="single value"):
             self.build(self.entry({"limit": value}, self.KIND))
+
+    @pytest.mark.parametrize("value", [2**31 - 1, -2**31])
+    def test_an_integer_at_the_int32_bounds_is_accepted(self, value):
+        assert self.build(self.entry({"limit": value}, self.KIND)).body.fixed == [("limit", value)]
+
+    @pytest.mark.parametrize("value", [2**31, -2**31 - 1, 10**100])
+    def test_an_integer_outside_int32_is_rejected(self, value):
+        # Kiota types an unformatted integer as `int?`, and the body is deserialised into
+        # that model before it is sent — so this fails at run time even where the literal
+        # would compile, and 10**100 has no C# literal at all.
+        with pytest.raises(ManifestError, match="outside `int`"):
+            self.build(self.entry({"limit": value}, self.KIND))
+
+    def test_an_int64_field_takes_the_long_range(self):
+        assert self.build(self.entry({"version": 2**40}, self.KIND)).body.fixed == [("version", 2**40)]
+        with pytest.raises(ManifestError, match="outside `long`"):
+            self.build(self.entry({"version": 2**63}, self.KIND))
+
+    def test_a_number_is_sent_as_a_double(self):
+        assert self.build(self.entry({"score": 2}, self.KIND)).body.fixed == [("score", 2.0)]
+        # Too large for a double: refused here, not left to a C# literal that cannot parse.
+        with pytest.raises(ManifestError, match="not a finite number"):
+            self.build(self.entry({"score": 10**400}, self.KIND))

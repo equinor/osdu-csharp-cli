@@ -544,11 +544,16 @@ way it might not be:
 - a value of the wrong type, outside the field's `enum`, or a non-finite number like `.nan`,
   which has no literal to send. Types are read through nullable `anyOf` wrappers and `$ref`s,
   and only string, integer, number and boolean fields can be fixed;
+- an integer outside the type the client deserialises it into — `int`, or `long` for
+  `format: int64` — which would fail at run time even where the literal compiled;
 - a path that any option also writes — the same field, a parent or a child, including the
   paths an option's `parts` spread across. Fixed values are written first, so the option
   would replace them;
 - a `fixed:` that is present but empty, or not a mapping, which would do nothing while
   looking deliberate.
+
+Strings are emitted exactly, whitespace and control characters included — not through the
+tidying used for help text, which trims and folds newlines.
 
 ## Enum casing
 

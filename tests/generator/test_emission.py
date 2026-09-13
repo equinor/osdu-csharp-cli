@@ -16,7 +16,7 @@ import pathlib
 
 import pytest
 
-from generate_cli import Service, build_command, emit_command
+from generate_cli import Service, build_command, csharp_literal, emit_command
 
 GOLDEN = pathlib.Path(__file__).parent / "golden"
 
@@ -164,3 +164,20 @@ def test_emission_matches_the_recorded_output(name):
         f"{golden.name} has not been recorded. Review the output, then run "
         f"UPDATE_GOLDEN=1 python3 -m pytest")
     assert produced == golden.read_text(encoding="utf-8")
+
+
+@pytest.mark.parametrize("value, literal", [
+    (" data.Location ", '" data.Location "'),       # not trimmed
+    ("a" + chr(10) + "b", '"a\\nb"'),                 # not folded into a space
+    ("cr" + chr(13) + "x", '"cr\\rx"'),               # a raw CR would end the literal
+    ('say "hi" ' + chr(92), '"say \\"hi\\" \\\\"'),
+    (chr(0x2028), '"\\u2028"'),                      # a line break to the C# lexer
+    (True, "true"),
+    (-2**31, "-2147483648"),
+    (0.5, "0.5"),
+])
+def test_a_fixed_value_is_emitted_exactly(value, literal):
+    # Fixed values are sent as written, so their literal cannot share csharp_string's
+    # tidying, which is meant for help text. A scratch C# build compiled literals of each of
+    # these kinds and read them back byte for byte.
+    assert csharp_literal(value) == literal
