@@ -1,5 +1,16 @@
 # Changelog
 
+## [0.7.3](https://github.com/equinor/osdu-csharp-cli/compare/v0.7.2...v0.7.3) (2026-09-13)
+
+
+### Bug Fixes
+
+* **generator:** emit fixed strings exactly and range-check fixed integers ([f0966d6](https://github.com/equinor/osdu-csharp-cli/commit/f0966d65e5f2c6d5a352b575ff155408ad9260a5))
+* **generator:** refuse fixed body values that could silently not be sent ([4dfc5d4](https://github.com/equinor/osdu-csharp-cli/commit/4dfc5d4192a548fa9dcfa0f2430fb27436273c41))
+* **release:** stop a failed hash from publishing an empty checksum ([3270109](https://github.com/equinor/osdu-csharp-cli/commit/327010940fad9b7841de8b385ad5c3f4bcea3f37))
+* **search:** send limit 1 from record aggregate and map list records to it ([4a80ba1](https://github.com/equinor/osdu-csharp-cli/commit/4a80ba1fe4e3352fa85296f4df789cd5e5bf72ad))
+* **search:** send limit 1 from record aggregate and map list records to it ([e6b25b3](https://github.com/equinor/osdu-csharp-cli/commit/e6b25b359143ce8e970e16aef8f85ec37961cc67))
+
 ## [0.7.2](https://github.com/equinor/osdu-csharp-cli/compare/v0.7.1...v0.7.2) (2026-09-09)
 
 
