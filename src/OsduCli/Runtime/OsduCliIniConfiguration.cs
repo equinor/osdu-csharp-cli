@@ -55,7 +55,7 @@ public sealed class OsduCliIniConfigurationProvider(OsduCliIniConfigurationSourc
         // wrote `user` and had it ignored in silence. The Python CLI has no key for this at
         // all — its own MSAL code reads a `username` that was never added to its config — so
         // there is no precedent to honour and no reason to carry two spellings.
-        ["user"] = "Osdu:Username",
+        ["user"] = CliConfig.UserKey,
     };
 
     public override void Load()

@@ -19,7 +19,8 @@ public class CliConfigTests : IDisposable
         "OSDU_SERVER", "OSDU_DATA_PARTITION_ID", "OSDU_AUTHORITY",
         "OSDU_CLIENT_ID", "OSDU_SCOPES", "OSDU_USER",
         "Osdu__Server", "Osdu__DataPartitionId", "Osdu__Authority",
-        "Osdu__ClientId", "Osdu__Scopes", "Osdu__Username",
+        "Osdu__ClientId", "Osdu__Scopes", "Osdu__User",
+        "OSDU_CONFIG_DIR",
     ];
 
     private readonly Dictionary<string, string?> _saved = new();
@@ -112,11 +113,46 @@ public class CliConfigTests : IDisposable
     }
 
     [Fact]
-    public void DefaultPathSitsBesideThePythonClisConfig()
+    public void TheDefaultConfigLivesInOsducsOwnDirectory()
     {
-        // Both tools use ~/.osdu, so a machine configured for one is configured for both.
         Assert.Contains(".osdu", CliConfig.DefaultConfigPath);
         Assert.EndsWith("config.json", CliConfig.DefaultConfigPath);
+    }
+
+    [Fact]
+    public void OsduConfigDirRelocatesOsducsOwnDirectory()
+    {
+        Environment.SetEnvironmentVariable("OSDU_CONFIG_DIR", _directory);
+
+        Assert.Equal(Path.Combine(_directory, "config.json"), CliConfig.DefaultConfigPath);
+    }
+
+    [Fact]
+    public void AJsonProfileReadsItsDefaultAccountFromUser()
+    {
+        // `User`, matching --user and the Python profile's `user`. It was `Username` in JSON
+        // until osducs started writing JSON profiles itself.
+        var path = WriteConfig();
+        var json = File.ReadAllText(path).Replace(
+            "\"Scopes\"", "\"User\": \"azure@equinor.com\",\n    \"Scopes\"");
+        File.WriteAllText(path, json);
+
+        CliConfig.Load(path, out var username);
+
+        Assert.Equal("azure@equinor.com", username);
+    }
+
+    [Fact]
+    public void AJsonProfileNoLongerReadsUsername()
+    {
+        var path = WriteConfig();
+        var json = File.ReadAllText(path).Replace(
+            "\"Scopes\"", "\"Username\": \"azure@equinor.com\",\n    \"Scopes\"");
+        File.WriteAllText(path, json);
+
+        CliConfig.Load(path, out var username);
+
+        Assert.Null(username);
     }
 
     // ---- username normalisation ---------------------------------------------------------

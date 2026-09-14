@@ -115,8 +115,41 @@ wellbore-ddms   ok      0.29
 ...
 ```
 
-Otherwise create `~/.osdu/config.json` with an `Osdu` section, or set `OSDU_SERVER`,
-`OSDU_DATA_PARTITION_ID`, `OSDU_AUTHORITY`, `OSDU_CLIENT_ID` and `OSDU_SCOPES`.
+**Otherwise, create a profile.** Run in a terminal, this asks for each setting:
+
+```bash
+osducs config add dev
+```
+
+Or pass them, for a script:
+
+```bash
+osducs config add dev --server https://<instance>.energy.azure.com --partition dev \
+  --authority https://login.microsoftonline.com/<tenant-id> --client-id <app-id> \
+  --scopes "https://energy.azure.com/.default openid"
+```
+
+A second environment on the same tenant only needs what differs:
+
+```bash
+osducs config add test --from dev --server https://<test-instance>.energy.azure.com --partition test
+```
+
+If osducs has no other configuration yet — no profile it would read by default, no selection
+that still exists, and no `OSDU_*` variables — the profile you create is selected. Otherwise `config add` leaves
+the environment you are on alone, and `osducs config use <profile>` switches.
+Setting `OSDU_SERVER`, `OSDU_DATA_PARTITION_ID`, `OSDU_AUTHORITY`, `OSDU_CLIENT_ID` and
+`OSDU_SCOPES` works too, with no file at all.
+
+**Moving from the Python CLI** is one command per profile:
+
+```bash
+osducs config add dev --from dev
+```
+
+That writes `~/.osdu/dev.json`, which takes over from `~/.osducli/dev` wherever osducs would
+have read it. osducs reads the Python CLI's profiles but never writes to `~/.osducli/`, so the
+two tools stay independent — see [docs/USAGE.md](docs/USAGE.md#choosing-the-environment).
 
 ## Why
 

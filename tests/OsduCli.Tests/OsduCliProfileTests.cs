@@ -13,7 +13,7 @@ public class OsduCliProfileTests : IDisposable
 {
     private static readonly string[] Managed =
     [
-        "OSDUCLI_CONFIG_DIR",
+        "OSDUCLI_CONFIG_DIR", "OSDU_CONFIG_DIR",
         "OSDU_SERVER", "OSDU_DATA_PARTITION_ID", "OSDU_AUTHORITY",
         "OSDU_CLIENT_ID", "OSDU_SCOPES",
         "Osdu__Server", "Osdu__DataPartitionId", "Osdu__Authority",
@@ -33,6 +33,9 @@ public class OsduCliProfileTests : IDisposable
         }
         Directory.CreateDirectory(_directory);
         Environment.SetEnvironmentVariable("OSDUCLI_CONFIG_DIR", _directory);
+        // osducs's own directory too: resolving the default config reads the selection kept
+        // there, and the developer's real one must not decide these tests.
+        Environment.SetEnvironmentVariable("OSDU_CONFIG_DIR", Path.Combine(_directory, "native"));
     }
 
     public void Dispose()
@@ -198,7 +201,7 @@ public class OsduCliProfileTests : IDisposable
     [Fact]
     public void NoStateFileIsNotAnError()
     {
-        Assert.Null(CliConfig.SelectedProfile());
+        Assert.Null(CliConfig.PythonSelectedProfile());
     }
 
     [Fact]
