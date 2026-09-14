@@ -157,6 +157,26 @@ public class ConfigAddTests : ConfigTestDirectories
     }
 
     [Fact]
+    public void ABlankValueInTheSourceProfileIsNotCopied()
+    {
+        // `"Scopes": "   "` was copied as a value: nothing asked for it, and the new profile
+        // could not sign in.
+        File.WriteAllText(Path.Combine(Native, "src.json"), """
+            { "Osdu": { "Server": "https://src.example.com", "DataPartitionId": "p",
+                        "Authority": "https://login.microsoftonline.com/t", "ClientId": "c",
+                        "Scopes": "   " } }
+            """);
+
+        var exception = Assert.Throws<OsduException>(() => Add("copy", Nothing, from: "src"));
+        Assert.Contains("--scopes", exception.Message);
+
+        var asked = new List<string>();
+        Add("copy", Nothing, from: "src", ask: label => { asked.Add(label); return "scope/.default"; });
+        Assert.Single(asked);
+        Assert.Equal("scope/.default", CliConfig.Load("copy").Scopes);
+    }
+
+    [Fact]
     public void OptionsOverrideWhatIsCopied()
     {
         // The everyday case: a new environment on the same tenant needs only these two.
@@ -197,6 +217,11 @@ public class ConfigAddTests : ConfigTestDirectories
     [InlineData(".hidden")]
     [InlineData("")]
     [InlineData("state")]
+    [InlineData("CON")]
+    [InlineData("nul")]
+    [InlineData("Com1")]
+    [InlineData("lpt9")]
+    [InlineData("aux.backup")]
     public void ANameThatCannotBeAProfileIsRefused(string name)
     {
         Assert.Throws<OsduException>(() => Add(name));
@@ -341,5 +366,23 @@ public class ConfigAddTests : ConfigTestDirectories
         File.WriteAllText(Path.Combine(Native, "broken.json"), "{ not json");
 
         Assert.Contains(ConfigCommand.Profiles(), e => e.Name == "broken");
+    }
+
+    [Fact]
+    public void AnEmptyListStillReportsASelectionAndTheEnvironment()
+    {
+        // With nothing to list, a selection naming a profile that has gone and variables
+        // configuring osducs without a file are the only useful things to say.
+        CliConfig.Select("gone");
+        Environment.SetEnvironmentVariable("OSDU_SERVER", "https://from-env.example.com");
+        var stdout = new StringWriter();
+        var stderr = new StringWriter();
+
+        ConfigCommand.List(new OutputWriter(OutputFormat.Table, stdout, stderr));
+
+        var written = stdout.ToString() + stderr.ToString();
+        Assert.Contains("No profiles found", written);
+        Assert.Contains("'gone' no longer exists", written);
+        Assert.Contains("OSDU_SERVER", written);
     }
 }

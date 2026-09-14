@@ -200,7 +200,19 @@ public static class ConfigCommand
         }
         if (name.Equals("state", StringComparison.OrdinalIgnoreCase))
             throw new OsduException("'state' is reserved: ~/.osdu/state.json records which profile is selected.");
+
+        // Windows keeps these as device names whatever the extension, so `con.json` is not a
+        // file it will create. Refused on every platform: a profile directory is the kind of
+        // thing that gets copied to another machine.
+        var stem = name.Split('.')[0];
+        if (WindowsDeviceNames.Contains(stem))
+            throw new OsduException($"'{name}' cannot be a profile name: '{stem}' is a reserved device name on Windows.");
     }
+
+    private static readonly HashSet<string> WindowsDeviceNames = new(
+        new[] { "CON", "PRN", "AUX", "NUL" }
+            .Concat(Enumerable.Range(0, 10).SelectMany(n => new[] { $"COM{n}", $"LPT{n}" })),
+        StringComparer.OrdinalIgnoreCase);
 
     private static (ProfileSettings Seed, string? NotCarriedFrom, IReadOnlyList<string> NotCarried) Copy(string? from)
     {
@@ -316,47 +328,54 @@ public static class ConfigCommand
     {
         var list = new Command("list", "List the available profiles, marking the selected one.");
 
-        list.SetAction(parseResult => CliRunner.Run(parseResult, () =>
-        {
-            var output = Writer(parseResult);
-            var entries = Profiles().ToList();
-            if (entries.Count == 0)
-            {
-                output.Write("[]", Spec);
-                output.WriteNote(
-                    $"No profiles found in {CliConfig.NativeDirectory} or {CliConfig.ProfileDirectory}. "
-                    + "Create one with `osducs config add <profile>`.");
-                return 0;
-            }
-
-            var selected = SelectedFile();
-            var native = entries.Where(e => e.Source == Source.Osducs).Select(e => e.Name).ToHashSet(CliConfig.NameComparer);
-            var rows = new JsonArray();
-            foreach (var entry in entries)
-            {
-                // Reading each profile costs a file parse, and buys the only thing that makes
-                // a list of thirteen names useful: which environment each one points at.
-                var settings = Read(entry.Path);
-                rows.Add(new JsonObject
-                {
-                    ["profile"] = entry.Name,
-                    // A Python profile with a JSON one of the same name is still listed, so the
-                    // migration is visible, but marked so it is clear which one -c will read.
-                    ["source"] = entry.Source == Source.Osducs ? "osducs"
-                        : native.Contains(entry.Name) ? "python (overridden)" : "python",
-                    ["server"] = settings?.Server ?? "(unreadable)",
-                    ["partition"] = settings?.DataPartitionId ?? "",
-                    ["selected"] = selected is not null && CliConfig.SamePath(selected, entry.Path) ? "yes" : "",
-                });
-            }
-
-            output.Write(rows.ToJsonString(), Spec);
-            output.WriteNote(SelectionNote());
-            EnvironmentNote(output);
-            return 0;
-        }));
+        list.SetAction(parseResult => CliRunner.Run(parseResult, () => List(Writer(parseResult))));
 
         return list;
+    }
+
+    /// <summary>Writes the profile list. Separate from the command so its notes can be tested.</summary>
+    internal static int List(OutputWriter output)
+    {
+        var entries = Profiles().ToList();
+        if (entries.Count == 0)
+        {
+            output.Write("[]", Spec);
+            output.WriteNote(
+                $"No profiles found in {CliConfig.NativeDirectory} or {CliConfig.ProfileDirectory}. "
+                + "Create one with `osducs config add <profile>`.");
+            // Having nothing to list is exactly when a selection pointing at a profile that
+            // has gone, or variables configuring osducs without any file, need saying.
+            if (CliConfig.Selection().Origin != CliConfig.SelectionOrigin.None)
+                output.WriteNote(SelectionNote());
+            EnvironmentNote(output);
+            return 0;
+        }
+
+        var selected = SelectedFile();
+        var native = entries.Where(e => e.Source == Source.Osducs).Select(e => e.Name).ToHashSet(CliConfig.NameComparer);
+        var rows = new JsonArray();
+        foreach (var entry in entries)
+        {
+            // Reading each profile costs a file parse, and buys the only thing that makes
+            // a list of thirteen names useful: which environment each one points at.
+            var settings = Read(entry.Path);
+            rows.Add(new JsonObject
+            {
+                ["profile"] = entry.Name,
+                // A Python profile with a JSON one of the same name is still listed, so the
+                // migration is visible, but marked so it is clear which one -c will read.
+                ["source"] = entry.Source == Source.Osducs ? "osducs"
+                    : native.Contains(entry.Name) ? "python (overridden)" : "python",
+                ["server"] = settings?.Server ?? "(unreadable)",
+                ["partition"] = settings?.DataPartitionId ?? "",
+                ["selected"] = selected is not null && CliConfig.SamePath(selected, entry.Path) ? "yes" : "",
+            });
+        }
+
+        output.Write(rows.ToJsonString(), Spec);
+        output.WriteNote(SelectionNote());
+        EnvironmentNote(output);
+        return 0;
     }
 
     private static readonly OutputSpec Spec = OutputSpec.Table(

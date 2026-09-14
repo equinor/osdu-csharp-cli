@@ -150,9 +150,12 @@ public static class CliConfig
     internal static ProfileSettings ReadFiles(IEnumerable<string> paths)
     {
         var configuration = FromFiles(paths).Build();
+        // Blank is absent. A JSON profile holding `"Scopes": "   "` was otherwise copied by
+        // --from as a value, so nothing asked for it and the new profile could not sign in.
         string? Value(string key) =>
-            configuration[$"{OsduConfig.DefaultSectionName}:{key}"] is { Length: > 0 } value
-                ? value
+            configuration[$"{OsduConfig.DefaultSectionName}:{key}"] is { } value
+            && !string.IsNullOrWhiteSpace(value)
+                ? value.Trim()
                 : null;
 
         return new ProfileSettings(
@@ -308,10 +311,13 @@ public static class CliConfig
                 ? profile.Trim()
                 : null;
         }
-        catch (Exception exception) when (exception is IOException or JsonException
-                                              or InvalidOperationException or FormatException)
+        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException
+                                              or JsonException or InvalidOperationException
+                                              or FormatException)
         {
             // An unreadable state file is not a reason to fail; the other candidates stand.
+            // Permission is included: it is not an IOException, and failing on it stopped even
+            // `config show`, the command for finding out what is wrong.
             return null;
         }
     }
@@ -333,8 +339,10 @@ public static class CliConfig
                 ? JsonNode.Parse(File.ReadAllText(NativeStatePath)) as JsonObject ?? new JsonObject()
                 : new JsonObject();
         }
-        catch (JsonException)
+        catch (Exception exception) when (exception is JsonException or UnauthorizedAccessException)
         {
+            // Replaced rather than repaired; if the file really cannot be written, the write
+            // below says so.
             state = new JsonObject();
         }
 
@@ -368,7 +376,7 @@ public static class CliConfig
                 if (key.Equals("default_config", StringComparison.OrdinalIgnoreCase))
                     return value;
         }
-        catch (IOException)
+        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
         {
             // An unreadable state file is not a reason to fail; the other candidates stand.
         }

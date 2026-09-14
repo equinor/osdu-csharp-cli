@@ -1,3 +1,4 @@
+using System.Runtime.Versioning;
 using Equinor.OsduCli.Runtime;
 using Xunit;
 
@@ -182,5 +183,50 @@ public class ConfigStateTests : ConfigTestDirectories
 
         Assert.Equal("https://migrated.example.com", CliConfig.Load(null).Server);
         Assert.True(File.Exists(profile));
+    }
+
+    // ---- state files that cannot be read --------------------------------------------------
+
+    [Theory]
+    [InlineData("osducs")]
+    [InlineData("python")]
+    // Declared so the platform analyzer knows what the skip below already guarantees.
+    [UnsupportedOSPlatform("windows")]
+    public void AStateFileThatCannotBeReadIsIgnored(string tool)
+    {
+        // Permission failures are not IOExceptions, so they escaped the recovery meant for
+        // unreadable state and stopped every command — `config show` included, which is the
+        // one for finding out why.
+        Assert.SkipWhen(OperatingSystem.IsWindows(), "uses Unix file modes");
+        var state = tool == "osducs" ? NativeState : PythonState;
+        if (tool == "osducs")
+            File.WriteAllText(state, """{ "Profile": "dev" }""");
+        else
+            SelectInPythonCli(WritePythonProfile("dev"));
+        File.SetUnixFileMode(state, UnixFileMode.None);
+        try
+        {
+            Assert.SkipWhen(CanRead(state), "running as a user who can read any file");
+
+            Assert.Equal(CliConfig.SelectionOrigin.None, CliConfig.Selection().Origin);
+            Assert.Equal(2, CliConfig.Resolve(null).Count);
+        }
+        finally
+        {
+            File.SetUnixFileMode(state, UnixFileMode.UserRead | UnixFileMode.UserWrite);
+        }
+    }
+
+    private static bool CanRead(string path)
+    {
+        try
+        {
+            File.ReadAllBytes(path);
+            return true;
+        }
+        catch (UnauthorizedAccessException)
+        {
+            return false;
+        }
     }
 }

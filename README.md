@@ -135,7 +135,9 @@ A second environment on the same tenant only needs what differs:
 osducs config add test --from dev --server https://<test-instance>.energy.azure.com --partition test
 ```
 
-The first profile you create is selected; after that, `osducs config use <profile>` switches.
+If osducs has no other configuration yet — no profile it would read by default, no selection,
+and no `OSDU_*` variables — the profile you create is selected. Otherwise `config add` leaves
+the environment you are on alone, and `osducs config use <profile>` switches.
 Setting `OSDU_SERVER`, `OSDU_DATA_PARTITION_ID`, `OSDU_AUTHORITY`, `OSDU_CLIENT_ID` and
 `OSDU_SCOPES` works too, with no file at all.
 
