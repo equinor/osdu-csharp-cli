@@ -1,5 +1,22 @@
 # Changelog
 
+## [0.8.0](https://github.com/equinor/osdu-csharp-cli/compare/v0.7.3...v0.8.0) (2026-09-14)
+
+
+### Features
+
+* **config:** create JSON profiles and keep out of the Python CLI's files ([d490836](https://github.com/equinor/osdu-csharp-cli/commit/d490836416e201a2a125aa4e011c88330c91d3de))
+* **config:** create JSON profiles and keep out of the Python CLI's files ([c3691e8](https://github.com/equinor/osdu-csharp-cli/commit/c3691e8e20f954a29097e691ffd39a0ecd9918da))
+
+
+### Bug Fixes
+
+* **config:** no recursion on blank selections; honour env and path casing ([943841f](https://github.com/equinor/osdu-csharp-cli/commit/943841fc469e3143b8a838a196a2750d167c7f2f))
+* **config:** refuse device names, drop blank values, and survive unreadable state ([1dd5790](https://github.com/equinor/osdu-csharp-cli/commit/1dd579013a78dea66296e8ea70b108aa145748f0))
+* **config:** treat a selection whose profile is gone as no selection ([852be4f](https://github.com/equinor/osdu-csharp-cli/commit/852be4f384732bf6ba3e5252f034fefa799f2154))
+* **help:** list a noun's verbs under Commands, not Core resources ([332658e](https://github.com/equinor/osdu-csharp-cli/commit/332658e6fa6485acf263648b864b15c380d6ec69))
+* **help:** list a noun's verbs under Commands, not Core resources ([89f9066](https://github.com/equinor/osdu-csharp-cli/commit/89f9066144cf507d99609c2c16d9dfab9fd17021))
+
 ## [0.7.3](https://github.com/equinor/osdu-csharp-cli/compare/v0.7.2...v0.7.3) (2026-09-13)
 
 
