@@ -96,6 +96,7 @@ public static class ConfigCommand
             else
                 output.WriteNote($"Select it with `osducs config use {request.Name}`, or use it once with `-c {request.Name}`.");
             output.WriteNote($"Check it works: osducs status -c {request.Name}");
+            EnvironmentNote(output);
             return 0;
         }));
 
@@ -127,8 +128,11 @@ public static class ConfigCommand
             throw new OsduException($"{target} already exists. Pass --force to replace it.");
 
         // Decided before anything is written: after the write there is always a configuration.
+        // The environment counts — a machine set up entirely through OSDU_* variables is
+        // configured, and saying otherwise while selecting the new profile would be untrue.
         var nothingConfigured = CliConfig.Selection().Origin == CliConfig.SelectionOrigin.None
-            && !CliConfig.Resolve(null).Any(File.Exists);
+            && !CliConfig.Resolve(null).Any(File.Exists)
+            && !LoadsFromEnvironment();
 
         var (seed, notCarriedFrom, notCarried) = Copy(request.From);
         var given = request.Given;
@@ -154,6 +158,20 @@ public static class ConfigCommand
         return new AddOutcome(target, settings, notCarriedFrom, notCarried, nothingConfigured, inUse);
     }
 
+    /// <summary>Whether the environment alone holds a configuration that loads.</summary>
+    private static bool LoadsFromEnvironment()
+    {
+        try
+        {
+            CliConfig.Load(null);
+            return true;
+        }
+        catch (OsduException)
+        {
+            return false;
+        }
+    }
+
     /// <summary>Whether osducs now reads <paramref name="file"/> by default, ahead of anything it replaced.</summary>
     /// <remarks>
     /// Not merely whether it is one of the files read: the two default files always are, and a
@@ -162,13 +180,10 @@ public static class ConfigCommand
     /// </remarks>
     private static bool InEffect(string file)
     {
-        static bool Same(string a, string b) =>
-            string.Equals(Path.GetFullPath(a), Path.GetFullPath(b), StringComparison.Ordinal);
-
         return CliConfig.Selection().Origin == CliConfig.SelectionOrigin.None
-            ? Same(file, CliConfig.DefaultConfigPath)
+            ? CliConfig.SamePath(file, CliConfig.DefaultConfigPath)
             // Everything after the two defaults is the selection.
-            : CliConfig.Resolve(null).Skip(2).Any(path => Same(path, file));
+            : CliConfig.Resolve(null).Skip(2).Any(path => CliConfig.SamePath(path, file));
     }
 
     /// <summary>
@@ -315,7 +330,7 @@ public static class ConfigCommand
             }
 
             var selected = SelectedFile();
-            var native = entries.Where(e => e.Source == Source.Osducs).Select(e => e.Name).ToHashSet(StringComparer.Ordinal);
+            var native = entries.Where(e => e.Source == Source.Osducs).Select(e => e.Name).ToHashSet(CliConfig.NameComparer);
             var rows = new JsonArray();
             foreach (var entry in entries)
             {
@@ -331,13 +346,13 @@ public static class ConfigCommand
                         : native.Contains(entry.Name) ? "python (overridden)" : "python",
                     ["server"] = settings?.Server ?? "(unreadable)",
                     ["partition"] = settings?.DataPartitionId ?? "",
-                    ["selected"] = selected is not null
-                        && Path.GetFullPath(selected) == Path.GetFullPath(entry.Path) ? "yes" : "",
+                    ["selected"] = selected is not null && CliConfig.SamePath(selected, entry.Path) ? "yes" : "",
                 });
             }
 
             output.Write(rows.ToJsonString(), Spec);
             output.WriteNote(SelectionNote());
+            EnvironmentNote(output);
             return 0;
         }));
 
@@ -440,6 +455,7 @@ public static class ConfigCommand
             output.WriteNote("Later files win. Environment variables win over all of them.");
             if (string.IsNullOrWhiteSpace(requested))
                 output.WriteNote(SelectionNote());
+            EnvironmentNote(output);
             return 0;
         }));
 
@@ -483,14 +499,15 @@ public static class ConfigCommand
                 var name = Path.GetFileName(file);
                 // `state` records the selection rather than being one, and the directory also
                 // holds token caches. A file counts as a profile if it names a server.
-                if (name == "state" || Read(file)?.Server is null)
+                if (string.Equals(name, "state", CliConfig.PathComparison) || Read(file)?.Server is null)
                     continue;
                 entries.Add(new ProfileEntry(name, file, Source.Python));
             }
         }
 
         return entries
-            .OrderBy(entry => entry.Name, StringComparer.Ordinal)
+            // Same comparison as the file system, so `Dev.json` sits beside the `dev` it overrides.
+            .OrderBy(entry => entry.Name, CliConfig.NameComparer)
             .ThenBy(entry => entry.Source);
     }
 
@@ -513,6 +530,16 @@ public static class ConfigCommand
             ? null
             // The two default files come first; everything after them is the selection.
             : CliConfig.Resolve(null).Skip(2).LastOrDefault(File.Exists);
+
+    /// <summary>
+    /// Names any OSDU_* variables in effect. They override every profile, so a list of files
+    /// and a selected marker say nothing reliable about what osducs will use while one is set.
+    /// </summary>
+    private static void EnvironmentNote(OutputWriter output)
+    {
+        if (CliConfig.EnvironmentOverrides() is { Count: > 0 } set)
+            output.WriteNote($"Set in the environment, overriding any profile: {string.Join(", ", set)}.");
+    }
 
     private static string SelectionNote() => CliConfig.Selection() switch
     {

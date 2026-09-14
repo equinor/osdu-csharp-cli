@@ -130,4 +130,57 @@ public class ConfigStateTests : ConfigTestDirectories
 
         Assert.Equal("https://elsewhere.example.com", CliConfig.Load(null).Server);
     }
+
+    // ---- selections that must not bring osducs down ---------------------------------------
+
+    [Fact]
+    public void ASelectionOfOnlySpacesIsNoSelection()
+    {
+        // Was read as a selection, resolved as a blank --config, which re-entered default
+        // resolution and read it again: a stack overflow on every command. If this regresses
+        // the test host dies with it, which is loud enough.
+        File.WriteAllText(NativeState, """{ "Profile": "   " }""");
+
+        Assert.Null(CliConfig.NativeSelection());
+        Assert.Equal(2, CliConfig.Resolve(null).Count);
+    }
+
+    [Fact]
+    public void APythonSelectionNamingItsOwnDirectoryDoesNotRecurse()
+    {
+        // `default_config = ~/.osducli/` has no file name. Treated as a profile name it was
+        // blank, with the same endless recursion as above.
+        SelectInPythonCli(Python + Path.DirectorySeparatorChar);
+
+        Assert.Contains(Python + Path.DirectorySeparatorChar, CliConfig.Resolve(null));
+    }
+
+    // ---- file-system casing ---------------------------------------------------------------
+
+    [Fact]
+    public void PathsCompareTheWayThePlatformsFileSystemDoes()
+    {
+        var expected = OperatingSystem.IsWindows() || OperatingSystem.IsMacOS()
+            ? StringComparison.OrdinalIgnoreCase
+            : StringComparison.Ordinal;
+
+        Assert.Equal(expected, CliConfig.PathComparison);
+        Assert.True(CliConfig.SamePath(Python, Python + Path.DirectorySeparatorChar));
+    }
+
+    [Fact]
+    public void AMigratedProfileTakesOverWhenThePythonStateSpellsTheDirectoryInAnotherCase()
+    {
+        // On a case-insensitive file system `.OSDUCLI` is `.osducli`. Compared exactly, the
+        // selected Python profile looked like one from elsewhere, and the migrated JSON
+        // profile beside it went unused.
+        var profile = WritePythonProfile("dev", "https://python.example.com");
+        var respelled = Path.Combine(Path.GetDirectoryName(Python)!, Path.GetFileName(Python).ToUpperInvariant(), "dev");
+        Assert.SkipUnless(File.Exists(respelled), "needs a case-insensitive file system");
+        SelectInPythonCli(respelled);
+        WriteNativeProfile("dev", "https://migrated.example.com");
+
+        Assert.Equal("https://migrated.example.com", CliConfig.Load(null).Server);
+        Assert.True(File.Exists(profile));
+    }
 }

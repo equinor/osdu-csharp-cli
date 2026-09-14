@@ -241,6 +241,29 @@ public class ConfigAddTests : ConfigTestDirectories
     }
 
     [Fact]
+    public void NothingIsSelectedWhenTheEnvironmentAlreadyConfiguresOsducs()
+    {
+        // A machine set up entirely through OSDU_* variables has a configuration. Treating it
+        // as having none selected the new profile and said there was nothing else to use.
+        Environment.SetEnvironmentVariable("OSDU_SERVER", "https://from-env.example.com");
+        Environment.SetEnvironmentVariable("OSDU_DATA_PARTITION_ID", "env");
+
+        var outcome = Add("dev");
+
+        Assert.False(outcome.Selected);
+        Assert.Null(CliConfig.NativeSelection());
+    }
+
+    [Fact]
+    public void EnvironmentOverridesAreReportedInEitherSpelling()
+    {
+        Environment.SetEnvironmentVariable("OSDU_SCOPES", "scope");
+        Environment.SetEnvironmentVariable("Osdu__User", "azure@equinor.com");
+
+        Assert.Equal(["OSDU_SCOPES", "Osdu__User"], CliConfig.EnvironmentOverrides());
+    }
+
+    [Fact]
     public void MigratingTheSelectedPythonProfileIsReportedAsInUse()
     {
         SelectInPythonCli(WritePythonProfile("dev"));

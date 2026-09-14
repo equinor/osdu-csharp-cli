@@ -89,6 +89,19 @@ public static class CliConfig
     public static OsduConfig Load(string? config) => Load(config, out _);
 
     /// <summary>
+    /// The environment variables currently setting one of the six profile settings, in either
+    /// spelling. They override every file, so commands that talk about files mention them.
+    /// </summary>
+    internal static IReadOnlyList<string> EnvironmentOverrides()
+    {
+        string[] native = ["Server", "DataPartitionId", "Authority", "ClientId", "Scopes", "User"];
+        return EnvAliases.Keys
+            .Concat(native.Select(key => $"{OsduConfig.DefaultSectionName}__{key}"))
+            .Where(name => !string.IsNullOrEmpty(Environment.GetEnvironmentVariable(name)))
+            .ToList();
+    }
+
+    /// <summary>
     /// Loads the configuration, and reports the default account it names, if any.
     /// </summary>
     /// <remarks>
@@ -188,19 +201,31 @@ public static class CliConfig
             List<string> candidates = [Path.Combine(ProfileDirectory, "config"), DefaultConfigPath];
             var (origin, value) = Selection();
             if (origin == SelectionOrigin.Osducs)
-                candidates.AddRange(Resolve(value));
+                candidates.AddRange(ResolveGiven(value));
             else if (origin == SelectionOrigin.Python)
                 candidates.AddRange(PythonSelectionCandidates(value));
             return candidates;
         }
 
-        // A path is used as given.
-        if (LooksLikePath(config))
-            return [config];
-
-        // A bare name is a profile, looked up in both conventions.
-        return [Path.Combine(ProfileDirectory, config), NativeProfilePath(config)];
+        return ResolveGiven(config);
     }
+
+    /// <summary>The files a non-blank <c>--config</c> value names.</summary>
+    /// <remarks>
+    /// Kept apart from <see cref="Resolve"/> because it never consults the selection, which is
+    /// what makes resolving a selection safe. The selection used to go back through
+    /// <see cref="Resolve"/>, so any selected value that came out blank — a <c>state.json</c>
+    /// holding only spaces, or a Python <c>default_config</c> naming its own directory with a
+    /// trailing separator — re-entered default resolution, read the same selection, and
+    /// recursed until the process died of a stack overflow. On every command, since every
+    /// command resolves its config.
+    /// </remarks>
+    private static IReadOnlyList<string> ResolveGiven(string config) =>
+        LooksLikePath(config)
+            // A path is used as given.
+            ? [config]
+            // A bare name is a profile, looked up in both conventions.
+            : [Path.Combine(ProfileDirectory, config), NativeProfilePath(config)];
 
     /// <summary>The files the Python CLI's selection stands for.</summary>
     /// <remarks>
@@ -212,12 +237,43 @@ public static class CliConfig
     /// </remarks>
     private static IReadOnlyList<string> PythonSelectionCandidates(string selected)
     {
-        var directory = Path.GetDirectoryName(Path.GetFullPath(selected));
-        return string.Equals(directory, Path.GetFullPath(ProfileDirectory).TrimEnd(Path.DirectorySeparatorChar),
-                   StringComparison.Ordinal)
-            ? Resolve(Path.GetFileName(selected))
+        var full = Path.GetFullPath(selected);
+        return Path.GetFileName(full) is { Length: > 0 } name
+               && Path.GetDirectoryName(full) is { } directory
+               && SamePath(directory, ProfileDirectory)
+            ? ResolveGiven(name)
             : [selected];
     }
+
+    /// <summary>
+    /// How paths compare: without regard to case on Windows and macOS, exactly on Linux.
+    /// </summary>
+    /// <remarks>
+    /// The file systems those platforms ship with are case-insensitive, so there <c>Dev.json</c>
+    /// is the file <c>-c dev</c> reads, and a state file that spells the profile directory
+    /// <c>.OsduCli</c> names the same directory as <c>.osducli</c>. Comparing exactly made osducs
+    /// disagree with the file system it was reading — a migrated profile went unused, and
+    /// <c>config list</c> reported a profile as not overridden while it was. This is the same
+    /// assumption .NET makes about those platforms; a case-sensitive volume on macOS is the
+    /// exception it gets wrong too.
+    /// </remarks>
+    internal static StringComparison PathComparison =>
+        OperatingSystem.IsWindows() || OperatingSystem.IsMacOS()
+            ? StringComparison.OrdinalIgnoreCase
+            : StringComparison.Ordinal;
+
+    /// <summary>Compares profile names, which are file names, as <see cref="PathComparison"/> does.</summary>
+    internal static StringComparer NameComparer =>
+        PathComparison == StringComparison.OrdinalIgnoreCase
+            ? StringComparer.OrdinalIgnoreCase
+            : StringComparer.Ordinal;
+
+    /// <summary>Whether two paths name the same file or directory.</summary>
+    internal static bool SamePath(string first, string second) =>
+        string.Equals(
+            Path.TrimEndingDirectorySeparator(Path.GetFullPath(first)),
+            Path.TrimEndingDirectorySeparator(Path.GetFullPath(second)),
+            PathComparison);
 
     /// <summary>Which tool's selection is in effect.</summary>
     internal enum SelectionOrigin { None, Osducs, Python }
@@ -248,8 +304,8 @@ public static class CliConfig
         try
         {
             return JsonNode.Parse(File.ReadAllText(NativeStatePath))?["Profile"]?.GetValue<string>()
-                is { Length: > 0 } profile
-                ? profile
+                is { } profile && !string.IsNullOrWhiteSpace(profile)
+                ? profile.Trim()
                 : null;
         }
         catch (Exception exception) when (exception is IOException or JsonException
@@ -366,7 +422,7 @@ public static class CliConfig
     /// <summary>Names the profiles that exist, so a typo is one line from being fixed.</summary>
     private static string AvailableProfiles()
     {
-        var names = new SortedSet<string>(StringComparer.Ordinal);
+        var names = new SortedSet<string>(NameComparer);
 
         if (Directory.Exists(ProfileDirectory))
         {
