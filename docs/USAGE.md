@@ -29,17 +29,65 @@ talking to is no longer visible on the command line.
 ### Choosing the environment
 
 ```bash
-osducs config list          # every profile, with the server and partition each points at
+osducs config add test      # create a profile, asking for any setting not given as a flag
+osducs config list          # every profile, with its source, server and partition
 osducs config use test      # make one the default for every later command
 osducs config show          # what is in effect now, and which files were read
 ```
 
-`config use` writes `~/.osducli/state`, the same file the Python CLI's `osdu config update`
-writes, so the two tools do not end up disagreeing about which environment you are on. Other
-keys in that file are left alone.
+osducs keeps its own files in `~/.osdu/`: each profile as `<name>.json`, and the selection in
+`state.json`. It reads the Python CLI's profiles in `~/.osducli/` but **never writes there** —
+migration runs from that tool to this one, and neither should quietly change the other.
+
+Until you run `osducs config use`, osducs follows whatever profile the Python CLI has
+selected, so an existing user starts in the environment they already work in. After that the
+two are independent: `config use` records osducs's choice only, and says so.
 
 A profile is validated before it is selected — a config that does not parse is refused at the
 moment you choose it, rather than breaking the next command you run.
+
+### Creating and migrating profiles
+
+`osducs config add <profile>` writes `~/.osdu/<profile>.json`. In a terminal it asks for each
+required setting that was not given; in a script, a missing one is an error naming its flag.
+
+| Flag | Setting |
+|---|---|
+| `--server` | OSDU base URL |
+| `--partition` | data partition ID |
+| `--authority` | Entra ID authority, `https://login.microsoftonline.com/<tenant-id>` |
+| `--client-id` | the app registration to sign in through — it must allow public-client sign-in with redirect URI `http://localhost` |
+| `--scopes` | OAuth scopes, space-separated |
+| `--user` | optional default account |
+| `--from <profile>` | copy every setting from an existing profile; flags override what is copied |
+| `--force` | replace a profile of the same name |
+
+`--from` is also the migration: `osducs config add dev --from dev` copies the Python profile
+`dev` into `~/.osdu/dev.json`, which then wins wherever `dev` is read — including when it is
+the profile the Python CLI has selected. The Python profile is left in place, and
+`config list` shows it as overridden. Keys osducs does not use, such as the `*_url` entries
+and the ACL defaults, are named rather than copied.
+
+The first profile created on a machine with no other configuration is selected. Otherwise
+`config add` never changes which environment you are on.
+
+A JSON profile looks like this:
+
+```json
+{
+  "Osdu": {
+    "Server": "https://<instance>.energy.azure.com",
+    "DataPartitionId": "dev",
+    "Authority": "https://login.microsoftonline.com/<tenant-id>",
+    "ClientId": "<app-id>",
+    "Scopes": "https://energy.azure.com/.default openid",
+    "User": "name@equinor.com"
+  }
+}
+```
+
+`User` is optional. osducs has no export back to the Python format: a profile osducs writes
+holds only the settings osducs uses, and the Python CLI needs more than those.
 
 `-c <profile>` still overrides the default for a single command.
 
@@ -50,20 +98,21 @@ Later sources win:
 | Source | Notes |
 |---|---|
 | `~/.osducli/config` | the Python CLI's default profile |
-| `~/.osdu/config.json` | this CLI's own file, if you have one |
-| `~/.osducli/state` → `default_config` | the profile `osdu config update` selected |
+| `~/.osdu/config.json` | this CLI's own default file, if you have one |
+| the selected profile | from `~/.osdu/state.json` once `osducs config use` has been run, otherwise the profile the Python CLI's `~/.osducli/state` names |
 | `OSDU_*` environment variables | `OSDU_SERVER`, `OSDU_DATA_PARTITION_ID`, `OSDU_AUTHORITY`, `OSDU_CLIENT_ID`, `OSDU_SCOPES`, `OSDU_USER` |
 | `--config` | an explicit profile name or file path |
 
-Selecting a profile in the Python CLI moves both tools together — `osducs` reads that
-selection rather than keeping a second one that could disagree.
+A profile name is looked up in both directories, `~/.osducli/<name>` and then
+`~/.osdu/<name>.json`, so an osducs profile wins over a Python profile of the same name.
 
 ```bash
 osducs status -c prod          # a profile from ~/.osducli/
 osducs status -c ./my.json     # a path; format detected from content, not extension
 ```
 
-`OSDUCLI_CONFIG_DIR` relocates the profile directory, the same variable the Python CLI reads.
+`OSDU_CONFIG_DIR` relocates osducs's own directory. `OSDUCLI_CONFIG_DIR` relocates the Python
+CLI's, the same variable that tool reads.
 
 Only six values are used: server, data partition, authority, client id, scopes and user. The
 per-service `*_url` entries in a profile are **ignored** — this CLI derives each base path
@@ -80,12 +129,13 @@ osducs record search -k "osdu:wks:master-data--Well:*" --user azure@equinor.com
 ```
 
 To avoid typing it every time, put it in the config profile beside the environment it belongs
-to:
+to — `"User"` in a JSON profile, or `user` in a Python one:
 
-```ini
-[core]
-user = azure@equinor.com
+```json
+{ "Osdu": { "User": "azure@equinor.com" } }
 ```
+
+`osducs config add <profile> --user azure@equinor.com` writes it for you.
 
 `--user` overrides it, and `OSDU_USER` works for a shell session.
 

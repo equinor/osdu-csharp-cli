@@ -21,7 +21,7 @@ public static class GlobalOptions
 
     public static readonly Option<string?> Config = new("--config", "-c")
     {
-        Description = "Config file path, or a profile name from ~/.osducli/.",
+        Description = "Config file path, or a profile name from ~/.osdu/ or ~/.osducli/.",
         Recursive = true,
     };
 

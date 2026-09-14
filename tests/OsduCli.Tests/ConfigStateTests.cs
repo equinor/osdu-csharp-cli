@@ -4,86 +4,130 @@ using Xunit;
 namespace OsduCli.Tests;
 
 /// <summary>
-/// Covers recording which profile is selected.
+/// Which profile is selected, and whose selection osducs follows.
 /// </summary>
 /// <remarks>
-/// The file is shared with the Python CLI's `osdu config update`. Writing it is how `osducs
-/// config use` avoids inventing a second, competing notion of "current environment" — which
-/// means it has to leave alone whatever else that tool keeps there.
+/// osducs keeps its selection in its own <c>~/.osdu/state.json</c>. It used to write the
+/// Python CLI's <c>~/.osducli/state</c> instead, so switching environment here switched it
+/// there too. Migration runs one way, from that tool to this one, so osducs reads that file —
+/// following the other tool's choice until it has one of its own — and never writes it.
 /// </remarks>
-public class ConfigStateTests : IDisposable
+[Collection(nameof(EnvironmentCollection))]
+public class ConfigStateTests : ConfigTestDirectories
 {
-    private readonly string _directory = Path.Combine(
-        Path.GetTempPath(), "osdu-state-tests-" + Guid.NewGuid().ToString("N"));
-    private readonly string? _previous;
-
-    public ConfigStateTests()
-    {
-        Directory.CreateDirectory(_directory);
-        _previous = Environment.GetEnvironmentVariable("OSDUCLI_CONFIG_DIR");
-        Environment.SetEnvironmentVariable("OSDUCLI_CONFIG_DIR", _directory);
-    }
-
-    public void Dispose()
-    {
-        Environment.SetEnvironmentVariable("OSDUCLI_CONFIG_DIR", _previous);
-        if (Directory.Exists(_directory)) Directory.Delete(_directory, recursive: true);
-        GC.SuppressFinalize(this);
-    }
-
-    private string State => Path.Combine(_directory, "state");
+    private string NativeState => Path.Combine(Native, "state.json");
+    private string PythonState => Path.Combine(Python, "state");
 
     [Fact]
-    public void SelectingAProfileRecordsItsAbsolutePath()
+    public void SelectingRecordsTheProfileInOsducsOwnStateFile()
     {
-        CliConfig.SelectProfile(Path.Combine(_directory, "dev"));
+        CliConfig.Select("dev");
 
-        Assert.Contains($"default_config = {Path.Combine(_directory, "dev")}",
-                        File.ReadAllText(State));
+        Assert.Contains("\"Profile\": \"dev\"", File.ReadAllText(NativeState));
+        Assert.Equal("dev", CliConfig.NativeSelection());
     }
 
     [Fact]
-    public void SwitchingReplacesTheSelectionRatherThanAppending()
+    public void SelectingNeverTouchesThePythonClisState()
     {
-        CliConfig.SelectProfile(Path.Combine(_directory, "dev"));
-        CliConfig.SelectProfile(Path.Combine(_directory, "test"));
+        // The point of the change: choosing an environment in osducs must not move the
+        // Python CLI to it.
+        var before = WritePythonProfile("prod");
+        SelectInPythonCli(before);
+        var original = File.ReadAllBytes(PythonState);
 
-        var lines = File.ReadAllLines(State)
-            .Where(l => l.TrimStart().StartsWith("default_config", StringComparison.Ordinal))
-            .ToList();
+        CliConfig.Select("dev");
 
-        Assert.Single(lines);
-        Assert.EndsWith("test", lines[0]);
+        Assert.Equal(original, File.ReadAllBytes(PythonState));
     }
 
     [Fact]
-    public void OtherKeysInTheFileSurvive()
+    public void SwitchingReplacesTheSelection()
     {
-        // Dropping a key this tool does not recognise would be a silent way to break the
-        // Python CLI, which owns the file as much as osducs does.
-        File.WriteAllLines(State, ["[core]", "default_config = /old", "something_else = keep me"]);
+        CliConfig.Select("dev");
+        CliConfig.Select("test");
 
-        CliConfig.SelectProfile(Path.Combine(_directory, "dev"));
-
-        var text = File.ReadAllText(State);
-        Assert.Contains("something_else = keep me", text);
-        Assert.DoesNotContain("/old", text);
+        Assert.Equal("test", CliConfig.NativeSelection());
     }
 
     [Fact]
-    public void AMissingStateFileIsCreatedWithItsSection()
+    public void OtherKeysInTheStateFileSurvive()
     {
-        CliConfig.SelectProfile(Path.Combine(_directory, "dev"));
+        // Written now so a later version can add to the file without this dropping it.
+        File.WriteAllText(NativeState, """{ "Profile": "old", "SomethingElse": "keep me" }""");
 
-        Assert.StartsWith("[core]", File.ReadAllText(State));
+        CliConfig.Select("dev");
+
+        var text = File.ReadAllText(NativeState);
+        Assert.Contains("keep me", text);
+        Assert.Equal("dev", CliConfig.NativeSelection());
     }
 
     [Fact]
-    public void TheSelectionIsReadBackByTheSameCodeThatResolvesConfig()
+    public void AnUnreadableStateFileIsIgnoredRatherThanFatal()
     {
-        var profile = Path.Combine(_directory, "dev");
-        CliConfig.SelectProfile(profile);
+        File.WriteAllText(NativeState, "not json");
 
-        Assert.Equal(profile, CliConfig.SelectedProfile());
+        Assert.Null(CliConfig.NativeSelection());
+    }
+
+    [Fact]
+    public void ThePythonClisSelectionIsFollowedUntilOsducsHasItsOwn()
+    {
+        SelectInPythonCli(WritePythonProfile("dev", "https://python-selected.example.com"));
+
+        Assert.Equal(CliConfig.SelectionOrigin.Python, CliConfig.Selection().Origin);
+        Assert.Equal("https://python-selected.example.com", CliConfig.Load(null).Server);
+    }
+
+    [Fact]
+    public void OsducsOwnSelectionWinsOverThePythonClis()
+    {
+        SelectInPythonCli(WritePythonProfile("dev", "https://python-selected.example.com"));
+        WriteNativeProfile("test", "https://osducs-selected.example.com");
+
+        CliConfig.Select("test");
+
+        Assert.Equal(CliConfig.SelectionOrigin.Osducs, CliConfig.Selection().Origin);
+        Assert.Equal("https://osducs-selected.example.com", CliConfig.Load(null).Server);
+    }
+
+    [Fact]
+    public void ASelectionByNameFollowsWhicheverFileWinsForThatName()
+    {
+        // Select a profile while it only exists in the Python CLI, migrate it, and the
+        // migrated copy is what is used — no second selection.
+        WritePythonProfile("dev", "https://python.example.com");
+        CliConfig.Select("dev");
+        Assert.Equal("https://python.example.com", CliConfig.Load(null).Server);
+
+        WriteNativeProfile("dev", "https://migrated.example.com");
+
+        Assert.Equal("https://migrated.example.com", CliConfig.Load(null).Server);
+    }
+
+    [Fact]
+    public void AMigratedProfileTakesOverFromThePythonClisSelectionToo()
+    {
+        // Otherwise `config add dev --from dev` would create a profile osducs went on ignoring
+        // for as long as it followed the other tool's selection.
+        SelectInPythonCli(WritePythonProfile("dev", "https://python.example.com"));
+        WriteNativeProfile("dev", "https://migrated.example.com");
+
+        Assert.Equal("https://migrated.example.com", CliConfig.Load(null).Server);
+    }
+
+    [Fact]
+    public void APythonSelectionOutsideItsProfileDirectoryIsUsedAsAPath()
+    {
+        var elsewhere = Path.Combine(Native, "..", "elsewhere-profile");
+        File.WriteAllLines(elsewhere,
+        [
+            "[core]", "server = https://elsewhere.example.com", "data_partition_id = p",
+            "authority = https://login.example.com", "client_id = c", "scopes = s",
+        ]);
+        SelectInPythonCli(elsewhere);
+
+        Assert.Equal("https://elsewhere.example.com", CliConfig.Load(null).Server);
     }
 }
