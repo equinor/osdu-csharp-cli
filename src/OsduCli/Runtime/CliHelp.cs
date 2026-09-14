@@ -65,6 +65,19 @@ public static class CliHelp
     internal const string DefaultSection = "Core resources";
 
     /// <summary>
+    /// Heading for the entries on any page below the root — a noun's verbs and sub-nouns.
+    /// </summary>
+    /// <remarks>
+    /// Its own constant because the root's heading is not a general one. Nested pages used to
+    /// share <see cref="DefaultSection"/>, which was harmless while it read "Commands"; renaming
+    /// it for the root then put <c>list</c>, <c>get</c> and <c>search</c> under "Core
+    /// resources" on <c>osducs record --help</c>, and <c>osducs wellbore --help</c> announced
+    /// its verbs as core resources of a service that is not core. On those pages the entries
+    /// really are commands, so here the word fits.
+    /// </remarks>
+    internal const string NestedSection = "Commands";
+
+    /// <summary>
     /// Heading for commands about the tool rather than the platform, rendered last.
     /// </summary>
     /// <remarks>
@@ -130,7 +143,7 @@ public static class CliHelp
         foreach (var option in options.Where(IsCommon))
             rows.Add((Label(option), option.Description ?? string.Empty, "Common Options"));
         foreach (var sub in command.Subcommands.Where(c => !c.Hidden))
-            rows.Add((sub.Name, sub.Description ?? string.Empty, SectionFor(sub)));
+            rows.Add((sub.Name, sub.Description ?? string.Empty, SectionFor(command, sub)));
 
         if (rows.Count == 0)
             return;
@@ -142,11 +155,11 @@ public static class CliHelp
         // section, so the order is predictable without anyone maintaining a list.
         var named = rows.Select(row => row.Section)
             .Where(section => section is not ("Arguments" or "Options" or "Common Options"
-                or DefaultSection or ToolSection))
+                or DefaultSection or NestedSection or ToolSection))
             .Distinct()
             .OrderBy(section => section, StringComparer.Ordinal);
 
-        var ordered = new[] { "Arguments", "Options", "Common Options", DefaultSection }
+        var ordered = new[] { "Arguments", "Options", "Common Options", DefaultSection, NestedSection }
             .Concat(named)
             .Append(ToolSection);
 
@@ -222,11 +235,17 @@ public static class CliHelp
     }
 
     /// <summary>
-    /// The heading a subcommand renders under. Only top-level commands are categorised;
-    /// anything nested falls into the default group, which is what a noun's own help wants.
+    /// The heading <paramref name="sub"/> renders under on <paramref name="page"/>'s help.
     /// </summary>
-    private static string SectionFor(Command command) =>
-        Categories.GetValueOrDefault(command.Name, DefaultSection);
+    /// <remarks>
+    /// Categories are looked up only on the root page. They are keyed by name, so consulting
+    /// them anywhere else would file a nested command that happens to share a name with a
+    /// root one under that root command's heading.
+    /// </remarks>
+    private static string SectionFor(Command page, Command sub) =>
+        page is RootCommand
+            ? Categories.GetValueOrDefault(sub.Name, DefaultSection)
+            : NestedSection;
 
     private static Command? Parent(Command command) =>
         command.Parents.OfType<Command>().FirstOrDefault();
