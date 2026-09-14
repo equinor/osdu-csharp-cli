@@ -136,7 +136,10 @@ public class CliHelpTests
 
         var help = Render(group);
 
-        Assert.Contains($"{CliHelp.DefaultSection}:", help);
+        // Asserted DefaultSection until that was renamed "Core resources" for the root page,
+        // at which point this kept passing while pinning the wrong heading for a noun's verbs.
+        Assert.Contains($"{CliHelp.NestedSection}:", help);
+        Assert.DoesNotContain($"{CliHelp.DefaultSection}:", help);
         Assert.Contains("List records.", help);
         Assert.Contains("Get a record.", help);
     }

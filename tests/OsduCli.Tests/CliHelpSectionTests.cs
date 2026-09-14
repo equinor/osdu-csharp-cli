@@ -105,4 +105,41 @@ public class CliHelpSectionTests
         Assert.Equal(shortLine.IndexOf("Help for", StringComparison.Ordinal),
                      longLine.IndexOf("Help for", StringComparison.Ordinal));
     }
+
+    [Fact]
+    public void ANounsOwnPageListsItsVerbsAsCommands()
+    {
+        // `osducs record --help` showed `list`, `get` and `search` under "Core resources",
+        // because nested pages borrowed the root's heading and the root's heading was renamed.
+        var root = new RootCommand("osducs");
+        GlobalOptions.AddTo(root);
+        var noun = new Command("zznoun", "A noun.");
+        noun.Subcommands.Add(new Command("list", "List them."));
+        root.Subcommands.Add(noun);
+
+        var buffer = new StringWriter();
+        CliHelp.Write(noun, buffer);
+        var help = buffer.ToString();
+
+        Assert.Contains($"{CliHelp.NestedSection}:", help);
+        Assert.DoesNotContain($"{CliHelp.DefaultSection}:", help);
+    }
+
+    [Fact]
+    public void ANestedCommandIsNotFiledUnderARootCommandsHeadingThatSharesItsName()
+    {
+        // Categories are keyed by name. A nested `zzshared` must not inherit the heading
+        // given to a root command of the same name.
+        CliHelp.Categorise("zzshared", CliHelp.ToolSection);
+        var root = new RootCommand("osducs");
+        GlobalOptions.AddTo(root);
+        var noun = new Command("zzparent", "A noun.");
+        noun.Subcommands.Add(new Command("zzshared", "Nested, not the tool command."));
+        root.Subcommands.Add(noun);
+
+        var buffer = new StringWriter();
+        CliHelp.Write(noun, buffer);
+
+        Assert.DoesNotContain($"{CliHelp.ToolSection}:", buffer.ToString());
+    }
 }

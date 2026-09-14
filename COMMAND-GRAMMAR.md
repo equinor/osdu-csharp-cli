@@ -639,7 +639,10 @@ at. `The CLI itself` groups `account`, `status` and `completion` by what they co
 is why it can hold both a noun that takes verbs and two commands that do not.
 
 Sections apply only to the root list. A noun's own help is a short list of verbs and gains
-nothing from headings.
+nothing from named sections, so its entries sit under `Commands:` — which, one level down, is
+exactly what they are. That page once borrowed the root's heading, so renaming it put
+`record list` and `record get` under "Core resources" until the two were given separate
+constants.
 
 ---
 
