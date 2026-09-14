@@ -130,8 +130,9 @@ public static class ConfigCommand
         // Decided before anything is written: after the write there is always a configuration.
         // The environment counts — a machine set up entirely through OSDU_* variables is
         // configured, and saying otherwise while selecting the new profile would be untrue.
-        var nothingConfigured = CliConfig.Selection().Origin == CliConfig.SelectionOrigin.None
-            && !CliConfig.Resolve(null).Any(File.Exists)
+        // A selection counts only through its files, which Resolve already lists: a selection
+        // whose profile has been deleted is not an environment anyone is on.
+        var nothingConfigured = !CliConfig.Resolve(null).Any(File.Exists)
             && !LoadsFromEnvironment();
 
         var (seed, notCarriedFrom, notCarried) = Copy(request.From);
@@ -180,7 +181,7 @@ public static class ConfigCommand
     /// </remarks>
     private static bool InEffect(string file)
     {
-        return CliConfig.Selection().Origin == CliConfig.SelectionOrigin.None
+        return CliConfig.SelectedFile() is null
             ? CliConfig.SamePath(file, CliConfig.DefaultConfigPath)
             // Everything after the two defaults is the selection.
             : CliConfig.Resolve(null).Skip(2).Any(path => CliConfig.SamePath(path, file));
@@ -351,7 +352,7 @@ public static class ConfigCommand
             return 0;
         }
 
-        var selected = SelectedFile();
+        var selected = CliConfig.SelectedFile();
         var native = entries.Where(e => e.Source == Source.Osducs).Select(e => e.Name).ToHashSet(CliConfig.NameComparer);
         var rows = new JsonArray();
         foreach (var entry in entries)
@@ -544,12 +545,6 @@ public static class ConfigCommand
     }
 
     /// <summary>The file the selection resolves to — the one that wins for the selected name.</summary>
-    private static string? SelectedFile() =>
-        CliConfig.Selection().Origin == CliConfig.SelectionOrigin.None
-            ? null
-            // The two default files come first; everything after them is the selection.
-            : CliConfig.Resolve(null).Skip(2).LastOrDefault(File.Exists);
-
     /// <summary>
     /// Names any OSDU_* variables in effect. They override every profile, so a list of files
     /// and a selected marker say nothing reliable about what osducs will use while one is set.
@@ -562,8 +557,10 @@ public static class ConfigCommand
 
     private static string SelectionNote() => CliConfig.Selection() switch
     {
-        (CliConfig.SelectionOrigin.Osducs, var profile) when SelectedFile() is null =>
+        (CliConfig.SelectionOrigin.Osducs, var profile) when CliConfig.SelectedFile() is null =>
             $"The selected profile '{profile}' no longer exists; osducs falls back to its default config files.",
+        (CliConfig.SelectionOrigin.Python, var profile) when CliConfig.SelectedFile() is null =>
+            $"The Python CLI's selected profile {profile} no longer exists; osducs falls back to its default config files.",
         (CliConfig.SelectionOrigin.Osducs, _) => "Selected with `osducs config use`.",
         (CliConfig.SelectionOrigin.Python, _) =>
             "Following the Python CLI's selection until `osducs config use` makes one of osducs's own.",

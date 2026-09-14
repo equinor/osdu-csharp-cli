@@ -69,7 +69,9 @@ the profile the Python CLI has selected. The Python profile is left in place, an
 and the ACL defaults, are named rather than copied.
 
 A profile created on a machine with no other configuration — no profile osducs would read by
-default, no selection, and no `OSDU_*` variables — is selected. Otherwise `config add` never
+default, no selection that still exists, and no `OSDU_*` variables — is selected. That makes it
+osducs's own selection, so if the only selection was a Python CLI one naming a deleted profile,
+osducs stops following that tool from then on. Otherwise `config add` never
 changes which environment you are on.
 
 A JSON profile looks like this:

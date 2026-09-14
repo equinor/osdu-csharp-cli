@@ -278,6 +278,23 @@ public static class CliConfig
             Path.TrimEndingDirectorySeparator(Path.GetFullPath(second)),
             PathComparison);
 
+    /// <summary>
+    /// The file the selection resolves to — the one that wins for the selected name — or null
+    /// when nothing is selected or nothing selected still exists.
+    /// </summary>
+    /// <remarks>
+    /// Whether a selection is recorded and whether it names anything are different questions,
+    /// and asking the first when the second was meant is how a deleted profile went on being
+    /// described as followed, and how a dead selection stopped <c>config add</c> selecting
+    /// the first real profile. Anything that needs to know whether a selection is live asks
+    /// this. It sits here because it depends on <see cref="Resolve"/> listing the two default
+    /// files before the selection's.
+    /// </remarks>
+    internal static string? SelectedFile() =>
+        Selection().Origin == SelectionOrigin.None
+            ? null
+            : Resolve(null).Skip(2).LastOrDefault(File.Exists);
+
     /// <summary>Which tool's selection is in effect.</summary>
     internal enum SelectionOrigin { None, Osducs, Python }
 

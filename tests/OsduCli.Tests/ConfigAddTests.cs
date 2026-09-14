@@ -385,4 +385,62 @@ public class ConfigAddTests : ConfigTestDirectories
         Assert.Contains("'gone' no longer exists", written);
         Assert.Contains("OSDU_SERVER", written);
     }
+
+    // ---- selections whose profile has gone ------------------------------------------------
+
+    private void SelectADeletedProfile(string tool)
+    {
+        if (tool == "osducs")
+            CliConfig.Select("deleted");
+        else
+            SelectInPythonCli(Path.Combine(Python, "deleted"));
+    }
+
+    [Theory]
+    [InlineData("osducs")]
+    [InlineData("python")]
+    public void AStaleSelectionIsReportedAsGoneWhicheverToolMadeIt(string tool)
+    {
+        // A deleted Python-selected profile was described as followed, while resolution had
+        // already fallen back to the default files.
+        WritePythonProfile("prod");
+        SelectADeletedProfile(tool);
+        var stdout = new StringWriter();
+        var stderr = new StringWriter();
+
+        ConfigCommand.List(new OutputWriter(OutputFormat.Table, stdout, stderr));
+
+        var written = stdout.ToString() + stderr.ToString();
+        Assert.Contains("no longer exists", written);
+        Assert.DoesNotContain("Following", written);
+        Assert.DoesNotContain("yes", stdout.ToString());
+    }
+
+    [Theory]
+    [InlineData("osducs")]
+    [InlineData("python")]
+    public void AFirstProfileIsSelectedWhenTheOnlySelectionIsStale(string tool)
+    {
+        // A dead selection is not an environment anyone is on. Treating it as one left the
+        // new profile unselected, so the next command still found no configuration.
+        SelectADeletedProfile(tool);
+
+        var outcome = Add("dev");
+
+        Assert.True(outcome.Selected);
+        Assert.Equal("https://osdu.example.com", CliConfig.Load(null).Server);
+    }
+
+    [Fact]
+    public void ADefaultConfigIsReportedInUseWhenTheSelectionIsStale()
+    {
+        // With the selection dead, config.json is what osducs reads over the Python default.
+        WritePythonProfile("config");
+        SelectADeletedProfile("osducs");
+
+        var outcome = Add("config");
+
+        Assert.False(outcome.Selected);
+        Assert.True(outcome.AlreadyInUse);
+    }
 }
