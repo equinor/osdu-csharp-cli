@@ -80,7 +80,7 @@ commits to choose the next version and write the changelog:
 Bumping `Equinor.OsduCsharpClient` also means bumping `ref` in
 [`spec-source.yaml`](spec-source.yaml) to the matching client tag, in the same pull request. A
 test fails if the two disagree, since the coverage check has to see the specs that client was
-generated from. A Dependabot pull request for the client needs that commit added to it.
+generated from.
 
 ## Security
 
