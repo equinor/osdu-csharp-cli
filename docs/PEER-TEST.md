@@ -82,7 +82,7 @@ osducs status
 ```
 
 ```
-https://equinorswedev.energy.azure.com  partition dev
+https://<instance>.energy.azure.com  partition dev
 Service         Status  Version          Build
 --------------  ------  ---------------  ------------------------
 crs-catalog     ok      0.29.2-SNAPSHOT  2026-08-05T09:49:35.371Z

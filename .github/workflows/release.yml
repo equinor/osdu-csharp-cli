@@ -69,8 +69,12 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      # Self-contained, not NativeAOT: AOT does not build yet (see SESSION-NOTES §8.7).
-      # ~80 MB per platform, which is the cost of needing no .NET runtime on the machine.
+      # Self-contained, not NativeAOT. AOT would be ~8 MB with near-instant startup, but as
+      # measured it does not work, and every blocker is in Equinor.OsduCsharpClient:
+      # OsduConfig's `required` and `init` members defeat the source-generated config binder,
+      # and OsduClient creates service clients with Activator.CreateInstance, which trimming
+      # breaks. Fixing either changes the client's public API, so it is the client's call.
+      # ~80 MB per platform is the cost of needing no .NET runtime on the machine.
       - name: Publish
         working-directory: src/OsduCli
         run: >
