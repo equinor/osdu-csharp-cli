@@ -62,16 +62,25 @@ recompile, so a new one can slip past without being seen.
 
 ## Commits and releases
 
-Commit messages follow [Conventional Commits](https://www.conventionalcommits.org/).
-[release-please](https://github.com/googleapis/release-please) reads them to choose the next
-version and write the changelog:
+Pull request titles follow [Conventional Commits](https://www.conventionalcommits.org/), and a
+check fails any that do not, using the same rules as the other OSDU libraries
+([`.commitlintrc.yml`](.commitlintrc.yml)). Pull requests are squash-merged, so the title becomes
+the commit on `main`. [release-please](https://github.com/googleapis/release-please) reads those
+commits to choose the next version and write the changelog:
 
 - `fix:` for a bug fix, released as a patch version.
 - `feat:` for new behaviour, released as a minor version.
+- `deps:` for dependency updates, released as a patch version. Dependabot uses it.
 - `!` (as in `feat!:`) only when users of `osducs` must change something to keep working. A
   change that is breaking somewhere else, such as in a dependency, is not a breaking change here.
-- `docs:`, `test:`, `build:` and `ci:` for changes that do not affect the CLI's behaviour. They
-  do not trigger a release.
+- `revert:` to undo an earlier change. It appears in the changelog and triggers a release.
+- `docs:`, `chore:`, `refactor:`, `style:` and `ci:` for everything else. These are left out of
+  the changelog and do not trigger a release.
+
+Bumping `Equinor.OsduCsharpClient` also means bumping `ref` in
+[`spec-source.yaml`](spec-source.yaml) to the matching client tag, in the same pull request. A
+test fails if the two disagree, since the coverage check has to see the specs that client was
+generated from. A Dependabot pull request for the client needs that commit added to it.
 
 ## Security
 

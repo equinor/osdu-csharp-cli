@@ -1,0 +1,22 @@
+name: Code scanning
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  schedule:
+    # Run every Wednesday at 00:00 UTC.
+    - cron: 0 0 * * 3
+
+permissions: {}
+
+jobs:
+  github-actions:
+    # Scan GitHub Actions workflow files for security vulnerabilities.
+    name: GitHub Actions
+    permissions:
+      contents: read
+      actions: read
+      security-events: write
+    uses: equinor/ops-actions/.github/workflows/zizmor-codeql.yml@4b9451c480b4b8632730c9cbc2f8d13e7a852259 # v9.42.0
