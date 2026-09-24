@@ -30,20 +30,31 @@ this way, and [COMMAND-GRAMMAR.md](COMMAND-GRAMMAR.md) holds the rules every com
 
 ## Build and test
 
-These are the checks CI runs on every pull request:
+Before pushing, with your changes committed, run the same checks CI runs on a pull request, in
+the same configuration:
 
 ```bash
-python3 tools/fetch_specs.py             # the specs, pinned to the client version in use
-python3 -m pytest                        # the generator's own tests
-python3 tools/generate_cli.py --check    # every in-scope endpoint is mapped or excluded
-python3 tools/generate_docs.py --check   # docs/COMMANDS.md is up to date
-dotnet build --no-incremental            # keep this free of warnings
-dotnet test
+python3 tools/fetch_specs.py              # the specs, pinned to the client version in use
+python3 -m pytest                         # the generator's own tests
+python3 tools/generate_cli.py --check     # every in-scope endpoint is mapped or excluded
+python3 tools/generate_docs.py --check    # docs/COMMANDS.md is up to date
+python3 tools/generate_cli.py && git diff --exit-code -- src/OsduCli/Commands/Generated
+dotnet build OsduCli.slnx --configuration Release --no-incremental
+dotnet test tests/OsduCli.Tests/OsduCli.Tests.csproj --configuration Release --no-build
 ```
 
-The project keeps its build free of warnings, though CI does not enforce it. That is why
-`--no-incremental` matters: an incremental build does not repeat warnings from files it did not
-recompile, so a new one can slip past without being seen.
+The fifth line fails if regenerating changes the committed code, which is how CI catches a
+manifest change committed without its generated output. It compares against what is committed,
+so run it after committing; if it fails, the regenerated files are what belongs in the next
+commit.
+
+CI builds and tests in Release, so do the same: a check that passes only in Debug has not passed.
+It also builds a preview binary for each platform and checks the pull request title, neither of
+which needs a local step.
+
+Keep the build free of warnings, though CI does not enforce it. CI starts from a clean checkout,
+so it sees every warning. Locally, `--no-incremental` gets the same result, because an
+incremental build does not repeat warnings from files it did not recompile.
 
 ## Changing a command
 
@@ -84,4 +95,5 @@ generated from.
 
 ## Security
 
-Report vulnerabilities as described in [SECURITY.md](SECURITY.md), not in a public issue.
+To report a vulnerability, follow [SECURITY.md](SECURITY.md). Which channel to use depends on
+how serious it is.
