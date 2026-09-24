@@ -11,30 +11,42 @@ is used against a live instance, and the generator runs in CI.
 
 ## Install
 
-The repository is **internal**, so release assets need an authenticated download — a plain
-`curl` of the asset URL returns 404. Either use the GitHub CLI:
+Download the archive for your platform from the [latest release][releases]. No account is
+needed. Each is around 30 MB compressed, and nothing else has to be installed, since the .NET
+runtime is inside the binary.
+
+macOS (Apple silicon):
 
 ```bash
-gh release download --repo equinor/osdu-csharp-cli --pattern "osducs-osx-arm64.tar.gz"
+curl -LO https://github.com/equinor/osdu-csharp-cli/releases/latest/download/osducs-osx-arm64.tar.gz
 tar -xzf osducs-osx-arm64.tar.gz && chmod +x osducs
+```
 
-# macOS quarantines downloads until the binary is signed and notarized
+Linux: the same, with `osducs-linux-x64.tar.gz`.
+
+Downloaded through a browser instead? macOS marks the file as quarantined, and since the binary
+is not yet signed and notarized, it will not run until the mark is cleared:
+
+```bash
 xattr -d com.apple.quarantine ./osducs
 ```
 
-…or download from the [releases page][releases] in a browser you are signed in with.
-
-`osducs-linux-x64.tar.gz` and `osducs-win-x64.zip` are the other two. Around 30 MB
-compressed; nothing else is needed, since the .NET runtime is inside the binary.
+`curl` does not set that flag, so after the commands above `xattr` would only report
+`No such xattr`.
 
 ### Windows
 
-The download carries a `Zone.Identifier` stream — the Mark of the Web — which is what
+```powershell
+curl.exe -LO https://github.com/equinor/osdu-csharp-cli/releases/latest/download/osducs-win-x64.zip
+Expand-Archive osducs-win-x64.zip -DestinationPath .
+.\osducs --version           # note the .\ — see below
+```
+
+A browser download carries a `Zone.Identifier` stream — the Mark of the Web — which is what
 SmartScreen reacts to. Clearing it needs no administrator:
 
 ```powershell
 Unblock-File .\osducs.exe    # or tick Unblock in the file's Properties dialog
-.\osducs --version           # note the .\ — see below
 ```
 
 Unblocking the `.zip` before extracting saves doing it per file.
@@ -62,9 +74,9 @@ On macOS and Linux the equivalent is somewhere already on `PATH`, such as
 
 ### Checking a download against the release
 
-Every asset ships a `.sha256` beside it, holding two lines: the archive's hash and the hash of
-the binary inside it. The second is the one Windows tooling reports, and the one to compare
-after extracting:
+Every asset ships a `.sha256` beside it, at the same URL with `.sha256` added, holding two
+lines: the archive's hash and the hash of the binary inside it. The second is the one Windows
+tooling reports, and the one to compare after extracting:
 
 ```powershell
 (Get-FileHash .\osducs.exe -Algorithm SHA256).Hash

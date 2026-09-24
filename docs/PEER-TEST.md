@@ -16,29 +16,31 @@ It does not replace `osducli`. The binary is called `osducs` precisely so both c
 
 ## 1. Install (2 minutes)
 
-The repository is internal, so the download needs to be authenticated. A plain `curl` of the
-asset URL returns 404.
+No account or sign-in is needed.
 
 **macOS (Apple silicon)**
 
 ```bash
-gh release download --repo equinor/osdu-csharp-cli --pattern "osducs-osx-arm64.tar.gz"
+curl -LO https://github.com/equinor/osdu-csharp-cli/releases/latest/download/osducs-osx-arm64.tar.gz
 tar -xzf osducs-osx-arm64.tar.gz && chmod +x osducs
-xattr -d com.apple.quarantine ./osducs     # not yet notarized
 sudo mv osducs /usr/local/bin/
 ```
+
+Downloaded through a browser instead? Run `xattr -d com.apple.quarantine ./osducs` before moving
+it: the binary is not yet notarized, and macOS quarantines browser downloads.
 
 **Windows**
 
 ```powershell
-gh release download --repo equinor/osdu-csharp-cli --pattern "osducs-win-x64.zip"
+curl.exe -LO https://github.com/equinor/osdu-csharp-cli/releases/latest/download/osducs-win-x64.zip
 Expand-Archive osducs-win-x64.zip -DestinationPath .
+.\osducs --version
 ```
 
-**SmartScreen will stop it the first time**, with *"Windows protected your PC — prevented an
-unrecognised app from starting"*. The dialog shows only a **Don't run** button; the way past it
-is the **More info** link, which reveals **Run anyway**. That is expected: the binary is
-unsigned, so Windows has no reputation for it.
+**A browser download is stopped by SmartScreen the first time**, with *"Windows protected your
+PC — prevented an unrecognised app from starting"*. The dialog shows only a **Don't run**
+button; the way past it is the **More info** link, which reveals **Run anyway**. That is
+expected: the binary is unsigned, so Windows has no reputation for it.
 
 Cleaner alternative, which avoids the dialog by clearing the downloaded-from-internet mark:
 
@@ -46,15 +48,15 @@ Cleaner alternative, which avoids the dialog by clearing the downloaded-from-int
 Unblock-File .\osducs.exe
 ```
 
-**If Run anyway does not appear, or the app is still blocked after clicking it, stop and tell
-us.** That is the difference between SmartScreen — a warning anyone can click through — and
+**If the app is blocked and Run anyway does not appear, or it is still blocked after clicking
+it, stop and tell us** — whichever way you downloaded it. That is the difference between SmartScreen — a warning anyone can click through — and
 WDAC, an application-control policy that cannot be bypassed. Which of the two your laptop
 enforces is the single most valuable thing this test round can establish; see §5.
 
-**Linux** — `osducs-linux-x64.tar.gz`, same shape as macOS without the `xattr` line.
+**Linux** — `osducs-linux-x64.tar.gz`, the same commands as macOS.
 
-No browser? The [releases page](https://github.com/equinor/osdu-csharp-cli/releases/latest)
-works if you are signed in to GitHub.
+The [releases page](https://github.com/equinor/osdu-csharp-cli/releases/latest) has all three,
+and the notes for each release.
 
 ### Testing a change that is not released yet
 
