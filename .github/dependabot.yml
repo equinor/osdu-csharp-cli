@@ -1,0 +1,22 @@
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+      day: sunday
+    cooldown:
+      default-days: 7
+    # Prefix commit messages with "deps" to include dependency updates in patch releases
+    commit-message:
+      prefix: deps
+    groups:
+      github-actions:
+        patterns: ["*"]
+
+  # No NuGet entry, unlike osdu-csharp-client. This repo restores Equinor.OsduCsharpClient
+  # from GitHub Packages, which asks for a token even for public packages. With the entry in
+  # place, the automatic dependency submission it switches on failed on 401 for every pull
+  # request, and Dependabot would meet the same feed. Enabling it needs a `registries:` entry for
+  # https://nuget.pkg.github.com/equinor/index.json backed by a Dependabot secret with
+  # read:packages. Bumping the client also needs spec-source.yaml bumped with it.

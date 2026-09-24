@@ -56,12 +56,12 @@ public class OsduCliProfileTests : IDisposable
             storage_url = /api/storage/v2/
             unit_url = /api/unit/v3/
             data_partition_id = dev
-            legal_tag = dev-equinor-osdu-reference-default
-            acl_viewer = data.default.viewers@dev.dataservices.energy
+            legal_tag = opendes-public-usa-dataset-1
+            acl_viewer = data.default.viewers@opendes.contoso.com
             authentication_mode = msal_interactive
-            authority = https://login.microsoftonline.com/3aa4a235
+            authority = https://login.microsoftonline.com/00000000-0000-0000-0000-000000000000
             scopes = https://energy.azure.com/.default openid
-            client_id = 7a414874-4b27-4378-b34f-bc9e5a5faa4f
+            client_id = 11111111-2222-3333-4444-555555555555
             """);
         return path;
     }
@@ -75,7 +75,7 @@ public class OsduCliProfileTests : IDisposable
 
         Assert.Equal("https://dev.example.com", config.Server);
         Assert.Equal("dev", config.DataPartitionId);
-        Assert.Equal("7a414874-4b27-4378-b34f-bc9e5a5faa4f", config.ClientId);
+        Assert.Equal("11111111-2222-3333-4444-555555555555", config.ClientId);
         Assert.Equal("https://energy.azure.com/.default openid", config.Scopes);
     }
 
