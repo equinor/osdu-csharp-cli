@@ -4,6 +4,8 @@ Most of `osducs` is generated. The OpenAPI specs say what each OSDU service can 
 manifests in [`cli-manifest/`](cli-manifest/) say what the CLI exposes and how, and
 `tools/generate_cli.py` joins the two into C#. The [README](README.md) explains why it is built
 this way, and [COMMAND-GRAMMAR.md](COMMAND-GRAMMAR.md) holds the rules every command follows.
+[docs/DEVELOPMENT.md](docs/DEVELOPMENT.md) covers how the code fits together and the less
+frequent tasks: upgrading the client library, adding a service and releasing.
 
 ## Prerequisites
 
