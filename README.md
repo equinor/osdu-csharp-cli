@@ -106,6 +106,7 @@ rather than replacing it.
 | [docs/USAGE.md](docs/USAGE.md) | configuration, output, finding records — the everyday guide |
 | [docs/COMMANDS.md](docs/COMMANDS.md) | every command and flag, generated from the manifests |
 | [docs/TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md) | failure modes seen against a live instance, and which are not the CLI's fault |
+| [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md) | for maintainers: how the code fits together, upgrading the client, adding a service, releasing |
 | [docs/MANIFEST.md](docs/MANIFEST.md) | every key a manifest can use, for adding or changing commands |
 | [COMMAND-GRAMMAR.md](COMMAND-GRAMMAR.md) | why commands are named as they are, and the reasoning behind manifest features |
 
