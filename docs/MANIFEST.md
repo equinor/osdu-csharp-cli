@@ -117,6 +117,7 @@ A request body takes one of two forms.
 | `required` | no | Whether the file must be given. Defaults to `true`. |
 | `help` | no | Help text. Defaults to "JSON file containing the request body." |
 | `wrap-single` | no | Accept a single JSON object where the endpoint takes a list, and wrap it in an array. Several create endpoints take a list, but users usually have one record. |
+| `collection` | no | Whether the body is a JSON array of `model`. Derived from the spec. When `model` is given, it defaults to `false`. |
 
 **Assembled from options.** Each body property the command exposes gets its own option:
 
@@ -125,15 +126,15 @@ A request body takes one of two forms.
 | `fields` | yes, for this form | Body properties and their options. See [Body `fields`](#body-fields). |
 | `fixed` | no | Properties sent with a fixed value on every call, which no option can change. See [`fixed` body values](../COMMAND-GRAMMAR.md#fixed-body-values). |
 
-A body has either `flag` or `fields`, never both. The file-form keys `short`, `required`, `help`
-and `wrap-single` are refused alongside `fields`.
+A body has either `flag` or `fields`, never both. The file-form keys `short`, `required`, `help`,
+`wrap-single` and `collection` are refused alongside `fields`. Options build a single JSON
+object, so an operation whose body is an array has to read it from a file.
 
-Both forms take these:
+Both forms take this:
 
 | Key | Required | What it does |
 |---|---|---|
 | `model` | no | The client library's class for the body. Derived from the spec's `$ref`, and required when the spec declares the body inline. A class outside the service's `models` namespace needs its full name. |
-| `collection` | no | Whether the body is a JSON array of `model`. Derived from the spec. When `model` is given, it defaults to `false`. |
 
 ### Body `fields`
 
@@ -165,7 +166,7 @@ mapping:
 | `columns-from` | no | A body field whose values become the columns when the user gives it, so fields asked for with `record search --returned-fields` are shown. Must name one of the command's body fields. See [`columns-from`](../COMMAND-GRAMMAR.md#columns-from). |
 | `total-from` | no | A top-level number printed above the table as "N matching records", in table mode only. A count of exactly 10,000 is shown as "10,000+" with a pointer to `--track-total-count`, Search's cap on counts. See [`total-from`](../COMMAND-GRAMMAR.md#total-from). |
 | `cursor-from` | no | A top-level string holding the next page's cursor. When it is present, a note says `More results: repeat with --cursor <value>`, in both output modes, so the command should have a `--cursor` option. |
-| `message` | no | The line printed on success by a command whose operation returns no body. Defaults to "Done.". Refused on an operation that returns a body, where it would never be shown. |
+| `message` | no | The line printed on success by a command whose operation returns no body. Defaults to "Done.". Refused on an operation that returns a body, where it would never be shown, even when empty. |
 
 ### `examples`
 

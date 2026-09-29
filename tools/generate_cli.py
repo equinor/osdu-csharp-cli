@@ -1109,12 +1109,21 @@ def build_command(entry: dict, operation: dict, where: str, models_root: str,
             )
 
         # Keys that configure the file option only. With `fields:` there is no such option,
-        # so they would be accepted and do nothing.
+        # so they would be accepted and do nothing. `collection` is among them: a body built
+        # from fields is always one JSON object, so `collection: true` would deserialise an
+        # object as an array and fail at run time, and `false` would do nothing.
         if fields_cfg and (file_only := sorted(
-                {"short", "required", "help", "wrap-single"} & set(body_cfg))):
+                {"short", "required", "help", "wrap-single", "collection"} & set(body_cfg))):
             raise ManifestError(
                 f"{where}: `body:` key(s) {', '.join(file_only)} apply to a body read from a "
                 "file (`flag:`), not to one assembled from `fields:`.")
+        # The same mismatch, derived rather than declared: an operation whose body is an
+        # array cannot take the single object `fields:` builds.
+        if fields_cfg and collection:
+            raise ManifestError(
+                f"{where}: this operation's body is a JSON array, and `fields:` builds a single "
+                "object. Read the body from a file with `flag:` instead, adding `wrap-single: "
+                "true` to accept one object.")
         # Checked like params: a body option on a global alias shadows it or makes the parse
         # ambiguous, and this check used to cover params only.
         for key in ("flag", "short"):
@@ -1208,7 +1217,8 @@ def build_command(entry: dict, operation: dict, where: str, models_root: str,
     if not isinstance(output, dict):
         raise ManifestError(f"{where}: `output:` must be a mapping or the literal `raw`")
 
-    if output.get("message") and returns_value(operation):
+    # The key's presence, not its value: `message: ""` would be just as ineffective.
+    if "message" in output and returns_value(operation):
         raise ManifestError(
             f"{where}: `output.message` is printed only when the operation returns no body, "
             "and this one returns a body, so the message would never be shown.")

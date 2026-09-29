@@ -14,7 +14,7 @@ import pytest
 import yaml
 
 import generate_cli
-from generate_cli import MANIFEST_KEYS, ManifestError, build_service
+from generate_cli import MANIFEST_KEYS, ManifestError, build_service, check_tree
 
 ROOT = Path(__file__).resolve().parents[2]
 REFERENCE = ROOT / "docs" / "MANIFEST.md"
@@ -71,12 +71,14 @@ def example_manifest() -> str:
 @pytest.mark.skipif(not (ROOT / "openapi_specs" / "legal").is_dir(),
                     reason="specs not fetched; run tools/fetch_specs.py")
 def test_the_example_builds_against_the_real_spec(tmp_path):
-    # Coverage is checked by main(), not build_service, so a partial manifest is fine here;
-    # what this catches is an example naming keys, operations or params that do not exist.
+    # Every check a generator run applies except coverage, which needs the whole service.
+    # build_service catches unknown keys, operations and params; check_tree catches what only
+    # the assembled tree shows, such as a group with no description.
     path = tmp_path / "legal.yaml"
     path.write_text(example_manifest(), encoding="utf-8")
 
     service = build_service(path)
+    check_tree([service])
 
     assert [" ".join(c.path) for c in service.commands] == ["legaltag get"]
 

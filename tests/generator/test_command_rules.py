@@ -293,8 +293,14 @@ class TestKeysThatWereAcceptedAndIgnored:
         command = build(base(output={"message": "Deleted"}), {**OPERATION, **self.NO_BODY})
         assert command.message == "Deleted"
 
+    def test_an_empty_message_on_an_operation_that_returns_a_body_is_rejected(self):
+        # The key, not its value: `message: ""` is just as ineffective.
+        with pytest.raises(ManifestError, match="never be shown"):
+            build(base(output={"message": ""}))
+
     @pytest.mark.parametrize("key, value", [
-        ("short", "-b"), ("required", False), ("help", "x"), ("wrap-single", True)])
+        ("short", "-b"), ("required", False), ("help", "x"), ("wrap-single", True),
+        ("collection", True), ("collection", False)])
     def test_file_only_body_keys_are_rejected_with_fields(self, key, value):
         entry = {"command": "record search", "op": {"method": "post", "path": "/query"},
                  "body": {key: value, "fields": {"kind": {"flag": "--kind"}}},
@@ -324,3 +330,19 @@ class TestBodyOptionAliases:
                  "body": {"flag": "--config"}, "output": "raw"}
         with pytest.raises(ManifestError, match="global option"):
             build(entry, BODY_OPERATION)
+
+    def test_fields_cannot_build_a_body_the_operation_takes_as_an_array(self):
+        # `fields:` always builds one JSON object; deserialising it as a list fails at run
+        # time, so an array body has to come from a file.
+        array_operation = {
+            "requestBody": {"content": {"application/json": {"schema": {
+                "type": "array", "items": {"$ref": "#/components/schemas/Record"}}}}},
+            "responses": {"200": {"content": {"application/json": {"schema": {"type": "object"}}}}},
+        }
+        entry = {"command": "record put", "op": {"method": "put", "path": "/records"},
+                 "body": {"fields": {"kind": {"flag": "--kind"}}}, "output": "raw"}
+        with pytest.raises(ManifestError, match="JSON array"):
+            build(entry, array_operation)
+
+        entry["body"] = {"flag": "--file", "wrap-single": True}
+        assert build(entry, array_operation).body.collection
