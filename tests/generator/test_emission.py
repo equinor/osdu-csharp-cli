@@ -60,7 +60,7 @@ CASES = {
          "op": {"method": "get", "path": "/query/records"},
          "params": {"kind": {"flag": "--kind", "short": "-k", "required": True,
                              "help": "Kind."},
-                    "limit": {"flag": "--limit", "type": "int", "help": "Max."}},
+                    "limit": {"flag": "--limit", "help": "Max."}},
          "output": {"root": "results", "columns": {"Id": "id", "Kind": "kind"}}},
         operation(parameters=[query("kind"), query("limit", "int32")]),
     ),

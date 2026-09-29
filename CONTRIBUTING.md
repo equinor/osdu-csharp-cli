@@ -58,7 +58,8 @@ incremental build does not repeat warnings from files it did not recompile.
 
 ## Changing a command
 
-- **Edit the manifest, then regenerate.** Run `python3 tools/generate_cli.py` and
+- **Edit the manifest, then regenerate.** [docs/MANIFEST.md](docs/MANIFEST.md) lists every key
+  a manifest can use. Run `python3 tools/generate_cli.py` and
   `python3 tools/generate_docs.py`, and commit the regenerated `src/OsduCli/Commands/Generated/`
   and `docs/COMMANDS.md` with the manifest change. CI fails if they are out of date.
 - **Never edit the generated `.g.cs` files.** Behaviour the manifest cannot express belongs in

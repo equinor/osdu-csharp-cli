@@ -50,8 +50,7 @@ commands:
     op: { method: post, path: "/metadataRecord/{id}/undelete" }
     params:
       id: { flag: --id, short: -id, required: true, help: Dataset metadata record id to restore. }
-    output:
-      message: Dataset metadata record restored
+    output: raw
 
   - command: dataset upload-url
     summary: Get instructions for writing a new dataset's bytes.

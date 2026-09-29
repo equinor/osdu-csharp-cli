@@ -106,7 +106,8 @@ rather than replacing it.
 | [docs/USAGE.md](docs/USAGE.md) | configuration, output, finding records — the everyday guide |
 | [docs/COMMANDS.md](docs/COMMANDS.md) | every command and flag, generated from the manifests |
 | [docs/TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md) | failure modes seen against a live instance, and which are not the CLI's fault |
-| [COMMAND-GRAMMAR.md](COMMAND-GRAMMAR.md) | why commands are named as they are, and the manifest reference |
+| [docs/MANIFEST.md](docs/MANIFEST.md) | every key a manifest can use, for adding or changing commands |
+| [COMMAND-GRAMMAR.md](COMMAND-GRAMMAR.md) | why commands are named as they are, and the reasoning behind manifest features |
 
 ## First run
 
@@ -231,6 +232,8 @@ Data rather than an expression language because a generator can emit and validat
 reviewer can read it without knowing JMESPath, and it needs no expression evaluator at
 runtime — which keeps NativeAOT trivial.
 
+Every key a manifest can use is listed in [docs/MANIFEST.md](docs/MANIFEST.md).
+
 ## What the generator derives, and what it refuses to guess
 
 Derived from the spec: the Kiota request-builder accessor chain, the HTTP method, C# option
@@ -281,9 +284,9 @@ or transport failure rather than a user error.
 
 ## Smoke-testing the examples
 
-Help examples are untested documentation and rot silently — `data.Country:"Norway"` sat in
-`record search --help` matching nothing, because that field exists on no OSDU kind. CI cannot
-catch it: it needs a live service and a token.
+Examples are untested documentation and rot silently — `data.Country:"Norway"` sat in
+`record search`'s documentation matching nothing, because that field exists on no OSDU kind. CI
+cannot catch it: it needs a live service and a token.
 
 ```bash
 python3 tools/smoke_test.py            # every example, default profile
@@ -292,7 +295,7 @@ python3 tools/smoke_test.py record     # only `record …` commands
 ```
 
 The examples live in the manifests beside the command they document, so the string shown in
-help and the string executed here are the same string. An example that cannot run anywhere —
+[the command reference](docs/COMMANDS.md) and the string executed here are the same string. An example that cannot run anywhere —
 a record id is scoped to a data partition — carries a `skip:` reason and is reported as
 skipped rather than failed.
 

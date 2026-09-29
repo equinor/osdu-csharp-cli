@@ -16,7 +16,7 @@ commands:
     summary: List LegalTags in the partition.
     op: { method: get, path: /legaltags }
     params:
-      valid: { flag: --valid, type: bool, help: "Return only valid tags (true) or only invalid ones (false). Omit for all." }
+      valid: { flag: --valid, help: "Return only valid tags (true) or only invalid ones (false). Omit for all." }
     examples:
       - ""
     output:

@@ -270,3 +270,115 @@ class TestFixedBodyValues:
         # Too large for a double: refused here, not left to a C# literal that cannot parse.
         with pytest.raises(ManifestError, match="not a finite number"):
             self.build(self.entry({"score": 10**400}, self.KIND))
+
+
+class TestKeysThatWereAcceptedAndIgnored:
+    """Keys the manifest reference used to have to describe as "accepted, no effect".
+
+    Each was valid YAML, passed the unknown-key check, and did nothing, which is the failure
+    the unknown-key check exists to prevent.
+    """
+
+    NO_BODY = {"responses": {"204": {"description": "done"}}}
+
+    def test_a_param_type_is_rejected_because_the_spec_decides_it(self):
+        with pytest.raises(ManifestError, match="'type'"):
+            build(base(params={"recordId": {"flag": "--record-id", "type": "int"}}))
+
+    def test_a_message_on_an_operation_that_returns_a_body_is_rejected(self):
+        with pytest.raises(ManifestError, match="never be shown"):
+            build(base(output={"message": "Restored"}))
+
+    def test_a_message_on_an_operation_with_no_body_is_accepted(self):
+        command = build(base(output={"message": "Deleted"}), {**OPERATION, **self.NO_BODY})
+        assert command.message == "Deleted"
+
+    @pytest.mark.parametrize("body", [
+        {"flag": "--file", "fields": {}},
+        {"fields": {}},
+    ])
+    def test_an_empty_fields_map_is_rejected(self, body):
+        # Beside `flag:` it was accepted and did nothing.
+        entry = {"command": "record search", "op": {"method": "post", "path": "/query"},
+                 "body": body, "output": "raw"}
+        with pytest.raises(ManifestError, match="is empty"):
+            build(entry, BODY_OPERATION)
+
+    def test_an_empty_message_on_an_operation_that_returns_a_body_is_rejected(self):
+        # The key, not its value: `message: ""` is just as ineffective.
+        with pytest.raises(ManifestError, match="never be shown"):
+            build(base(output={"message": ""}))
+
+    @pytest.mark.parametrize("key, value", [
+        ("short", "-b"), ("required", False), ("help", "x"), ("wrap-single", True),
+        ("collection", True), ("collection", False)])
+    def test_file_only_body_keys_are_rejected_with_fields(self, key, value):
+        entry = {"command": "record search", "op": {"method": "post", "path": "/query"},
+                 "body": {key: value, "fields": {"kind": {"flag": "--kind"}}},
+                 "output": "raw"}
+        with pytest.raises(ManifestError, match=key):
+            build(entry, BODY_OPERATION)
+
+
+class TestBodyOptionAliases:
+    """Body options were exempt from the global-alias check that params get."""
+
+    @pytest.mark.parametrize("flag", ["--config", "-c", "--output", "--user", "--help"])
+    def test_a_body_field_cannot_reuse_a_global_alias(self, flag):
+        entry = {"command": "record search", "op": {"method": "post", "path": "/query"},
+                 "body": {"fields": {"kind": {"flag": flag}}}, "output": "raw"}
+        with pytest.raises(ManifestError, match="global option"):
+            build(entry, BODY_OPERATION)
+
+    def test_a_body_field_short_alias_is_checked_too(self):
+        entry = {"command": "record search", "op": {"method": "post", "path": "/query"},
+                 "body": {"fields": {"kind": {"flag": "--kind", "short": "-o"}}}, "output": "raw"}
+        with pytest.raises(ManifestError, match="global option"):
+            build(entry, BODY_OPERATION)
+
+    def test_a_body_file_flag_is_checked_too(self):
+        entry = {"command": "record add", "op": {"method": "post", "path": "/query"},
+                 "body": {"flag": "--config"}, "output": "raw"}
+        with pytest.raises(ManifestError, match="global option"):
+            build(entry, BODY_OPERATION)
+
+
+class TestArrayBodies:
+    """A body built from `fields:` is always one JSON object, so it cannot serve an operation
+    whose body is an array; that has to come from a file."""
+
+    def test_fields_cannot_build_a_body_the_operation_takes_as_an_array(self):
+        # `fields:` always builds one JSON object; deserialising it as a list fails at run
+        # time, so an array body has to come from a file.
+        array_operation = {
+            "requestBody": {"content": {"application/json": {"schema": {
+                "type": "array", "items": {"$ref": "#/components/schemas/Record"}}}}},
+            "responses": {"200": {"content": {"application/json": {"schema": {"type": "object"}}}}},
+        }
+        entry = {"command": "record put", "op": {"method": "put", "path": "/records"},
+                 "body": {"fields": {"kind": {"flag": "--kind"}}}, "output": "raw"}
+        with pytest.raises(ManifestError, match="JSON array"):
+            build(entry, array_operation)
+
+        entry["body"] = {"flag": "--file", "wrap-single": True}
+        assert build(entry, array_operation).body.collection
+
+    INLINE_ARRAY = {
+        "requestBody": {"content": {"application/json": {"schema": {
+            "type": "array", "items": {"type": "object", "properties": {"kind": {"type": "string"}}}}}}},
+        "responses": {"200": {"content": {"application/json": {"schema": {"type": "object"}}}}},
+    }
+
+    def test_an_explicit_model_does_not_hide_an_array_body_from_fields(self):
+        # An inline array body needs `model:`, and naming the model used to skip looking at the
+        # schema, so the array went unnoticed and `fields:` was accepted.
+        entry = {"command": "record put", "op": {"method": "put", "path": "/records"},
+                 "body": {"model": "RecordsPutRequestBody", "fields": {"kind": {"flag": "--kind"}}},
+                 "output": "raw"}
+        with pytest.raises(ManifestError, match="JSON array"):
+            build(entry, self.INLINE_ARRAY)
+
+    def test_an_explicit_model_on_an_array_body_is_read_as_a_collection(self):
+        entry = {"command": "record put", "op": {"method": "put", "path": "/records"},
+                 "body": {"model": "RecordsPutRequestBody", "flag": "--file"}, "output": "raw"}
+        assert build(entry, self.INLINE_ARRAY).body.collection
