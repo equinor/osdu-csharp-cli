@@ -331,6 +331,11 @@ class TestBodyOptionAliases:
         with pytest.raises(ManifestError, match="global option"):
             build(entry, BODY_OPERATION)
 
+
+class TestArrayBodies:
+    """A body built from `fields:` is always one JSON object, so it cannot serve an operation
+    whose body is an array; that has to come from a file."""
+
     def test_fields_cannot_build_a_body_the_operation_takes_as_an_array(self):
         # `fields:` always builds one JSON object; deserialising it as a list fails at run
         # time, so an array body has to come from a file.
