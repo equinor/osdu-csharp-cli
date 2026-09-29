@@ -25,7 +25,7 @@ commands:
     summary: List groups the caller belongs to.
     op: { method: get, path: /groups }
     params:
-      roleRequired: { flag: --role-required, type: bool, help: Include the caller's role in each group. }
+      roleRequired: { flag: --role-required, help: Include the caller's role in each group. }
     examples:
       - ""
     output:
@@ -68,7 +68,7 @@ commands:
     params:
       group_email: { flag: --group, short: -g, required: true, help: Group email address. }
       role:        { flag: --role, help: Return only members with this role. }
-      includeType: { flag: --include-type, type: bool, help: Include each member's type in the output. }
+      includeType: { flag: --include-type, help: Include each member's type in the output. }
     output:
       root: members
       columns:
@@ -127,7 +127,7 @@ commands:
       # them all has no other way to guess it from a list of the three real types.
       type:         { flag: --type, required: true, help: "Group type: NONE for all groups, or DATA, SERVICE or USER to filter." }
       appid:        { flag: --appid, help: Filter to groups granted to this application id. }
-      roleRequired: { flag: --role-required, type: bool, help: Include the member's role in each group. }
+      roleRequired: { flag: --role-required, help: Include the member's role in each group. }
     output:
       root: groups
       columns:

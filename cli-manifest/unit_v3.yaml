@@ -30,8 +30,8 @@ commands:
     summary: List all units in the catalog.
     op: { method: get, path: /v3/unit }
     params:
-      offset: { flag: --offset, type: int, help: Number of units to skip. }
-      limit:  { flag: --limit,  type: int, help: Maximum number of units to return. }
+      offset: { flag: --offset, help: Number of units to skip. }
+      limit:  { flag: --limit, help: Maximum number of units to return. }
     examples:
       - --limit 5
     output:
@@ -53,8 +53,8 @@ commands:
     summary: Search the unit catalog.
     op: { method: post, path: /v3/unit/search }
     params:
-      offset: { flag: --offset, type: int, help: Number of results to skip. }
-      limit:  { flag: --limit,  type: int, help: Maximum number of results to return. }
+      offset: { flag: --offset, help: Number of results to skip. }
+      limit:  { flag: --limit, help: Maximum number of results to return. }
     body:
       fields:
         query:
@@ -119,8 +119,8 @@ commands:
     summary: List mappings between units in different namespaces.
     op: { method: get, path: /v3/unit/maps }
     params:
-      offset: { flag: --offset, type: int, help: Number of mappings to skip. }
-      limit:  { flag: --limit,  type: int, help: Maximum number of mappings to return. }
+      offset: { flag: --offset, help: Number of mappings to skip. }
+      limit:  { flag: --limit, help: Maximum number of mappings to return. }
     output: raw
 
   # ---- unit conversion ---------------------------------------------------------------
@@ -152,8 +152,8 @@ commands:
     summary: Search across every kind of item in the catalog.
     op: { method: post, path: /v3/catalog/search }
     params:
-      offset: { flag: --offset, type: int, help: Number of results to skip. }
-      limit:  { flag: --limit,  type: int, help: Maximum number of results to return. }
+      offset: { flag: --offset, help: Number of results to skip. }
+      limit:  { flag: --limit, help: Maximum number of results to return. }
     body:
       fields:
         query:
@@ -167,8 +167,8 @@ commands:
     summary: List the states a unit or measurement mapping can be in.
     op: { method: get, path: /v3/catalog/mapstates }
     params:
-      offset: { flag: --offset, type: int, help: Number of states to skip. }
-      limit:  { flag: --limit,  type: int, help: Maximum number of states to return. }
+      offset: { flag: --offset, help: Number of states to skip. }
+      limit:  { flag: --limit, help: Maximum number of states to return. }
     output: raw
 
   - command: unit catalog last-modified
@@ -181,8 +181,8 @@ commands:
     summary: List all measurements in the catalog.
     op: { method: get, path: /v3/measurement/list }
     params:
-      offset: { flag: --offset, type: int, help: Number of measurements to skip. }
-      limit:  { flag: --limit,  type: int, help: Maximum number of measurements to return. }
+      offset: { flag: --offset, help: Number of measurements to skip. }
+      limit:  { flag: --limit, help: Maximum number of measurements to return. }
     output:
       root: measurements
       columns:
@@ -201,8 +201,8 @@ commands:
     summary: Search the measurement catalog.
     op: { method: post, path: /v3/measurement/search }
     params:
-      offset: { flag: --offset, type: int, help: Number of results to skip. }
-      limit:  { flag: --limit,  type: int, help: Maximum number of results to return. }
+      offset: { flag: --offset, help: Number of results to skip. }
+      limit:  { flag: --limit, help: Maximum number of results to return. }
     body:
       fields:
         query:
@@ -221,8 +221,8 @@ commands:
     summary: List mappings between measurements in different namespaces.
     op: { method: get, path: /v3/measurement/maps }
     params:
-      offset: { flag: --offset, type: int, help: Number of mappings to skip. }
-      limit:  { flag: --limit,  type: int, help: Maximum number of mappings to return. }
+      offset: { flag: --offset, help: Number of mappings to skip. }
+      limit:  { flag: --limit, help: Maximum number of mappings to return. }
     output: raw
 
   # ---- unit-system -------------------------------------------------------------------
@@ -230,8 +230,8 @@ commands:
     summary: List the available unit systems.
     op: { method: get, path: /v3/unitsystem/list }
     params:
-      offset: { flag: --offset, type: int, help: Number of unit systems to skip. }
-      limit:  { flag: --limit,  type: int, help: Maximum number of unit systems to return. }
+      offset: { flag: --offset, help: Number of unit systems to skip. }
+      limit:  { flag: --limit, help: Maximum number of unit systems to return. }
     output: raw
 
   - command: unit-system get
@@ -239,8 +239,8 @@ commands:
     op: { method: get, path: /v3/unitsystem }
     params:
       name:   { flag: --name, short: -n, required: true, help: Unit system name. }
-      offset: { flag: --offset, type: int, help: Number of entries to skip. }
-      limit:  { flag: --limit,  type: int, help: Maximum number of entries to return. }
+      offset: { flag: --offset, help: Number of entries to skip. }
+      limit:  { flag: --limit, help: Maximum number of entries to return. }
     output: raw
 
 exclude:

@@ -660,7 +660,9 @@ MANIFEST_KEYS = {
     "command": {"command", "summary", "op", "builder", "params", "body", "output",
                 "examples", "require-one-of", "mutually-exclusive", "forbidden-hint"},
     "op": {"method", "path"},
-    "param": {"flag", "short", "required", "help", "type"},
+    # No `type`: a parameter's C# type is derived from the spec. The key used to be accepted
+    # here and never read, so 25 manifest entries stated a type that had no effect.
+    "param": {"flag", "short", "required", "help"},
     "body": {"flag", "short", "required", "help", "model", "collection", "wrap-single",
              "fields", "fixed"},
     "body field": {"flag", "short", "required", "help", "type", "parts"},
@@ -761,6 +763,15 @@ def build_service(manifest_path: Path) -> Service:
                 f"{manifest_path.name}: exclude {key[0].upper()} {key[1]} needs a `reason:`"
             )
         claimed.add(key)
+
+    # A single pattern written as a string was iterated character by character, and the `*`
+    # among them matched every path, so the scope silently covered the whole spec.
+    scope = manifest.get("scope")
+    if scope is not None and (not isinstance(scope, list)
+                              or not all(isinstance(p, str) for p in scope)):
+        raise ManifestError(
+            f"{manifest_path.name}: `scope:` must be a list of path patterns, such as "
+            f"[\"/ddms/v3/*\"], not {scope!r}")
 
     spec_version = ((spec.get("info") or {}).get("version") or "").strip()
 
@@ -1097,11 +1108,27 @@ def build_command(entry: dict, operation: dict, where: str, models_root: str,
                 "(assemble the body from options)."
             )
 
+        # Keys that configure the file option only. With `fields:` there is no such option,
+        # so they would be accepted and do nothing.
+        if fields_cfg and (file_only := sorted(
+                {"short", "required", "help", "wrap-single"} & set(body_cfg))):
+            raise ManifestError(
+                f"{where}: `body:` key(s) {', '.join(file_only)} apply to a body read from a "
+                "file (`flag:`), not to one assembled from `fields:`.")
+        # Checked like params: a body option on a global alias shadows it or makes the parse
+        # ambiguous, and this check used to cover params only.
+        for key in ("flag", "short"):
+            if body_cfg.get(key):
+                check_alias(body_cfg[key], where, f"body {key}")
+
         fields = []
         field_schemas = body_schema_properties(operation, spec)
         for field_name, field_cfg in fields_cfg.items():
             if "flag" not in field_cfg:
                 raise ManifestError(f"{where}: body field {field_name!r} needs a `flag:`")
+            check_alias(field_cfg["flag"], where, f"body field {field_name!r} flag")
+            if field_cfg.get("short"):
+                check_alias(field_cfg["short"], where, f"body field {field_name!r} short alias")
             field_schema = resolve_field_schema(field_schemas, field_name, spec)
             fields.append(BodyField(
                 name=field_name,
@@ -1180,6 +1207,11 @@ def build_command(entry: dict, operation: dict, where: str, models_root: str,
         output = {}
     if not isinstance(output, dict):
         raise ManifestError(f"{where}: `output:` must be a mapping or the literal `raw`")
+
+    if output.get("message") and returns_value(operation):
+        raise ManifestError(
+            f"{where}: `output.message` is printed only when the operation returns no body, "
+            "and this one returns a body, so the message would never be shown.")
 
     columns_from = output.get("columns-from")
     if columns_from:

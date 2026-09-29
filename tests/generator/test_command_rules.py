@@ -270,3 +270,57 @@ class TestFixedBodyValues:
         # Too large for a double: refused here, not left to a C# literal that cannot parse.
         with pytest.raises(ManifestError, match="not a finite number"):
             self.build(self.entry({"score": 10**400}, self.KIND))
+
+
+class TestKeysThatWereAcceptedAndIgnored:
+    """Keys the manifest reference used to have to describe as "accepted, no effect".
+
+    Each was valid YAML, passed the unknown-key check, and did nothing, which is the failure
+    the unknown-key check exists to prevent.
+    """
+
+    NO_BODY = {"responses": {"204": {"description": "done"}}}
+
+    def test_a_param_type_is_rejected_because_the_spec_decides_it(self):
+        with pytest.raises(ManifestError, match="'type'"):
+            build(base(params={"recordId": {"flag": "--record-id", "type": "int"}}))
+
+    def test_a_message_on_an_operation_that_returns_a_body_is_rejected(self):
+        with pytest.raises(ManifestError, match="never be shown"):
+            build(base(output={"message": "Restored"}))
+
+    def test_a_message_on_an_operation_with_no_body_is_accepted(self):
+        command = build(base(output={"message": "Deleted"}), {**OPERATION, **self.NO_BODY})
+        assert command.message == "Deleted"
+
+    @pytest.mark.parametrize("key, value", [
+        ("short", "-b"), ("required", False), ("help", "x"), ("wrap-single", True)])
+    def test_file_only_body_keys_are_rejected_with_fields(self, key, value):
+        entry = {"command": "record search", "op": {"method": "post", "path": "/query"},
+                 "body": {key: value, "fields": {"kind": {"flag": "--kind"}}},
+                 "output": "raw"}
+        with pytest.raises(ManifestError, match=key):
+            build(entry, BODY_OPERATION)
+
+
+class TestBodyOptionAliases:
+    """Body options were exempt from the global-alias check that params get."""
+
+    @pytest.mark.parametrize("flag", ["--config", "-c", "--output", "--user", "--help"])
+    def test_a_body_field_cannot_reuse_a_global_alias(self, flag):
+        entry = {"command": "record search", "op": {"method": "post", "path": "/query"},
+                 "body": {"fields": {"kind": {"flag": flag}}}, "output": "raw"}
+        with pytest.raises(ManifestError, match="global option"):
+            build(entry, BODY_OPERATION)
+
+    def test_a_body_field_short_alias_is_checked_too(self):
+        entry = {"command": "record search", "op": {"method": "post", "path": "/query"},
+                 "body": {"fields": {"kind": {"flag": "--kind", "short": "-o"}}}, "output": "raw"}
+        with pytest.raises(ManifestError, match="global option"):
+            build(entry, BODY_OPERATION)
+
+    def test_a_body_file_flag_is_checked_too(self):
+        entry = {"command": "record add", "op": {"method": "post", "path": "/query"},
+                 "body": {"flag": "--config"}, "output": "raw"}
+        with pytest.raises(ManifestError, match="global option"):
+            build(entry, BODY_OPERATION)
