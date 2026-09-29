@@ -148,7 +148,9 @@ environment that has not caught up, while the spec is right. See
 - **On macOS, allow the Keychain prompt.** The sign-in cache is protected by the Keychain, and a
   locally built binary is a different program each time it is rebuilt, so macOS asks whether it
   may read the cache. Until someone answers, the command waits.
-- **Every pull request builds binaries** for all three platforms and keeps them for 14 days.
+- **A pull request whose checks pass gets binaries** for all three platforms, kept for 14
+  days. They are built only when both Check manifests and Build and test succeed, so a pull
+  request that fails either has none.
   [PEER-TEST.md](PEER-TEST.md#testing-a-change-that-is-not-released-yet) shows how to download
   one, so a reviewer can run the change without building it.
 
@@ -184,8 +186,8 @@ release.
 
 | Workflow | Runs on | What it does |
 |---|---|---|
-| Run Tests | pull requests | **Check manifests**: fetches the specs, runs the generator's tests and checks, and fails if the generated code or `docs/COMMANDS.md` is out of date. **Build and test**: builds and runs the C# tests in Release. **Preview**: builds the three binaries for reviewers. |
-| Release | pushes to `main` | Runs release-please; when a release is created, runs the tests and publishes the binaries. |
+| Run Tests | pull requests, and called by Release | **Check manifests**: fetches the specs, runs the generator's tests and checks, and fails if the generated code or `docs/COMMANDS.md` is out of date. **Build and test**: builds and runs the C# tests in Release. **Preview**, on pull requests only and once both have passed: builds the three binaries for reviewers. |
+| Release | pushes to `main`, and by hand | On a push, runs release-please, and when that creates a release, runs Run Tests and publishes the binaries. Run by hand, it skips release-please and runs the tests and publishing for the latest release. |
 | Code scanning | pull requests, pushes to `main`, weekly | Checks the workflow files for security problems with zizmor. GitHub's CodeQL default setup runs alongside it. |
 | Lint Pull Request | pull requests | Checks the title against [`.commitlintrc.yml`](../.commitlintrc.yml). |
 
