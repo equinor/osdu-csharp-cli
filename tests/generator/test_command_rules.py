@@ -346,3 +346,23 @@ class TestBodyOptionAliases:
 
         entry["body"] = {"flag": "--file", "wrap-single": True}
         assert build(entry, array_operation).body.collection
+
+    INLINE_ARRAY = {
+        "requestBody": {"content": {"application/json": {"schema": {
+            "type": "array", "items": {"type": "object", "properties": {"kind": {"type": "string"}}}}}}},
+        "responses": {"200": {"content": {"application/json": {"schema": {"type": "object"}}}}},
+    }
+
+    def test_an_explicit_model_does_not_hide_an_array_body_from_fields(self):
+        # An inline array body needs `model:`, and naming the model used to skip looking at the
+        # schema, so the array went unnoticed and `fields:` was accepted.
+        entry = {"command": "record put", "op": {"method": "put", "path": "/records"},
+                 "body": {"model": "RecordsPutRequestBody", "fields": {"kind": {"flag": "--kind"}}},
+                 "output": "raw"}
+        with pytest.raises(ManifestError, match="JSON array"):
+            build(entry, self.INLINE_ARRAY)
+
+    def test_an_explicit_model_on_an_array_body_is_read_as_a_collection(self):
+        entry = {"command": "record put", "op": {"method": "put", "path": "/records"},
+                 "body": {"model": "RecordsPutRequestBody", "flag": "--file"}, "output": "raw"}
+        assert build(entry, self.INLINE_ARRAY).body.collection

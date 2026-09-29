@@ -117,7 +117,7 @@ A request body takes one of two forms.
 | `required` | no | Whether the file must be given. Defaults to `true`. |
 | `help` | no | Help text. Defaults to "JSON file containing the request body." |
 | `wrap-single` | no | Accept a single JSON object where the endpoint takes a list, and wrap it in an array. Several create endpoints take a list, but users usually have one record. |
-| `collection` | no | Whether the body is a JSON array of `model`. Derived from the spec. When `model` is given, it defaults to `false`. |
+| `collection` | no | Whether the body is a JSON array of `model`. Derived from the spec, including when `model` is given, so set it only to override that. |
 
 **Assembled from options.** Each body property the command exposes gets its own option:
 

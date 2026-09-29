@@ -451,6 +451,12 @@ def body_schema_properties(operation: dict, spec: dict) -> dict:
     return schema.get("properties") or {}
 
 
+def body_is_array(operation: dict) -> bool:
+    """True when the operation's JSON request body is an array."""
+    content = ((operation.get("requestBody") or {}).get("content") or {}).get("application/json")
+    return ((content or {}).get("schema") or {}).get("type") == "array"
+
+
 def body_model(operation: dict, spec_title: str) -> tuple[str, bool]:
     """Return ``(model class name, is_collection)`` for an operation's JSON request body."""
     content = ((operation.get("requestBody") or {}).get("content") or {}).get("application/json")
@@ -458,7 +464,7 @@ def body_model(operation: dict, spec_title: str) -> tuple[str, bool]:
         raise ManifestError(f"{spec_title}: request body has no application/json schema")
 
     schema = content["schema"]
-    collection = schema.get("type") == "array"
+    collection = body_is_array(operation)
     if collection:
         schema = schema.get("items") or {}
 
@@ -1093,7 +1099,11 @@ def build_command(entry: dict, operation: dict, where: str, models_root: str,
         # Kiota synthesises a type for every inline body schema, so an inline schema is
         # workable — it just can't be *derived*, and the manifest has to say the name.
         if "model" in body_cfg:
-            model, collection = body_cfg["model"], False
+            # The class name cannot be derived, but whether the body is an array still can,
+            # and must be: an inline array body is exactly the case that needs an explicit
+            # model. Assuming `False` here let `fields:` build one object for an array body,
+            # and would have deserialised a file's array as a single object.
+            model, collection = body_cfg["model"], body_is_array(operation)
         else:
             model, collection = body_model(operation, where)
         fields_cfg = body_cfg.get("fields") or {}
