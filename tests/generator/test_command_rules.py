@@ -293,6 +293,17 @@ class TestKeysThatWereAcceptedAndIgnored:
         command = build(base(output={"message": "Deleted"}), {**OPERATION, **self.NO_BODY})
         assert command.message == "Deleted"
 
+    @pytest.mark.parametrize("body", [
+        {"flag": "--file", "fields": {}},
+        {"fields": {}},
+    ])
+    def test_an_empty_fields_map_is_rejected(self, body):
+        # Beside `flag:` it was accepted and did nothing.
+        entry = {"command": "record search", "op": {"method": "post", "path": "/query"},
+                 "body": body, "output": "raw"}
+        with pytest.raises(ManifestError, match="is empty"):
+            build(entry, BODY_OPERATION)
+
     def test_an_empty_message_on_an_operation_that_returns_a_body_is_rejected(self):
         # The key, not its value: `message: ""` is just as ineffective.
         with pytest.raises(ManifestError, match="never be shown"):

@@ -1107,6 +1107,11 @@ def build_command(entry: dict, operation: dict, where: str, models_root: str,
         else:
             model, collection = body_model(operation, where)
         fields_cfg = body_cfg.get("fields") or {}
+        # Present but empty is a declaration that does nothing; beside `flag:` it was accepted
+        # without a word, and on its own it was reported as missing rather than as empty.
+        if "fields" in body_cfg and not fields_cfg:
+            raise ManifestError(f"{where}: `body: fields:` is empty. Name at least one field, "
+                                "or remove it and read the body from a file with `flag:`.")
         if fields_cfg and "flag" in body_cfg:
             raise ManifestError(
                 f"{where}: `body:` has both `flag:` and `fields:`. A body is either read "

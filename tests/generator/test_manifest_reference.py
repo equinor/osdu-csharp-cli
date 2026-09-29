@@ -68,8 +68,10 @@ def example_manifest() -> str:
     return re.search(r"## A small example\n\n```yaml\n(.*?)```", text, re.S).group(1)
 
 
-@pytest.mark.skipif(not (ROOT / "openapi_specs" / "legal").is_dir(),
-                    reason="specs not fetched; run tools/fetch_specs.py")
+# Where the generator reads specs from, not only the fetched copy: an OSDU_SPECS_DIR or a
+# sibling checkout of the client has the Legal spec too, and should not skip this.
+@pytest.mark.skipif(not (generate_cli.SPECS_DIR / "legal").is_dir(),
+                    reason="no specs where the generator looks; run tools/fetch_specs.py")
 def test_the_example_builds_against_the_real_spec(tmp_path):
     # Every check a generator run applies except coverage, which needs the whole service.
     # build_service catches unknown keys, operations and params; check_tree catches what only

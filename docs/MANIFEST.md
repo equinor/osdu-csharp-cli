@@ -156,7 +156,8 @@ or as an empty array.
 
 ### `output`
 
-`output: raw`, or leaving `output` out, prints the response as indented JSON. Otherwise it is a
+When the operation returns a body, `output: raw`, or leaving `output` out, prints it as indented
+JSON. When it returns none, the command prints `message`, or "Done.". Otherwise `output` is a
 mapping:
 
 | Key | Required | What it does |
