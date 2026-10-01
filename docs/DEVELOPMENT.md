@@ -58,6 +58,7 @@ Both packages come from GitHub Packages, which needs a token even though they ar
 | `Runtime/CliHelp.cs` | Renders `--help`; the library's own help cannot be customised. |
 | `Runtime/GlobalOptions.cs` | `--output`, `--config`, `--user`, `--debug`: the options every command has. |
 | `Runtime/EnumOptions.cs` | Accepts enum values in any casing and sends the spec's spelling. |
+| `Runtime/CommandSuggestions.cs` | Explains a command that does not exist, and suggests the one meant: the same words in another order, or a typo away. |
 
 Behaviour a manifest cannot express can also go in a partial class that extends a generated
 service through its `Customize` hook, in `Commands/Handwritten/`. That folder does not exist yet,
