@@ -420,9 +420,25 @@ Resource-first helps here rather than hurting. Consistent verbs mean that once y
 Today's `mygroups` / `listtags` / `runs` / `areas` have to be learned one at a time.
 
 Already in place, verified: `--help` at every level and without configuration; `-h`, `-?`
-aliases; command options separated from Common Options; every alias listed; "Did you mean"
-suggestions on typos; full help reprinted when a required option is missing; `--debug` for
-full exception detail.
+aliases; command options separated from Common Options; every alias listed; full help
+reprinted when a required option is missing; `--debug` for full exception detail.
+
+**A command that does not exist is explained, with a suggestion.** The first word that is not a
+command where it was typed is named, and the closest existing command is suggested: the same
+words in another order, then a command containing all of them, then one a typo away.
+
+```
+$ osducs member add group
+'add' is not a command under `osducs member`.
+Did you mean `osducs group member add`?
+```
+
+A tester wrote exactly that, the right words in the wrong order, while trying to add someone to
+a group. Before this, the parser showed the help for `member group`, where it had stopped, and
+with `-h` dropped the unknown word without a word and showed the help for `member` as though it
+were the answer. Typo suggestions were listed here as in place, but System.CommandLine 2.0 gives
+none, so they are part of the same change. The help printed afterwards is for the command the
+unknown word followed, and the exit code is 1, since nothing ran.
 
 Two gaps worth closing as the surface grows:
 

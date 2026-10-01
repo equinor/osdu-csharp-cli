@@ -60,6 +60,13 @@ try
 {
     var parseResult = root.Parse(args);
 
+    // A word that is not a command where it was typed, such as `add` in `osducs member add
+    // group`. Handled before help, because a help request used to drop that word without a
+    // word and show the help for whatever had matched, which reads as an answer. Only on a
+    // line the parser has already rejected, so a valid command can never be second-guessed.
+    if (parseResult.Errors.Count > 0 && CommandSuggestions.Find(root, args) is { } unknown)
+        return CommandSuggestions.Report(unknown, Console.Error, Console.Out);
+
     // The custom help action replaces the built-in one, which cleared parse errors itself.
     // Without this, `osducs storage get --help` would report the missing --id instead of
     // showing help.
