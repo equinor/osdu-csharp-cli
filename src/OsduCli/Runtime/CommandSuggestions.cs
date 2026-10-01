@@ -128,15 +128,25 @@ public static class CommandSuggestions
             .ToList();
     }
 
-    /// <summary>The leading words of <paramref name="rest"/> that are subcommands in turn.</summary>
+    /// <summary>
+    /// The leading words of <paramref name="rest"/> that are subcommands in turn, spelled as the
+    /// commands are.
+    /// </summary>
+    /// <remarks>
+    /// Matched without regard to case, like the rest of the suggestions. Matching exactly cut
+    /// <c>reocrd Get</c> short at <c>osducs record</c>, and returning the typed word would have
+    /// suggested a <c>Get</c> the parser then refuses.
+    /// </remarks>
     private static IEnumerable<string> Reachable(Command command, IReadOnlyList<string> rest)
     {
         foreach (var word in rest)
         {
-            var child = command.Subcommands.FirstOrDefault(c => c.Name == word);
+            var child = command.Subcommands.FirstOrDefault(c =>
+                string.Equals(c.Name, word, StringComparison.OrdinalIgnoreCase)
+                || c.Aliases.Contains(word, StringComparer.OrdinalIgnoreCase));
             if (child is null)
                 yield break;
-            yield return word;
+            yield return child.Name;
             command = child;
         }
     }

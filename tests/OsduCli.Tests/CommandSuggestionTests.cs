@@ -87,6 +87,9 @@ public class CommandSuggestionTests
     [InlineData(new[] { "reocrd", "get" }, "reocrd", "osducs record get")]
     [InlineData(new[] { "grup", "member", "add" }, "grup", "osducs group member add")]
     [InlineData(new[] { "legaltg", "list", "-h" }, "legaltg", "osducs legaltag list")]
+    // The words after the corrected one in any casing, suggested in the commands' own spelling.
+    [InlineData(new[] { "reocrd", "Get" }, "reocrd", "osducs record get")]
+    [InlineData(new[] { "reocrd", "VERSION", "list" }, "reocrd", "osducs record version list")]
     public void ATypoIsCorrectedWhenNoReorderingMatches(string[] args, string word, string expected)
     {
         // COMMAND-GRAMMAR.md listed typo suggestions as in place; System.CommandLine 2.0 gives
