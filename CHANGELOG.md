@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.9.0](https://github.com/equinor/osdu-csharp-cli/compare/v0.8.0...v0.9.0) (2026-10-01)
+
+
+### Features
+
+* **cli:** name an unknown command word and suggest the command meant ([#45](https://github.com/equinor/osdu-csharp-cli/issues/45)) ([8fa8b4b](https://github.com/equinor/osdu-csharp-cli/commit/8fa8b4b250b2e02c90e9e4793452b9886f71ecf4))
+
 ## [0.8.0](https://github.com/equinor/osdu-csharp-cli/compare/v0.7.3...v0.8.0) (2026-09-14)
 
 
