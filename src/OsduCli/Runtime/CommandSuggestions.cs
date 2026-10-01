@@ -155,25 +155,56 @@ public static class CommandSuggestions
     /// Edits between two words — insertions, deletions, substitutions and swaps of neighbouring
     /// letters, each counting one.
     /// </summary>
+    /// <remarks>
+    /// Damerau–Levenshtein without the usual restriction that a swapped pair is left alone
+    /// afterwards. With it, <c>asrch</c> is three edits from <c>search</c>, since the swap
+    /// <c>as</c> → <c>sa</c> cannot be followed by inserting the <c>e</c> between them, and the
+    /// typo fell outside the two allowed. The table of where each letter was last seen is what
+    /// lets a swap span letters edited since (Lowrance and Wagner, 1975).
+    /// </remarks>
     internal static int EditDistance(string first, string second)
     {
-        var distance = new int[first.Length + 1, second.Length + 1];
-        for (var i = 0; i <= first.Length; i++) distance[i, 0] = i;
-        for (var j = 0; j <= second.Length; j++) distance[0, j] = j;
-
-        for (var i = 1; i <= first.Length; i++)
+        var unreachable = first.Length + second.Length;
+        // Offset by one row and column, which hold `unreachable` as a sentinel.
+        var distance = new int[first.Length + 2, second.Length + 2];
+        distance[0, 0] = unreachable;
+        for (var i = 0; i <= first.Length; i++)
         {
-            for (var j = 1; j <= second.Length; j++)
-            {
-                var cost = first[i - 1] == second[j - 1] ? 0 : 1;
-                distance[i, j] = Math.Min(Math.Min(
-                    distance[i - 1, j] + 1, distance[i, j - 1] + 1), distance[i - 1, j - 1] + cost);
-                if (i > 1 && j > 1 && first[i - 1] == second[j - 2] && first[i - 2] == second[j - 1])
-                    distance[i, j] = Math.Min(distance[i, j], distance[i - 2, j - 2] + 1);
-            }
+            distance[i + 1, 0] = unreachable;
+            distance[i + 1, 1] = i;
+        }
+        for (var j = 0; j <= second.Length; j++)
+        {
+            distance[0, j + 1] = unreachable;
+            distance[1, j + 1] = j;
         }
 
-        return distance[first.Length, second.Length];
+        var lastRowOf = new Dictionary<char, int>();
+        for (var i = 1; i <= first.Length; i++)
+        {
+            var lastMatchingColumn = 0;
+            for (var j = 1; j <= second.Length; j++)
+            {
+                var swapRow = lastRowOf.GetValueOrDefault(second[j - 1]);
+                var swapColumn = lastMatchingColumn;
+                var cost = 1;
+                if (first[i - 1] == second[j - 1])
+                {
+                    cost = 0;
+                    lastMatchingColumn = j;
+                }
+
+                distance[i + 1, j + 1] = Math.Min(
+                    Math.Min(distance[i, j] + cost, distance[i + 1, j] + 1),
+                    Math.Min(distance[i, j + 1] + 1,
+                        distance[swapRow, swapColumn]
+                        + (i - swapRow - 1) + 1 + (j - swapColumn - 1)));
+            }
+
+            lastRowOf[first[i - 1]] = i;
+        }
+
+        return distance[first.Length + 1, second.Length + 1];
     }
 
     /// <summary>

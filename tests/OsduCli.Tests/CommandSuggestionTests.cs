@@ -89,6 +89,7 @@ public class CommandSuggestionTests
     [InlineData(new[] { "legaltg", "list", "-h" }, "legaltg", "osducs legaltag list")]
     // The words after the corrected one in any casing, suggested in the commands' own spelling.
     [InlineData(new[] { "reocrd", "Get" }, "reocrd", "osducs record get")]
+    [InlineData(new[] { "record", "asrch" }, "asrch", "osducs record search")]
     [InlineData(new[] { "reocrd", "VERSION", "list" }, "reocrd", "osducs record version list")]
     public void ATypoIsCorrectedWhenNoReorderingMatches(string[] args, string word, string expected)
     {
@@ -115,6 +116,12 @@ public class CommandSuggestionTests
     [InlineData("serch", "search", 1)]
     [InlineData("grup", "group", 1)]
     [InlineData("abc", "xyz", 3)]
+    // A swap followed by an edit between the swapped letters: two edits, where the restricted
+    // form of the algorithm counted three.
+    [InlineData("asrch", "search", 2)]
+    [InlineData("ca", "abc", 2)]
+    [InlineData("", "abc", 3)]
+    [InlineData("abc", "", 3)]
     public void EditDistanceCountsASwapOfNeighbouringLettersAsOne(string a, string b, int expected)
     {
         Assert.Equal(expected, CommandSuggestions.EditDistance(a, b));
