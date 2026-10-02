@@ -25,6 +25,17 @@ public static class AccountCommand
         list.SetAction((parseResult, cancellationToken) =>
             CliRunner.RunAsync(parseResult, async (context, token) =>
         {
+            if (context.Msal is null)
+            {
+                // An application sign-in has no accounts, and the interactive cache, which
+                // may well hold some, is not what this profile uses.
+                context.Output.Write("[]", Spec);
+                context.Output.WriteNote(
+                    $"This profile signs in as the application {context.Config.ClientId} with a "
+                    + "client secret, so there is no account to choose.");
+                return 0;
+            }
+
             var cached = await context.Msal.GetCachedUsernamesAsync(token);
             // The resolved choice, not just the flag: a `user` in the profile counts
             // too, and reading only --user here reported the wrong account as in use.
@@ -51,8 +62,7 @@ public static class AccountCommand
             // rather than nothing at all. The advisories below go to stderr for the same
             // reason from the other side: they must survive JSON mode, where the rows cannot
             // express "selected but not signed in" — every row just reads as not in use.
-            context.Output.Write(rows.ToJsonString(), OutputSpec.Table(
-                null, ("Account", "account"), ("In use", "inUse")));
+            context.Output.Write(rows.ToJsonString(), Spec);
 
             if (cached.Count == 0)
             {
@@ -81,4 +91,7 @@ public static class AccountCommand
         command.Subcommands.Add(list);
         return command;
     }
+
+    private static readonly OutputSpec Spec = OutputSpec.Table(
+        null, ("Account", "account"), ("In use", "inUse"));
 }

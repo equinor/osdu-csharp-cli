@@ -56,8 +56,9 @@ required setting that was not given; in a script, a missing one is an error nami
 | `--server` | OSDU base URL |
 | `--partition` | data partition ID |
 | `--authority` | Entra ID authority, `https://login.microsoftonline.com/<tenant-id>` |
-| `--client-id` | the app registration to sign in through — it must allow public-client sign-in with redirect URI `http://localhost` |
+| `--client-id` | the app registration to sign in through — for a browser sign-in it must allow public-client sign-in with redirect URI `http://localhost` |
 | `--scopes` | OAuth scopes, space-separated |
+| `--authentication-mode` | `msal_interactive`, as you through a browser (the default), or `msal_non_interactive`, as the application with a client secret — see [Signing in as an application](#signing-in-as-an-application) |
 | `--user` | optional default account |
 | `--from <profile>` | copy every setting from an existing profile; flags override what is copied |
 | `--force` | replace a profile of the same name |
@@ -66,7 +67,9 @@ required setting that was not given; in a script, a missing one is an error nami
 `dev` into `~/.osdu/dev.json`, which then wins wherever `dev` is read — including when it is
 the profile the Python CLI has selected. The Python profile is left in place, and
 `config list` shows it as overridden. Keys osducs does not use, such as the `*_url` entries
-and the ACL defaults, are named rather than copied.
+and the ACL defaults, are named rather than copied. A profile's `authentication_mode` and
+`client_secret` are copied; one with a mode osducs does not have, such as `refresh_token`, is
+refused until `--authentication-mode` chooses one it does.
 
 A profile created on a machine with no other configuration — no profile osducs would read by
 default, no selection that still exists, and no `OSDU_*` variables — is selected. That makes it
@@ -84,13 +87,16 @@ A JSON profile looks like this:
     "Authority": "https://login.microsoftonline.com/<tenant-id>",
     "ClientId": "<app-id>",
     "Scopes": "https://energy.azure.com/.default openid",
+    "AuthenticationMode": "msal_interactive",
     "User": "name@equinor.com"
   }
 }
 ```
 
-`User` is optional. osducs has no export back to the Python format: a profile osducs writes
-holds only the settings osducs uses, and the Python CLI needs more than those.
+`User` is optional, and so is `AuthenticationMode`: a profile without one signs in through a
+browser. A profile that signs in as an application also has a `ClientSecret`. osducs writes
+every profile readable only by you. It has no export back to the Python format: a profile
+osducs writes holds only the settings osducs uses, and the Python CLI needs more than those.
 
 `-c <profile>` still overrides the default for a single command.
 
@@ -103,7 +109,7 @@ Later sources win:
 | `~/.osducli/config` | the Python CLI's default profile |
 | `~/.osdu/config.json` | this CLI's own default file, if you have one |
 | the selected profile | from `~/.osdu/state.json` once `osducs config use` has been run, otherwise the profile the Python CLI's `~/.osducli/state` names |
-| `OSDU_*` environment variables | `OSDU_SERVER`, `OSDU_DATA_PARTITION_ID`, `OSDU_AUTHORITY`, `OSDU_CLIENT_ID`, `OSDU_SCOPES`, `OSDU_USER` |
+| `OSDU_*` environment variables | `OSDU_SERVER`, `OSDU_DATA_PARTITION_ID`, `OSDU_AUTHORITY`, `OSDU_CLIENT_ID`, `OSDU_SCOPES`, `OSDU_USER`, `OSDU_AUTHENTICATION_MODE`, `OSDU_CLIENT_SECRET` |
 | `--config` | an explicit profile name or file path |
 
 A profile name is looked up in both directories, `~/.osducli/<name>` and then
@@ -117,10 +123,16 @@ osducs status -c ./my.json     # a path; format detected from content, not exten
 `OSDU_CONFIG_DIR` relocates osducs's own directory. `OSDUCLI_CONFIG_DIR` relocates the Python
 CLI's, the same variable that tool reads.
 
-Only six values are used: server, data partition, authority, client id, scopes and user. The
-per-service `*_url` entries in a profile are **ignored** — this CLI derives each base path
-from the service's own OpenAPI spec, and honouring the profile would double the version
-segment. See [COMMAND-GRAMMAR.md](../COMMAND-GRAMMAR.md).
+The authentication mode and client secret are the exception to layering: they come from the
+profile in effect, or the environment, and never from a file beneath it. A default `config`
+file set to `msal_non_interactive` would otherwise turn a profile without a mode into an
+application sign-in with that file's secret.
+
+Only these values are used: server, data partition, authority, client id, scopes, user,
+authentication mode and client secret. The per-service `*_url` entries in a profile are
+**ignored** — this CLI derives each base path from the service's own OpenAPI spec, and
+honouring the profile would double the version segment. See
+[COMMAND-GRAMMAR.md](../COMMAND-GRAMMAR.md).
 
 ## Signing in as a particular account
 
@@ -169,6 +181,46 @@ wrong identity looks exactly like one that ran as the right one.
 
 The account you name does not have to be signed in yet. The browser will open on it, and if
 you sign in as somebody else the command fails rather than use them.
+
+## Signing in as an application
+
+Some environments are reached as an application rather than a person — an admin app
+registration, or a pipeline. The Python CLI calls this `authentication_mode =
+msal_non_interactive`, and osducs reads its profiles that say so: the client secret in the
+profile signs in, with no browser and no account.
+
+To make an osducs profile of one, copy it or create it:
+
+```bash
+osducs config add test_admin --from test_admin
+osducs config add ci --from dev --authentication-mode msal_non_interactive
+```
+
+The secret is copied with `--from`, or asked for without being shown. It is never an option,
+which would leave it in your shell history. Leave the prompt blank, or run without a terminal,
+and the profile is written without one; the secret then comes from `OSDU_CLIENT_SECRET` when
+the profile is used, which is the way for a pipeline:
+
+```bash
+OSDU_CLIENT_SECRET="$SECRET_FROM_THE_VAULT" osducs -c ci record search --kind "…"
+```
+
+An application signs in with a single scope, its resource's `/.default`. Copying a browser
+profile removes `openid` and the other scopes that ask about a person, and says so; scopes
+naming more than one resource, or none, are refused until `--scopes` gives the one meant.
+A default account copied from a browser profile is left behind for the same reason.
+
+`osducs config show` says whether a secret is set, never what it is, and on Linux and macOS
+points out a profile holding one that other users on the machine can read. osducs writes its
+own profiles readable only by you — a file mode of 600, or on Windows an access list naming
+only you — and the Python CLI restricts only the profiles it wrote.
+
+An application has no accounts to choose between, so `--user` is refused with such a profile,
+and `account list` says so rather than listing the browser sign-ins.
+
+The Python CLI's other modes — `refresh_token`, and those named after a cloud provider — are
+not supported. A profile using one is refused with that said, rather than signed in through a
+browser instead.
 
 ## Output
 

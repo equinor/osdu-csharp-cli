@@ -59,9 +59,17 @@ jobs:
           python3 tools/generate_cli.py
           git diff --exit-code -- src/OsduCli/Commands/Generated
 
+  # On Windows as well as Linux. Most people running osducs are on Windows, none of the people
+  # working on it can test there locally, and some behaviour differs by platform: profiles
+  # are restricted to their owner with Unix file modes on one and an access list on the other.
   test:
-    name: Build and test
-    runs-on: ubuntu-latest
+    name: Build and test (${{ matrix.os }})
+    strategy:
+      # A failure on one platform should not hide whether the other passed.
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
     permissions:
       contents: read
       packages: read # Equinor.OsduCsharpClient comes from GitHub Packages
@@ -104,7 +112,7 @@ jobs:
         if: ${{ !cancelled() }}
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
-          name: test-results
+          name: test-results-${{ matrix.os }}
           path: "**/TestResults/*.trx"
           retention-days: 5
 

@@ -24,6 +24,10 @@ namespace Equinor.OsduCli.Runtime;
 /// <para>Record-creation defaults (<c>legal_tag</c>, <c>acl_viewer</c>, <c>acl_owner</c>,
 /// <c>other_relevant_data_countries</c>) are not mapped either — nothing consumes them until
 /// <c>dataload</c> is ported.</para>
+///
+/// <para><c>authentication_mode</c> and <c>client_secret</c> are mapped. They were not at
+/// first, and a profile set to <c>msal_non_interactive</c> was signed in through a browser
+/// instead, with an app registration that has no redirect URI for one.</para>
 /// </remarks>
 public sealed class OsduCliIniConfigurationSource : IConfigurationSource
 {
@@ -56,6 +60,8 @@ public sealed class OsduCliIniConfigurationProvider(OsduCliIniConfigurationSourc
         // all — its own MSAL code reads a `username` that was never added to its config — so
         // there is no precedent to honour and no reason to carry two spellings.
         ["user"] = CliConfig.UserKey,
+        ["authentication_mode"] = CliConfig.AuthenticationModeKey,
+        ["client_secret"] = CliConfig.ClientSecretKey,
     };
 
     public override void Load()

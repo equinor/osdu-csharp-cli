@@ -55,6 +55,39 @@ At most three specific failures are shown. `--debug` prints the whole response b
 Also entitlements. `group member list` and `group member count` need rights on the
 Entitlements service that a normal user account does not have.
 
+A 401 can also come back as a web page rather than JSON — some gateways answer a token they
+reject that way. osducs reports the page's title as the reason:
+
+```
+error: 401 from the service. 401 - Unauthorized: Access is denied due to invalid credentials.
+```
+
+Before 0.10.0 this ended in an `InvalidOperationException` and a stack trace (*"Content type
+text/html does not have a factory registered to be parsed"*). If the profile is one the Python
+CLI uses with `authentication_mode = msal_non_interactive`, those versions also signed in as
+you instead of as the application, which is the likelier cause of the 401 itself; see
+[Signing in as an application](USAGE.md#signing-in-as-an-application).
+
+## `error: sign-in failed. AADSTS…`
+
+Entra ID refused the sign-in, and the code says why. The common ones:
+
+- **`AADSTS7000215` Invalid client secret.** The profile signs in as an application and its
+  secret is wrong or has expired. Secrets are rotated; get the current one, and update the
+  profile's `ClientSecret` (`client_secret` in a Python profile) or `OSDU_CLIENT_SECRET`. Copy
+  the secret's *value*, not its ID.
+- **`AADSTS50011` The redirect URI … does not match.** A browser sign-in through an app
+  registration that is not set up for one. If the Python CLI uses the same profile without a
+  browser, it signs in as an application: check that osducs reads its `authentication_mode`
+  with `osducs config show`. Otherwise the app registration needs public-client sign-in with
+  redirect URI `http://localhost`.
+- **`AADSTS700016` Application … was not found.** The profile's client ID or authority is
+  wrong, or names a different tenant.
+- **`AADSTS1002012` or `AADSTS70011`, a scope that is not valid.** An application signs in
+  with one scope, its resource's `/.default`, and nothing else: no `openid`, and no second
+  resource. `config add` sees to that for profiles it writes; a profile written by hand or by
+  the Python CLI needs its scopes corrected.
+
 ## `404 No static resource …`
 
 The endpoint is not deployed on your instance. That is Spring's message for "no controller

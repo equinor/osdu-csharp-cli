@@ -1,5 +1,6 @@
 using System.CommandLine;
 using System.Text.Json;
+using Microsoft.Identity.Client;
 using Microsoft.Kiota.Abstractions;
 using Microsoft.Kiota.Abstractions.Serialization;
 using Equinor.OsduCsharpClient.Facade;
@@ -37,7 +38,7 @@ public static class CliRunner
     /// spec changed — and rather than reflection, which trimming can quietly defeat and which
     /// would fail silently if a model ever declared the property differently.
     /// </remarks>
-    private static string? Describe(ApiException exception)
+    internal static string? Describe(ApiException exception)
     {
         if (!string.IsNullOrWhiteSpace(exception.Message))
             return exception.Message;
@@ -205,6 +206,21 @@ public static class CliRunner
             // --debug: the whole exception, for diagnosing an auth or transport failure
             // that the one-line summaries below deliberately hide.
             Console.Error.WriteLine(exception);
+            return 1;
+        }
+        catch (MsalException exception)
+        {
+            // Entra refused the sign-in: most often an expired or wrong client secret, which
+            // a profile signing in as an application will meet when the secret is rotated.
+            // This escaped as a stack trace. The message is kept from its AADSTS code on,
+            // which says what is wrong; MSAL puts a paragraph of general advice before it.
+            // Entra ID can put the trace and correlation IDs after it on lines of their own;
+            // they are kept, on the same line, since they are what Microsoft support asks for.
+            var message = exception.Message;
+            var code = message.IndexOf("AADSTS", StringComparison.Ordinal);
+            var cause = string.Join(' ', (code > 0 ? message[code..] : message)
+                .Split(['\r', '\n'], StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries));
+            Console.Error.WriteLine($"error: sign-in failed. {cause}");
             return 1;
         }
         catch (OsduException exception)
