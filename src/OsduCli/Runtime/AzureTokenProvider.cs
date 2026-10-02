@@ -188,7 +188,9 @@ internal sealed partial class AzureTokenProvider(
                     + $"https://energy.azure.com/.default, not '{config.Scopes}'. Correct Scopes in the profile.");
         }
 
-        return Environment.GetEnvironmentVariable("AZURE_RESOURCE_ID") is { Length: > 0 } resource
+        // Blank is unset: only spaces made the scope "/.default", refused later and less clearly.
+        return Environment.GetEnvironmentVariable("AZURE_RESOURCE_ID") is { } resource
+               && !string.IsNullOrWhiteSpace(resource)
             ? $"{resource.Trim().TrimEnd('/')}/.default"
             : throw new OsduException(
                 $"{AuthenticationModes.Azure} needs to know which resource to sign in to. Set Scopes in the "
@@ -216,13 +218,15 @@ internal sealed partial class AzureTokenProvider(
     /// <summary>Who a token was issued to, for reporting.</summary>
     internal static string Describe(string token) => Identify(token).Description;
 
-    /// <summary>Who a token was issued to, and whether through the Azure CLI.</summary>
+    /// <summary>Who a token was issued to, and whether it was issued to the Azure CLI.</summary>
     /// <param name="Description">The identity, as a person would name it.</param>
-    /// <param name="ThroughAzureCli">
-    /// Whether the Azure CLI answered, the one source <c>az login</c> changes. The others come
-    /// before it in the order, so advice to run <c>az login</c> is wrong for them.
+    /// <param name="IssuedToAzureCli">
+    /// Whether the token names the Azure CLI as the client it was issued to, which means the
+    /// Azure CLI answered and <c>az login</c> changes who it is. False says nothing about the
+    /// source: the Azure CLI signed in as a service principal, as <c>azure/login</c> does in a
+    /// pipeline, issues tokens naming that principal, just as the sources ahead of it do.
     /// </param>
-    internal sealed record AzureIdentity(string Description, bool ThroughAzureCli);
+    internal sealed record AzureIdentity(string Description, bool IssuedToAzureCli);
 
     /// <inheritdoc cref="Describe"/>
     /// <remarks>
@@ -244,13 +248,13 @@ internal sealed partial class AzureTokenProvider(
                     : null;
 
             var application = Claim("appid") ?? Claim("azp");
-            var throughAzureCli = application == AzureCliApplication;
+            var issuedToAzureCli = application == AzureCliApplication;
             if ((Claim("upn") ?? Claim("preferred_username") ?? Claim("unique_name")) is { } person)
-                return new(throughAzureCli ? $"{person}, through the Azure CLI" : person, throughAzureCli);
+                return new(issuedToAzureCli ? $"{person}, through the Azure CLI" : person, issuedToAzureCli);
 
             return new(Claim("xms_mirid") is not null
                 ? $"the managed identity {application}"
-                : $"the application {application}", throughAzureCli);
+                : $"the application {application}", issuedToAzureCli);
         }
         catch (Exception exception) when (exception is IndexOutOfRangeException or FormatException
                                               or JsonException or ArgumentException)

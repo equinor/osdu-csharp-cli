@@ -32,13 +32,16 @@ public static class AccountCommand
                 var who = AzureTokenProvider.Identify(await context.Azure.GetTokenAsync(token));
                 context.Output.Write(
                     new JsonArray(new JsonObject { ["account"] = who.Description, ["inUse"] = "yes" }).ToJsonString(), Spec);
-                // `az login` changes only the Azure CLI's answer; the other sources come before
-                // it, so suggesting it when one of them answered would change nothing.
-                context.Output.WriteNote(who.ThroughAzureCli
+                // `az login` changes only the Azure CLI's answer, and the other sources come before
+                // it. The token says for certain that the Azure CLI answered only when it was
+                // issued to the Azure CLI itself; a service principal signed in to the Azure CLI,
+                // as in a pipeline, looks like any other application. So otherwise this does not
+                // say which source it was.
+                context.Output.WriteNote(who.IssuedToAzureCli
                     ? "This profile signs in through Azure, here through the Azure CLI. Choose another account with `az login`."
-                    : "This profile signs in through Azure, here as an identity the environment provides: AZURE_* "
-                      + "variables, a workload identity or a managed identity. These come before the Azure CLI, so "
-                      + "`az login` does not change it.");
+                    : "This profile signs in through Azure, as the first of these that is there: AZURE_* variables, "
+                      + "a workload identity, a managed identity, or the Azure CLI. `az login` changes it only when "
+                      + "the Azure CLI is the one answering.");
                 return 0;
             }
 

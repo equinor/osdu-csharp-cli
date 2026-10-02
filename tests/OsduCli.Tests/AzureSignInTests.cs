@@ -117,9 +117,14 @@ public class AzureSignInTests : ConfigTestDirectories
         Assert.Equal("5a1178c2-5867-4a34-8fb8-216164e30b5f/.default", AzureTokenProvider.ScopeFor(Config()));
     }
 
-    [Fact]
-    public void AProfileWithoutScopesOrAzureResourceIdSaysWhatIsMissing()
+    [Theory]
+    [InlineData(null)]
+    // Only spaces made the scope "/.default".
+    [InlineData("   ")]
+    public void AProfileWithoutScopesOrAzureResourceIdSaysWhatIsMissing(string? resource)
     {
+        Environment.SetEnvironmentVariable("AZURE_RESOURCE_ID", resource);
+
         var exception = Assert.Throws<OsduException>(() => AzureTokenProvider.ScopeFor(Config()));
 
         Assert.Contains("AZURE_RESOURCE_ID", exception.Message);
@@ -335,17 +340,18 @@ public class AzureSignInTests : ConfigTestDirectories
     }
 
     [Fact]
-    public void OnlyATokenFromTheAzureCliIsSaidToBeOne()
+    public void OnlyATokenIssuedToTheAzureCliIsSaidToBeOne()
     {
-        // Which decides whether `account list` suggests `az login`, which changes nothing for
-        // the sources ahead of the Azure CLI.
+        // Which decides whether `account list` suggests `az login`. An application's token
+        // says nothing about the source: a service principal signed in to the Azure CLI, as
+        // `azure/login` does in a pipeline, gets tokens naming the principal, not the CLI.
         var person = Token(new { upn = "steh@equinor.com", appid = "04b07795-8ddb-461a-bbee-02f9e1bf7b46" });
         var managed = Token(new { appid = "1111", xms_mirid = "/subscriptions/x" });
         var application = Token(new { appid = "2222" });
 
-        Assert.True(AzureTokenProvider.Identify(person).ThroughAzureCli);
-        Assert.False(AzureTokenProvider.Identify(managed).ThroughAzureCli);
-        Assert.False(AzureTokenProvider.Identify(application).ThroughAzureCli);
+        Assert.True(AzureTokenProvider.Identify(person).IssuedToAzureCli);
+        Assert.False(AzureTokenProvider.Identify(managed).IssuedToAzureCli);
+        Assert.False(AzureTokenProvider.Identify(application).IssuedToAzureCli);
     }
 
     [Fact]
