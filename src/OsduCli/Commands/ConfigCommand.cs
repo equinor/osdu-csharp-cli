@@ -209,11 +209,6 @@ public static class ConfigCommand
             notCarried = [.. notCarried, CliConfig.SamePath(notCarriedFrom, file) ? key : $"{key} (in {file})"];
         }
 
-        // A browser sign-in has no use for a secret, so one left over in the source profile is
-        // not spread to another file.
-        if (method == SignInMethod.Interactive && seed.ClientSecret is not null)
-            LeaveBehind("client_secret", "ClientSecret", source => source.ClientSecret);
-
         // A browser profile's default account means nothing once it signs in as an application.
         // Copied, it was refused, and nothing on the command line could clear it; only --user,
         // which says it means something, is refused.
@@ -226,19 +221,29 @@ public static class ConfigCommand
         settings = Complete(settings, ask);
         Validate(settings);
 
+        // A secret is copied only into a profile that signs in with it, from a profile that
+        // signed in with it, for the same client ID. A browser profile's secret is a leftover
+        // nothing has used, so switching its copy to an application sign-in promoted a value
+        // nobody had checked; and given another client ID, it is that application's secret
+        // that is wanted.
+        var copiedSecret = method == SignInMethod.ClientCredentials
+                           && AuthenticationModes.Parse(seed.AuthenticationMode) == SignInMethod.ClientCredentials
+                           && settings.ClientId == seed.ClientId
+            ? seed.ClientSecret
+            : null;
+        if (seed.ClientSecret is not null && copiedSecret is null)
+            LeaveBehind("client_secret", "ClientSecret", source => source.ClientSecret);
+
         IReadOnlyList<string> droppedScopes = [];
         if (method == SignInMethod.ClientCredentials)
         {
             (var scopes, droppedScopes) = ApplicationScopes(settings.Scopes!);
 
             // Last, so nothing typed after it can be refused and the secret typed again.
-            // Copied only with the client ID it was issued for: given another, it is that
-            // application's secret that is wanted.
             settings = settings with
             {
                 Scopes = scopes,
-                ClientSecret = (settings.ClientId == seed.ClientId ? seed.ClientSecret : null)
-                               ?? AskForSecret(askSecret, settings.ClientId!),
+                ClientSecret = copiedSecret ?? AskForSecret(askSecret, settings.ClientId!),
             };
         }
 

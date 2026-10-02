@@ -334,11 +334,30 @@ public class ClientCredentialsTests : ConfigTestDirectories
         WriteApplicationProfile("test_admin");
         var asked = new List<string>();
 
-        Add("other", Nothing with { ClientId = "another-app" }, from: "test_admin",
+        var outcome = Add("other", Nothing with { ClientId = "another-app" }, from: "test_admin",
             askSecret: label => { asked.Add(label); return "another-secret"; });
 
         Assert.StartsWith("Client secret for another-app", Assert.Single(asked));
         Assert.Equal("another-secret", Written("other")["ClientSecret"]!.GetValue<string>());
+        Assert.Contains("client_secret", outcome.NotCarried);
+    }
+
+    [Theory]
+    [InlineData("authentication_mode = msal_interactive")]
+    // No mode is a browser sign-in too.
+    [InlineData("")]
+    public void ABrowserProfilesLeftoverSecretIsNotPromoted(string mode)
+    {
+        // Switching the copy to an application sign-in used the leftover, unchecked secret.
+        WritePythonProfile("dev", extra: [mode, $"client_secret = {Secret}"]);
+        var asked = new List<string>();
+
+        var outcome = Add("ci", Nothing with { AuthenticationMode = "msal_non_interactive" }, from: "dev",
+            askSecret: label => { asked.Add(label); return "the-application-secret"; });
+
+        Assert.Single(asked);
+        Assert.Equal("the-application-secret", Written("ci")["ClientSecret"]!.GetValue<string>());
+        Assert.Contains("client_secret", outcome.NotCarried);
     }
 
     [Theory]
