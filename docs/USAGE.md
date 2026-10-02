@@ -250,8 +250,10 @@ has. osducs tries these in order and uses the first that is there:
 
 Visual Studio, VS Code, Azure PowerShell and the other places an Azure account can be signed
 in are deliberately not tried: any of them may hold some account, and osducs does not pick an
-identity by accident. `AZURE_TOKEN_CREDENTIALS` narrows the list further, for instance
-`AZURE_TOKEN_CREDENTIALS=AzureCliCredential`.
+identity by accident. `AZURE_TOKEN_CREDENTIALS` narrows the list further: `prod` for the
+first three, `dev` for the Azure CLI, or one of them by name, such as
+`AZURE_TOKEN_CREDENTIALS=AzureCliCredential`. A value naming a source osducs leaves out is
+refused rather than used.
 
 The profile's authority names the tenant, so the Azure CLI is asked for a token from that tenant
 whichever one it used last. Its scope names the resource, reduced to one `/.default` as for an

@@ -29,11 +29,16 @@ public static class AccountCommand
             {
                 // Which source answered and as whom is only known from a token, so this one
                 // fetches it, which `config show` does not.
-                var who = AzureTokenProvider.Describe(await context.Azure.GetTokenAsync(token));
-                context.Output.Write(new JsonArray(new JsonObject { ["account"] = who, ["inUse"] = "yes" }).ToJsonString(), Spec);
-                context.Output.WriteNote(
-                    "This profile signs in through Azure. Choose another account with `az login`, or "
-                    + "in a pipeline with the identity it runs as.");
+                var who = AzureTokenProvider.Identify(await context.Azure.GetTokenAsync(token));
+                context.Output.Write(
+                    new JsonArray(new JsonObject { ["account"] = who.Description, ["inUse"] = "yes" }).ToJsonString(), Spec);
+                // `az login` changes only the Azure CLI's answer; the other sources come before
+                // it, so suggesting it when one of them answered would change nothing.
+                context.Output.WriteNote(who.ThroughAzureCli
+                    ? "This profile signs in through Azure, here through the Azure CLI. Choose another account with `az login`."
+                    : "This profile signs in through Azure, here as an identity the environment provides: AZURE_* "
+                      + "variables, a workload identity or a managed identity. These come before the Azure CLI, so "
+                      + "`az login` does not change it.");
                 return 0;
             }
 

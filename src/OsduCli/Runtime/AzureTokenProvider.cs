@@ -24,7 +24,7 @@ namespace Equinor.OsduCli.Runtime;
 /// is the kind of guess about identity osducs refuses to make elsewhere. The Azure CLI stays,
 /// since it is the one a person signs in to on purpose. <c>AZURE_TOKEN_CREDENTIALS</c>, read by
 /// the Azure library itself, narrows the order further, for instance to
-/// <c>AzureCliCredential</c> alone.</para>
+/// <c>AzureCliCredential</c> alone; see <see cref="CheckSelection"/>.</para>
 ///
 /// <para>The Python CLI read its resource only from environment variables. Here it is the
 /// profile's scope, so a profile names its environment completely; <c>AZURE_RESOURCE_ID</c>
@@ -46,6 +46,7 @@ internal sealed partial class AzureTokenProvider(
 
     internal static AzureTokenProvider Create(OsduConfig config)
     {
+        CheckSelection(Environment.GetEnvironmentVariable(TokenCredentialsVariable));
         var tenant = TenantOf(config.Authority);
         return new(new DefaultAzureCredential(new DefaultAzureCredentialOptions
         {
@@ -138,6 +139,41 @@ internal sealed partial class AzureTokenProvider(
     [GeneratedRegex(@"\s*See the troubleshooting guide for more information\.\s*https?://\S+")]
     private static partial Regex TroubleshootingLink();
 
+    /// <summary>The variable through which Azure.Identity lets the environment choose its sources.</summary>
+    internal const string TokenCredentialsVariable = "AZURE_TOKEN_CREDENTIALS";
+
+    /// <summary>The <c>AZURE_TOKEN_CREDENTIALS</c> values that keep to this mode's sources.</summary>
+    private static readonly HashSet<string> Selections = new(StringComparer.OrdinalIgnoreCase)
+    {
+        // Groups, which the exclusions narrow: `dev` to the Azure CLI, `prod` to the other three.
+        "dev", "prod",
+        "EnvironmentCredential", "WorkloadIdentityCredential", "ManagedIdentityCredential", "AzureCliCredential",
+    };
+
+    /// <summary>
+    /// Refuses an <c>AZURE_TOKEN_CREDENTIALS</c> that names a source this mode leaves out.
+    /// </summary>
+    /// <remarks>
+    /// Azure.Identity builds a source named there whatever the exclusions say, so
+    /// <c>VisualStudioCredential</c> brought back a source left out on purpose, and
+    /// <c>InteractiveBrowserCredential</c> a browser sign-in; a value it does not know escaped
+    /// as an unhandled exception and a stack trace. Accepted as Azure.Identity accepts it:
+    /// empty is unset, and padding is trimmed, but only spaces is an error there too.
+    /// </remarks>
+    internal static void CheckSelection(string? selection)
+    {
+        if (string.IsNullOrEmpty(selection) || Selections.Contains(selection.Trim()))
+            return;
+
+        if (string.IsNullOrWhiteSpace(selection))
+            throw new OsduException($"{TokenCredentialsVariable} is set to nothing but spaces. Unset it, or name a source.");
+
+        throw new OsduException(
+            $"{TokenCredentialsVariable}={selection.Trim()} would sign in through a source {AuthenticationModes.Azure} "
+            + "profiles do not use. Set it to prod, dev, EnvironmentCredential, WorkloadIdentityCredential, "
+            + "ManagedIdentityCredential or AzureCliCredential, or unset it.");
+    }
+
     private string? Current() =>
         _token is { } token && token.ExpiresOn - Margin > _clock.GetUtcNow() ? token.Token : null;
 
@@ -178,12 +214,23 @@ internal sealed partial class AzureTokenProvider(
     private const string AzureCliApplication = "04b07795-8ddb-461a-bbee-02f9e1bf7b46";
 
     /// <summary>Who a token was issued to, for reporting.</summary>
+    internal static string Describe(string token) => Identify(token).Description;
+
+    /// <summary>Who a token was issued to, and whether through the Azure CLI.</summary>
+    /// <param name="Description">The identity, as a person would name it.</param>
+    /// <param name="ThroughAzureCli">
+    /// Whether the Azure CLI answered, the one source <c>az login</c> changes. The others come
+    /// before it in the order, so advice to run <c>az login</c> is wrong for them.
+    /// </param>
+    internal sealed record AzureIdentity(string Description, bool ThroughAzureCli);
+
+    /// <inheritdoc cref="Describe"/>
     /// <remarks>
     /// Read from the token's claims without checking its signature: this only says which of
     /// the sources answered and as whom, so a person can see what <c>az</c> or the environment
     /// decided. The service is what trusts the token, and it checks it.
     /// </remarks>
-    internal static string Describe(string token)
+    internal static AzureIdentity Identify(string token)
     {
         try
         {
@@ -197,21 +244,18 @@ internal sealed partial class AzureTokenProvider(
                     : null;
 
             var application = Claim("appid") ?? Claim("azp");
+            var throughAzureCli = application == AzureCliApplication;
             if ((Claim("upn") ?? Claim("preferred_username") ?? Claim("unique_name")) is { } person)
-            {
-                return application == AzureCliApplication
-                    ? $"{person}, through the Azure CLI"
-                    : person;
-            }
+                return new(throughAzureCli ? $"{person}, through the Azure CLI" : person, throughAzureCli);
 
-            return Claim("xms_mirid") is not null
+            return new(Claim("xms_mirid") is not null
                 ? $"the managed identity {application}"
-                : $"the application {application}";
+                : $"the application {application}", throughAzureCli);
         }
         catch (Exception exception) when (exception is IndexOutOfRangeException or FormatException
                                               or JsonException or ArgumentException)
         {
-            return "(not readable from the token)";
+            return new("(not readable from the token)", false);
         }
     }
 }

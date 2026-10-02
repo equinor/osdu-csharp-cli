@@ -139,6 +139,54 @@ public class AzureSignInTests : ConfigTestDirectories
         Assert.Equal(expected, AzureTokenProvider.TenantOf(authority));
     }
 
+    [Theory]
+    [InlineData(null)]
+    [InlineData("")]
+    [InlineData(" dev ")]
+    [InlineData("dev")]
+    [InlineData("prod")]
+    [InlineData("AzureCliCredential")]
+    [InlineData("managedidentitycredential")]
+    [InlineData("EnvironmentCredential")]
+    [InlineData("WorkloadIdentityCredential")]
+    public void AzureTokenCredentialsMayNarrowTheSources(string? selection)
+    {
+        Environment.SetEnvironmentVariable("AZURE_TOKEN_CREDENTIALS", selection);
+
+        var provider = AzureTokenProvider.Create(Config("https://energy.azure.com/.default"));
+
+        Assert.Equal("https://energy.azure.com/.default", provider.Scope);
+    }
+
+    [Theory]
+    // Built by Azure.Identity whatever the exclusions say: sources left out on purpose.
+    [InlineData("VisualStudioCredential")]
+    [InlineData("InteractiveBrowserCredential")]
+    [InlineData("AzurePowerShellCredential")]
+    // Unknown to Azure.Identity, which threw an unhandled exception.
+    [InlineData("bogus")]
+    public void AzureTokenCredentialsMayNotBringBackAnExcludedSource(string selection)
+    {
+        Environment.SetEnvironmentVariable("AZURE_TOKEN_CREDENTIALS", selection);
+
+        var exception = Assert.Throws<OsduException>(() =>
+            AzureTokenProvider.Create(Config("https://energy.azure.com/.default")));
+
+        Assert.StartsWith($"AZURE_TOKEN_CREDENTIALS={selection} would sign in through a source", exception.Message);
+    }
+
+    [Fact]
+    public void AzureTokenCredentialsOfOnlySpacesIsRefused()
+    {
+        // Azure.Identity trims it to nothing and throws.
+        Environment.SetEnvironmentVariable("AZURE_TOKEN_CREDENTIALS", "   ");
+
+        var exception = Assert.Throws<OsduException>(() =>
+            AzureTokenProvider.Create(Config("https://energy.azure.com/.default")));
+
+        Assert.Contains("nothing but spaces", exception.Message);
+    }
+
     // ---- tokens ---------------------------------------------------------------------------
 
     private sealed class Clock(DateTimeOffset now) : TimeProvider
@@ -284,6 +332,20 @@ public class AzureSignInTests : ConfigTestDirectories
         var token = Token(new { appid = "1111", xms_mirid = "/subscriptions/x/resourcegroups/y" });
 
         Assert.Equal("the managed identity 1111", AzureTokenProvider.Describe(token));
+    }
+
+    [Fact]
+    public void OnlyATokenFromTheAzureCliIsSaidToBeOne()
+    {
+        // Which decides whether `account list` suggests `az login`, which changes nothing for
+        // the sources ahead of the Azure CLI.
+        var person = Token(new { upn = "steh@equinor.com", appid = "04b07795-8ddb-461a-bbee-02f9e1bf7b46" });
+        var managed = Token(new { appid = "1111", xms_mirid = "/subscriptions/x" });
+        var application = Token(new { appid = "2222" });
+
+        Assert.True(AzureTokenProvider.Identify(person).ThroughAzureCli);
+        Assert.False(AzureTokenProvider.Identify(managed).ThroughAzureCli);
+        Assert.False(AzureTokenProvider.Identify(application).ThroughAzureCli);
     }
 
     [Fact]
