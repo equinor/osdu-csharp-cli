@@ -35,7 +35,9 @@ public sealed class CliContext : IDisposable
 
     /// <summary>
     /// The account this invocation will authenticate as, from <c>--user</c> or the profile's
-    /// <c>user</c>, or null when neither said or the profile signs in as an application.
+    /// <c>user</c>, or null when neither said or the profile signs in as an application. For a
+    /// profile signing in through Azure it is the account expected, which is checked rather
+    /// than chosen.
     /// Resolved once here so that commands reporting on it cannot disagree with the provider
     /// actually doing the work.
     /// </summary>
@@ -99,22 +101,21 @@ public sealed class CliContext : IDisposable
 
         if (signIn.Method == SignInMethod.Azure)
         {
-            // Refused, not ignored, for the reason it is with client credentials: whoever
-            // passed it expects to act as that account. Here the account is chosen in Azure.
-            if (requestedUser is not null)
-            {
-                throw new OsduException(
-                    $"--user does not apply: this profile signs in through Azure ({AuthenticationModes.Azure}), "
-                    + "as whoever `az login` or the environment says. Choose the account with `az login`.");
-            }
-
-            var azure = AzureTokenProvider.Create(config);
+            // The account is chosen in Azure, so --user and the profile's `user` cannot choose
+            // it; they say which one is expected, and a command signed in as anyone else is
+            // refused. OSDU_USER is not consulted: see SignInSettings.ProfileUser.
+            var expected = requestedUser is not null
+                ? new AzureTokenProvider.ExpectedAccount(requestedUser, FromFlag: true)
+                : signIn.ProfileUser is { } profileUser
+                    ? new AzureTokenProvider.ExpectedAccount(profileUser, FromFlag: false)
+                    : null;
+            var azure = AzureTokenProvider.Create(config, expected);
             return new CliContext(
                 new OsduClient(config, azure, loggerFactory),
                 new OutputWriter(format, Console.Out),
                 config,
                 msal: null,
-                username: null,
+                username: expected?.User,
                 azure);
         }
 

@@ -77,15 +77,38 @@ public class AzureSignInTests : ConfigTestDirectories
     }
 
     [Fact]
-    public void UserIsRefused()
+    public void UserIsTheAccountExpected()
     {
+        // Azure chooses the account; --user can only say which one the command must run as.
+        WriteAzureProfile("dev", "user = profile@equinor.com");
+
+        using var context = CliContext.Create(Parse("-c", "dev", "--user", "someone@equinor.com"));
+
+        Assert.Equal(new AzureTokenProvider.ExpectedAccount("someone@equinor.com", FromFlag: true), context.Azure?.Expected);
+    }
+
+    [Fact]
+    public void TheProfilesUserIsTheAccountExpected()
+    {
+        WriteAzureProfile("dev", "user = profile@equinor.com");
+
+        using var context = CliContext.Create(Parse("-c", "dev"));
+
+        Assert.Equal(new AzureTokenProvider.ExpectedAccount("profile@equinor.com", FromFlag: false), context.Azure?.Expected);
+    }
+
+    [Theory]
+    [InlineData("OSDU_USER")]
+    [InlineData("Osdu__User")]
+    public void TheEnvironmentsUserIsNotChecked(string variable)
+    {
+        // Exported for some other profile, it is no statement about this one.
         WriteAzureProfile("dev");
+        Environment.SetEnvironmentVariable(variable, "someone@equinor.com");
 
-        var exception = Assert.Throws<OsduException>(() =>
-            CliContext.Create(Parse("-c", "dev", "--user", "someone@equinor.com")));
+        using var context = CliContext.Create(Parse("-c", "dev"));
 
-        Assert.Contains("--user does not apply", exception.Message);
-        Assert.Contains("az login", exception.Message);
+        Assert.Null(context.Azure?.Expected);
     }
 
     [Theory]
@@ -314,6 +337,76 @@ public class AzureSignInTests : ConfigTestDirectories
         Assert.Equal("Sign-in through Azure failed. Azure CLI: Azure CLI authentication timed out.", exception.Message);
     }
 
+    // ---- the account expected -------------------------------------------------------------
+
+    private static AzureTokenProvider Signing(object claims, AzureTokenProvider.ExpectedAccount? expected) =>
+        new(new Credential(_ => new AccessToken(Token(claims), Start.AddHours(1))),
+            "https://energy.azure.com/.default", clock: new Clock(Start), expected: expected);
+
+    private const string AzureCli = "04b07795-8ddb-461a-bbee-02f9e1bf7b46";
+
+    [Fact]
+    public async Task TheAccountExpectedSignsInWhateverItsCasing()
+    {
+        var provider = Signing(new { upn = "Name@Equinor.com", appid = AzureCli },
+            new("name@equinor.com", FromFlag: false));
+
+        Assert.NotEmpty(await provider.GetTokenAsync(TestContext.Current.CancellationToken));
+    }
+
+    [Fact]
+    public async Task AnotherPersonIsRefused()
+    {
+        // `az login` as an admin account for some other task, then a command meant for the
+        // normal one: it would have run as admin.
+        var provider = Signing(new { upn = "admin@equinor.com", appid = AzureCli },
+            new("name@equinor.com", FromFlag: false));
+
+        var exception = await Assert.ThrowsAsync<OsduException>(() =>
+            provider.GetTokenAsync(TestContext.Current.CancellationToken));
+
+        Assert.Equal(
+            "This profile is for name@equinor.com, but Azure signed in as admin@equinor.com, through the Azure CLI. "
+            + "Sign in as name@equinor.com with `az login`, or remove `user` from the profile.",
+            exception.Message);
+    }
+
+    [Fact]
+    public async Task AnApplicationIsRefusedWhenAPersonIsExpected()
+    {
+        var provider = Signing(new { appid = "1111", xms_mirid = "/subscriptions/x" },
+            new("name@equinor.com", FromFlag: true));
+
+        var exception = await Assert.ThrowsAsync<OsduException>(() =>
+            provider.GetTokenAsync(TestContext.Current.CancellationToken));
+
+        Assert.Equal(
+            "--user asks for name@equinor.com, but Azure signed in as the managed identity 1111. "
+            + "Sign in as name@equinor.com with `az login` if the Azure CLI is the one answering, or leave out --user.",
+            exception.Message);
+    }
+
+    [Fact]
+    public async Task WithNoAccountExpectedAnyoneSignsIn()
+    {
+        var provider = Signing(new { appid = "2222" }, expected: null);
+
+        Assert.NotEmpty(await provider.GetTokenAsync(TestContext.Current.CancellationToken));
+    }
+
+    [Fact]
+    public async Task WhoSignedInCanBeAskedWithoutTheCheck()
+    {
+        // For `account list`, the command for finding out who you are.
+        var provider = Signing(new { upn = "admin@equinor.com", appid = AzureCli },
+            new("name@equinor.com", FromFlag: false));
+
+        var who = await provider.IdentifyAsync(TestContext.Current.CancellationToken);
+
+        Assert.Equal("admin@equinor.com", who.Person);
+        Assert.False(provider.IsExpected(who));
+    }
+
     // ---- who signed in --------------------------------------------------------------------
 
     private static string Token(object claims)
@@ -371,7 +464,7 @@ public class AzureSignInTests : ConfigTestDirectories
     // ---- config add, show and use ---------------------------------------------------------
 
     [Fact]
-    public void ABrowserProfileCopiedToAzureLeavesItsClientIdAndAccountBehind()
+    public void ABrowserProfileCopiedToAzureLeavesItsClientIdBehindAndKeepsItsAccount()
     {
         WriteNativeProfile("dev", user: "someone@equinor.com");
 
@@ -382,10 +475,21 @@ public class AzureSignInTests : ConfigTestDirectories
         Assert.Equal("azure", written["AuthenticationMode"]!.GetValue<string>());
         Assert.Equal("https://example.com/.default", written["Scopes"]!.GetValue<string>());
         Assert.Null(written["ClientId"]);
-        Assert.Null(written["User"]);
+        // Kept, as the account the profile's commands are checked against.
+        Assert.Equal("someone@equinor.com", written["User"]!.GetValue<string>());
         Assert.Null(written["ClientSecret"]);
-        Assert.Equal(["User", "ClientId"], outcome.NotCarried);
+        Assert.Equal(["ClientId"], outcome.NotCarried);
         Assert.Equal(["openid"], outcome.DroppedScopes);
+    }
+
+    [Fact]
+    public void UserCanBeGivenToANewAzureProfile()
+    {
+        WriteNativeProfile("dev");
+
+        Add("az", Nothing with { AuthenticationMode = "azure", User = "someone@equinor.com" }, from: "dev");
+
+        Assert.Equal("someone@equinor.com", Written("az")["User"]!.GetValue<string>());
     }
 
     [Fact]
@@ -425,5 +529,18 @@ public class AzureSignInTests : ConfigTestDirectories
         Assert.StartsWith("(not used", rows["client-id"]);
         Assert.Contains("account list", rows["user"]);
         Assert.False(rows.ContainsKey("client-secret"));
+    }
+
+    [Fact]
+    public void ShowSaysTheProfilesUserIsChecked()
+    {
+        WriteAzureProfile("dev", "user = someone@equinor.com");
+        // Shown as what is checked, which OSDU_USER is not.
+        Environment.SetEnvironmentVariable("OSDU_USER", "other@equinor.com");
+        var config = CliConfig.LoadWithSignIn("dev", out var signIn);
+
+        var rows = ConfigCommand.Rows(config, signIn).ToDictionary(row => row.Setting, row => row.Value);
+
+        Assert.Equal("someone@equinor.com (checked: commands signed in as anyone else are refused)", rows["user"]);
     }
 }

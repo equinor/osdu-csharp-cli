@@ -104,7 +104,11 @@ public static class ConfigCommand
                       + "in the profile, which only you can read.");
             }
             if (AuthenticationModes.Parse(outcome.Written.AuthenticationMode) == SignInMethod.Azure)
+            {
                 output.WriteNote(AzureSignInNote);
+                if (outcome.Written.User is { } user)
+                    output.WriteNote($"Commands check that Azure signed in as {user}, and are refused otherwise.");
+            }
             if (outcome.DroppedScopes is { Count: > 0 } dropped)
             {
                 output.WriteNote(
@@ -188,13 +192,11 @@ public static class ConfigCommand
                 + $"does not support. Pass --authentication-mode {AuthenticationModes.Interactive}, "
                 + $"{AuthenticationModes.ClientCredentials} or {AuthenticationModes.Azure} to choose one it does.");
         }
-        if (method != SignInMethod.Interactive && given.User is not null)
+        if (method == SignInMethod.ClientCredentials && given.User is not null)
         {
-            throw new OsduException(method == SignInMethod.Azure
-                ? $"--user does not apply to {AuthenticationModes.Azure}, which signs in as whoever `az login` "
-                  + "or the environment says. Choose the account there."
-                : $"--user does not apply to {AuthenticationModes.ClientCredentials}, which signs in as the "
-                  + "application rather than an account.");
+            throw new OsduException(
+                $"--user does not apply to {AuthenticationModes.ClientCredentials}, which signs in as the "
+                + "application rather than an account.");
         }
         if (method == SignInMethod.Azure && Blank(given.ClientId) is not null)
         {
@@ -215,10 +217,11 @@ public static class ConfigCommand
             notCarried = [.. notCarried, CliConfig.SamePath(notCarriedFrom, file) ? key : $"{key} (in {file})"];
         }
 
-        // A browser profile's default account means nothing once the copy signs in some other
-        // way. Copied, it was refused, and nothing on the command line could clear it; only
-        // --user, which says it means something, is refused.
-        if (method != SignInMethod.Interactive && settings.User is not null)
+        // A browser profile's default account means nothing once the copy signs in as an
+        // application. Copied, it was refused, and nothing on the command line could clear it;
+        // only --user, which says it means something, is refused. A profile signing in through
+        // Azure keeps it, as the account its commands are checked against.
+        if (method == SignInMethod.ClientCredentials && settings.User is not null)
         {
             LeaveBehind("user", "User", source => source.User);
             settings = settings with { User = null };
@@ -693,7 +696,11 @@ public static class ConfigCommand
             if (signIn.Method == SignInMethod.ClientCredentials)
                 output.WriteMessage($"Authenticating as the application {config.ClientId}, with a client secret.");
             else if (signIn.Method == SignInMethod.Azure)
+            {
                 output.WriteMessage(AzureSignInNote);
+                if (signIn.ProfileUser is { } user)
+                    output.WriteMessage($"Expected to be {user}; commands signed in as anyone else are refused.");
+            }
             else if (signIn.User is not null)
                 output.WriteMessage($"Authenticating as {signIn.User}.");
             if (CliConfig.PythonSelectedProfile() is not null)
@@ -775,8 +782,11 @@ public static class ConfigCommand
 
         if (signIn.Method == SignInMethod.Azure)
         {
-            // Who that is takes a token to find out, which `config show` does not fetch.
-            yield return ("user", "(whoever `az login` or the environment says — `osducs account list` shows who)");
+            // Who actually signs in takes a token to find out, which `config show` does not
+            // fetch. OSDU_USER is not shown: it is not what an azure profile is checked against.
+            yield return ("user", signIn.ProfileUser is { } user
+                ? $"{user} (checked: commands signed in as anyone else are refused)"
+                : "(whoever `az login` or the environment says — `osducs account list` shows who)");
         }
         else if (signIn.Method == SignInMethod.ClientCredentials)
         {

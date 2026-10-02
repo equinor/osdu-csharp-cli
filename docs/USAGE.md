@@ -258,9 +258,20 @@ refused rather than used.
 The profile's authority names the tenant, so the Azure CLI is asked for a token from that tenant
 whichever one it used last. Its scope names the resource, reduced to one `/.default` as for an
 application; a profile with no scope uses `AZURE_RESOURCE_ID`, as the Python CLI did. There is
-no client ID: `config add` leaves one copied from a browser profile behind, with the profile's
-default account. `--user` is refused — choose the account with `az login` — and `account list`
-shows who actually signed in.
+no client ID: `config add` leaves one copied from a browser profile behind.
+
+The Azure CLI has one active account for every tool that uses it, so `az login` as an admin
+account for one task would otherwise make every `azure` profile act as admin. A profile's
+`user` therefore stays, as the account its commands are checked against: Azure still chooses
+who signs in, and a command signed in as anyone else is refused before it sends anything.
+
+```
+error: This profile is for name@equinor.com, but Azure signed in as admin@equinor.com, through the Azure CLI. Sign in as name@equinor.com with `az login`, or remove `user` from the profile.
+```
+
+`--user` does the same for one command. `OSDU_USER` is not checked: exported for some other
+profile, it says nothing about this one. Without a `user`, whoever Azure signs in as is used,
+and `account list` shows who that is, or the mismatch.
 
 Whether a token from the Azure CLI is accepted depends on the environment's app registration.
 `https://energy.azure.com/.default` is asked for the shared Azure Data Manager for Energy

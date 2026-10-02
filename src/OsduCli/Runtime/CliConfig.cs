@@ -169,7 +169,7 @@ public static class CliConfig
 
         signIn = new SignInSettings(
             AuthenticationModes.Parse(mode), mode ?? AuthenticationModes.Interactive,
-            NormaliseUsername(configuration[UserKey]), secret);
+            NormaliseUsername(configuration[UserKey]), secret, profile.User);
 
         return OsduConfig.FromConfiguration(configuration);
     }

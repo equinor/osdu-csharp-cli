@@ -29,9 +29,15 @@ public static class AccountCommand
             {
                 // Which source answered and as whom is only known from a token, so this one
                 // fetches it, which `config show` does not.
-                var who = AzureTokenProvider.Identify(await context.Azure.GetTokenAsync(token));
+                // Without the check, so a mismatch is shown rather than refused: this is the
+                // command for finding out who you are signed in as.
+                var who = await context.Azure.IdentifyAsync(token);
+                var expected = context.Azure.IsExpected(who);
                 context.Output.Write(
-                    new JsonArray(new JsonObject { ["account"] = who.Description, ["inUse"] = "yes" }).ToJsonString(), Spec);
+                    new JsonArray(new JsonObject { ["account"] = who.Description, ["inUse"] = expected ? "yes" : "" })
+                        .ToJsonString(), Spec);
+                if (!expected)
+                    context.Output.WriteNote(context.Azure.Mismatch(who) + " Commands are refused until then.");
                 // `az login` changes only the Azure CLI's answer, and the other sources come before
                 // it. The token says for certain that the Azure CLI answered only when it was
                 // issued to the Azure CLI itself; a service principal signed in to the Azure CLI,

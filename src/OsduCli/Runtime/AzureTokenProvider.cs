@@ -31,9 +31,23 @@ namespace Equinor.OsduCli.Runtime;
 /// is the fallback for a profile that has none, as a Python <c>azure</c> profile does not.</para>
 /// </remarks>
 internal sealed partial class AzureTokenProvider(
-    TokenCredential credential, string scope, string? tenant = null, TimeProvider? clock = null)
+    TokenCredential credential, string scope, string? tenant = null, TimeProvider? clock = null,
+    AzureTokenProvider.ExpectedAccount? expected = null)
     : ITokenProvider
 {
+    /// <summary>The account a command expects to run as, and whether <c>--user</c> said so.</summary>
+    /// <remarks>
+    /// Azure, not osducs, decides who signs in: the Azure CLI has one active account for every
+    /// tool that uses it, so <c>az login</c> as an admin account for one task makes every
+    /// <c>azure</c> profile act as admin. A browser profile's <c>user</c> prevents exactly
+    /// that, by choosing the account; here it can only be checked, and a command signed in as
+    /// anyone else is refused before it sends anything.
+    /// </remarks>
+    internal sealed record ExpectedAccount(string User, bool FromFlag);
+
+    /// <summary>The account expected, or null when any will do.</summary>
+    internal ExpectedAccount? Expected => expected;
+
     /// <summary>How long before it expires a token is replaced, so none expires in flight.</summary>
     private static readonly TimeSpan Margin = TimeSpan.FromMinutes(5);
 
@@ -44,7 +58,7 @@ internal sealed partial class AzureTokenProvider(
     /// <summary>The scope tokens are asked for.</summary>
     internal string Scope => scope;
 
-    internal static AzureTokenProvider Create(OsduConfig config)
+    internal static AzureTokenProvider Create(OsduConfig config, ExpectedAccount? expected = null)
     {
         CheckSelection(Environment.GetEnvironmentVariable(TokenCredentialsVariable));
         var tenant = TenantOf(config.Authority);
@@ -57,7 +71,7 @@ internal sealed partial class AzureTokenProvider(
             ExcludeAzureDeveloperCliCredential = true,
             ExcludeBrokerCredential = true,
             ExcludeInteractiveBrowserCredential = true,
-        }), ScopeFor(config), tenant);
+        }), ScopeFor(config), tenant, expected: expected);
     }
 
     /// <remarks>
@@ -66,6 +80,39 @@ internal sealed partial class AzureTokenProvider(
     /// started a process per page.
     /// </remarks>
     public async Task<string> GetTokenAsync(CancellationToken cancellationToken = default)
+    {
+        var token = await FetchAsync(cancellationToken);
+        if (expected is not null && !IsExpected(Identify(token)))
+            throw new OsduException(Mismatch(Identify(token)));
+        return token;
+    }
+
+    /// <summary>Who Azure signs in as, without the check, for reporting.</summary>
+    internal async Task<AzureIdentity> IdentifyAsync(CancellationToken cancellationToken = default) =>
+        Identify(await FetchAsync(cancellationToken));
+
+    /// <summary>Whether <paramref name="who"/> is the account expected, if one is.</summary>
+    /// <remarks>
+    /// Compared without regard to case, as Entra ID compares sign-in names. An application's
+    /// token names no person, so it never matches a person expected.
+    /// </remarks>
+    internal bool IsExpected(AzureIdentity who) =>
+        expected is null || string.Equals(who.Person, expected.User, StringComparison.OrdinalIgnoreCase);
+
+    /// <summary>Explains signing in as someone other than the account expected.</summary>
+    internal string Mismatch(AzureIdentity who)
+    {
+        var account = expected!.User;
+        return (expected.FromFlag ? $"--user asks for {account}" : $"This profile is for {account}")
+               + $", but Azure signed in as {who.Description}. "
+               + (who.IssuedToAzureCli
+                   ? $"Sign in as {account} with `az login`"
+                   : $"Sign in as {account} with `az login` if the Azure CLI is the one answering")
+               + (expected.FromFlag ? ", or leave out --user." : ", or remove `user` from the profile.");
+    }
+
+    /// <summary>The token, from the command's cache or freshly fetched.</summary>
+    private async Task<string> FetchAsync(CancellationToken cancellationToken)
     {
         if (Current() is { } current)
             return current;
@@ -220,13 +267,14 @@ internal sealed partial class AzureTokenProvider(
 
     /// <summary>Who a token was issued to, and whether it was issued to the Azure CLI.</summary>
     /// <param name="Description">The identity, as a person would name it.</param>
+    /// <param name="Person">The person's sign-in name, or null for an application's token.</param>
     /// <param name="IssuedToAzureCli">
     /// Whether the token names the Azure CLI as the client it was issued to, which means the
     /// Azure CLI answered and <c>az login</c> changes who it is. False says nothing about the
     /// source: the Azure CLI signed in as a service principal, as <c>azure/login</c> does in a
     /// pipeline, issues tokens naming that principal, just as the sources ahead of it do.
     /// </param>
-    internal sealed record AzureIdentity(string Description, bool IssuedToAzureCli);
+    internal sealed record AzureIdentity(string Description, bool IssuedToAzureCli, string? Person = null);
 
     /// <inheritdoc cref="Describe"/>
     /// <remarks>
@@ -250,7 +298,7 @@ internal sealed partial class AzureTokenProvider(
             var application = Claim("appid") ?? Claim("azp");
             var issuedToAzureCli = application == AzureCliApplication;
             if ((Claim("upn") ?? Claim("preferred_username") ?? Claim("unique_name")) is { } person)
-                return new(issuedToAzureCli ? $"{person}, through the Azure CLI" : person, issuedToAzureCli);
+                return new(issuedToAzureCli ? $"{person}, through the Azure CLI" : person, issuedToAzureCli, person);
 
             return new(Claim("xms_mirid") is not null
                 ? $"the managed identity {application}"

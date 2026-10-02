@@ -117,5 +117,11 @@ internal sealed record ClientSecret(string Value)
 /// <param name="Mode">The mode as configured, or <c>msal_interactive</c> when none is.</param>
 /// <param name="User">The default account, from the profile or the environment.</param>
 /// <param name="Secret">The client secret, from the profile in effect or the environment.</param>
+/// <param name="ProfileUser">
+/// The <c>user</c> of the profile in effect alone, without <c>OSDU_USER</c> or a file beneath
+/// it: the account an <c>azure</c> profile is checked against. An <c>OSDU_USER</c> exported for
+/// some other profile is no statement about this one, and checking it would refuse commands
+/// over a variable nobody meant for them.
+/// </param>
 internal sealed record SignInSettings(
-    SignInMethod Method, string Mode, string? User, ClientSecret? Secret);
+    SignInMethod Method, string Mode, string? User, ClientSecret? Secret, string? ProfileUser = null);
