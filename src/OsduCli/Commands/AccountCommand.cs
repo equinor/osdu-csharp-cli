@@ -25,6 +25,18 @@ public static class AccountCommand
         list.SetAction((parseResult, cancellationToken) =>
             CliRunner.RunAsync(parseResult, async (context, token) =>
         {
+            if (context.Azure is not null)
+            {
+                // Which source answered and as whom is only known from a token, so this one
+                // fetches it, which `config show` does not.
+                var who = AzureTokenProvider.Describe(await context.Azure.GetTokenAsync(token));
+                context.Output.Write(new JsonArray(new JsonObject { ["account"] = who, ["inUse"] = "yes" }).ToJsonString(), Spec);
+                context.Output.WriteNote(
+                    "This profile signs in through Azure. Choose another account with `az login`, or "
+                    + "in a pipeline with the identity it runs as.");
+                return 0;
+            }
+
             if (context.Msal is null)
             {
                 // An application sign-in has no accounts, and the interactive cache, which

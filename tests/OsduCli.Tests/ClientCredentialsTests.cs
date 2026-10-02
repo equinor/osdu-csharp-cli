@@ -95,7 +95,7 @@ public class ClientCredentialsTests : ConfigTestDirectories
     [InlineData("MSAL_NON_INTERACTIVE", nameof(SignInMethod.ClientCredentials))]
     [InlineData(" msal_interactive ", nameof(SignInMethod.Interactive))]
     [InlineData("refresh_token", nameof(SignInMethod.Unsupported))]
-    [InlineData("azure", nameof(SignInMethod.Unsupported))]
+    [InlineData("gc", nameof(SignInMethod.Unsupported))]
     public void TheModeIsReadInAnyCasingAndAnUnknownOneIsReported(string mode, string expected)
     {
         WritePythonProfile("dev", extra: $"authentication_mode = {mode}");

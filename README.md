@@ -155,7 +155,9 @@ the environment you are on alone, and `osducs config use <profile>` switches.
 Setting `OSDU_SERVER`, `OSDU_DATA_PARTITION_ID`, `OSDU_AUTHORITY`, `OSDU_CLIENT_ID` and
 `OSDU_SCOPES` works too, with no file at all. A profile can also sign in as an application
 with a client secret, as the Python CLI's `msal_non_interactive` does — see
-[docs/USAGE.md](docs/USAGE.md#signing-in-as-an-application).
+[docs/USAGE.md](docs/USAGE.md#signing-in-as-an-application) — or through `az login` or an
+identity Azure provides, as its `azure` mode does — see
+[docs/USAGE.md](docs/USAGE.md#signing-in-through-azure).
 
 **Moving from the Python CLI** is one command per profile:
 
@@ -202,7 +204,9 @@ library and `OsduClient` takes an `ITokenProvider` rather than defaulting to one
 therefore also references `Equinor.OsduCsharpClient.Msal` and selects
 `MsalInteractiveTokenProvider`, which is the right answer for a tool driven by a person at a
 terminal. Sign-in is cached, OS-encrypted, under `~/.osdu`. A profile set to sign in as an
-application gets `MsalClientCredentialsTokenProvider` instead.
+application gets `MsalClientCredentialsTokenProvider` instead, and one signing in through Azure
+a small provider over Azure.Identity's `DefaultAzureCredential`, which the client library does
+not offer.
 
 ## The manifest is the point
 

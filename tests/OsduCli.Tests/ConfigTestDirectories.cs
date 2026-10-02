@@ -23,6 +23,8 @@ public abstract class ConfigTestDirectories : IDisposable
         "Osdu__Server", "Osdu__DataPartitionId", "Osdu__Authority",
         "Osdu__ClientId", "Osdu__Scopes", "Osdu__User",
         "Osdu__AuthenticationMode", "Osdu__ClientSecret",
+        // Read by the azure mode for a profile without scopes.
+        "AZURE_RESOURCE_ID",
     ];
 
     private readonly Dictionary<string, string?> _saved = new();

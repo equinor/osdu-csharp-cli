@@ -23,9 +23,15 @@ public sealed class CliContext : IDisposable
 
     /// <summary>
     /// The interactive MSAL provider, for commands that report on sign-in state. Null when the
-    /// profile signs in as an application, which has no accounts to report on.
+    /// profile signs in some other way, and its cache of accounts is not what is used.
     /// </summary>
     public MsalInteractiveTokenProvider? Msal { get; }
+
+    /// <summary>
+    /// The Azure provider, for commands that report who it signs in as. Null unless the
+    /// profile signs in through Azure.
+    /// </summary>
+    internal AzureTokenProvider? Azure { get; }
 
     /// <summary>
     /// The account this invocation will authenticate as, from <c>--user</c> or the profile's
@@ -37,13 +43,14 @@ public sealed class CliContext : IDisposable
 
     private CliContext(
         OsduClient client, OutputWriter output, OsduConfig config,
-        MsalInteractiveTokenProvider? msal, string? username)
+        MsalInteractiveTokenProvider? msal, string? username, AzureTokenProvider? azure = null)
     {
         Client = client;
         Output = output;
         Config = config;
         Msal = msal;
         Username = username;
+        Azure = azure;
     }
 
     /// <summary>
@@ -88,6 +95,27 @@ public sealed class CliContext : IDisposable
                 config,
                 msal: null,
                 username: null);
+        }
+
+        if (signIn.Method == SignInMethod.Azure)
+        {
+            // Refused, not ignored, for the reason it is with client credentials: whoever
+            // passed it expects to act as that account. Here the account is chosen in Azure.
+            if (requestedUser is not null)
+            {
+                throw new OsduException(
+                    $"--user does not apply: this profile signs in through Azure ({AuthenticationModes.Azure}), "
+                    + "as whoever `az login` or the environment says. Choose the account with `az login`.");
+            }
+
+            var azure = AzureTokenProvider.Create(config);
+            return new CliContext(
+                new OsduClient(config, azure, loggerFactory),
+                new OutputWriter(format, Console.Out),
+                config,
+                msal: null,
+                username: null,
+                azure);
         }
 
         if (signIn.Method == SignInMethod.Unsupported)

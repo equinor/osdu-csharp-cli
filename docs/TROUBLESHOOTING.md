@@ -68,6 +68,13 @@ CLI uses with `authentication_mode = msal_non_interactive`, those versions also 
 you instead of as the application, which is the likelier cause of the 401 itself; see
 [Signing in as an application](USAGE.md#signing-in-as-an-application).
 
+## `No Azure sign-in to use`
+
+A profile signing in through Azure (`azure`) found nothing to sign in with. The lines after the
+message say what each place it looked for an identity reported; for a person, the last one is
+the one that matters, and the fix is the `az login --tenant …` the message names. In a pipeline,
+check that the identity's variables reach the step running osducs.
+
 ## `error: sign-in failed. AADSTS…`
 
 Entra ID refused the sign-in, and the code says why. The common ones:
@@ -81,6 +88,11 @@ Entra ID refused the sign-in, and the code says why. The common ones:
   browser, it signs in as an application: check that osducs reads its `authentication_mode`
   with `osducs config show`. Otherwise the app registration needs public-client sign-in with
   redirect URI `http://localhost`.
+- **`AADSTS65001` The user or administrator has not consented to use the application … named
+  'Microsoft Azure CLI'.** A profile signing in through Azure asked the Azure CLI for a token to
+  an app registration that does not let it. An administrator of that app registration can add the
+  Azure CLI (`04b07795-8ddb-461a-bbee-02f9e1bf7b46`) as an authorised client application;
+  otherwise sign in with the profile's own mode instead.
 - **`AADSTS700016` Application … was not found.** The profile's client ID or authority is
   wrong, or names a different tenant.
 - **`AADSTS1002012` or `AADSTS70011`, a scope that is not valid.** An application signs in

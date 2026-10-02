@@ -151,6 +151,20 @@ public static class CliRunner
         }
     }
 
+    /// <summary>What a refused sign-in's message says is wrong, on one line.</summary>
+    /// <remarks>
+    /// Kept from its AADSTS code on, which says what is wrong; MSAL puts a paragraph of general
+    /// advice before it. Entra ID can put the trace and correlation IDs after it on lines of
+    /// their own; they are kept, on the same line, since they are what Microsoft support asks
+    /// for.
+    /// </remarks>
+    internal static string SignInCause(string message)
+    {
+        var code = message.IndexOf("AADSTS", StringComparison.Ordinal);
+        return string.Join(' ', (code > 0 ? message[code..] : message)
+            .Split(['\r', '\n'], StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries));
+    }
+
     /// <param name="requiredRoles">
     /// The roles the endpoint documents, used to explain a 403. Derived from the spec by the
     /// generator, so a command whose spec says nothing simply passes null.
@@ -212,15 +226,8 @@ public static class CliRunner
         {
             // Entra refused the sign-in: most often an expired or wrong client secret, which
             // a profile signing in as an application will meet when the secret is rotated.
-            // This escaped as a stack trace. The message is kept from its AADSTS code on,
-            // which says what is wrong; MSAL puts a paragraph of general advice before it.
-            // Entra ID can put the trace and correlation IDs after it on lines of their own;
-            // they are kept, on the same line, since they are what Microsoft support asks for.
-            var message = exception.Message;
-            var code = message.IndexOf("AADSTS", StringComparison.Ordinal);
-            var cause = string.Join(' ', (code > 0 ? message[code..] : message)
-                .Split(['\r', '\n'], StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries));
-            Console.Error.WriteLine($"error: sign-in failed. {cause}");
+            // This escaped as a stack trace.
+            Console.Error.WriteLine($"error: sign-in failed. {SignInCause(exception.Message)}");
             return 1;
         }
         catch (OsduException exception)
