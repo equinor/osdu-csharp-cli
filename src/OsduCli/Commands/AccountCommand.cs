@@ -25,6 +25,32 @@ public static class AccountCommand
         list.SetAction((parseResult, cancellationToken) =>
             CliRunner.RunAsync(parseResult, async (context, token) =>
         {
+            if (context.Azure is not null)
+            {
+                // Which source answered and as whom is only known from a token, so this one
+                // fetches it, which `config show` does not.
+                // Without the check, so a mismatch is shown rather than refused: this is the
+                // command for finding out who you are signed in as.
+                var who = await context.Azure.IdentifyAsync(token);
+                var expected = context.Azure.IsExpected(who);
+                context.Output.Write(
+                    new JsonArray(new JsonObject { ["account"] = who.Description, ["inUse"] = expected ? "yes" : "" })
+                        .ToJsonString(), Spec);
+                if (!expected)
+                    context.Output.WriteNote(context.Azure.Mismatch(who) + " Commands are refused until then.");
+                // `az login` changes only the Azure CLI's answer, and the other sources come before
+                // it. The token says for certain that the Azure CLI answered only when it was
+                // issued to the Azure CLI itself; a service principal signed in to the Azure CLI,
+                // as in a pipeline, looks like any other application. So otherwise this does not
+                // say which source it was.
+                context.Output.WriteNote(who.IssuedToAzureCli
+                    ? "This profile signs in through Azure, here through the Azure CLI. Choose another account with `az login`."
+                    : "This profile signs in through Azure, as the first of these that is there: AZURE_* variables, "
+                      + "a workload identity, a managed identity, or the Azure CLI. `az login` changes it only when "
+                      + "the Azure CLI is the one answering.");
+                return 0;
+            }
+
             if (context.Msal is null)
             {
                 // An application sign-in has no accounts, and the interactive cache, which

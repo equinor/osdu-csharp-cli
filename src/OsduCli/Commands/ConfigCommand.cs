@@ -58,9 +58,10 @@ public static class ConfigCommand
         from.CompletionSources.Add(_ => Profiles().Select(p => p.Name).Distinct().Select(n => new CompletionItem(n)));
         var mode = new Option<string>("--authentication-mode")
         {
-            Description = $"How the profile signs in: {AuthenticationModes.Interactive}, as you through a browser (the default), "
-                + $"or {AuthenticationModes.ClientCredentials}, as the application with a client secret. The secret is "
-                + "copied with --from or asked for without being shown, never given as an option.",
+            Description = $"How the profile signs in: {AuthenticationModes.Interactive}, as you through a browser (the default); "
+                + $"{AuthenticationModes.ClientCredentials}, as the application with a client secret, which is copied with "
+                + $"--from or asked for without being shown, never given as an option; or {AuthenticationModes.Azure}, "
+                + "through `az login` or an identity Azure provides.",
         };
         mode.AcceptAnyCasingFromAmong(AuthenticationModes.Supported);
         var force = new Option<bool>("--force") { Description = "Replace a profile of the same name." };
@@ -102,11 +103,17 @@ public static class ConfigCommand
                     : $"Signs in as the application {outcome.Written.ClientId}, with the client secret stored "
                       + "in the profile, which only you can read.");
             }
+            if (AuthenticationModes.Parse(outcome.Written.AuthenticationMode) == SignInMethod.Azure)
+            {
+                output.WriteNote(AzureSignInNote);
+                if (outcome.Written.User is { } user)
+                    output.WriteNote($"Commands check that Azure signed in as {user}, and are refused otherwise.");
+            }
             if (outcome.DroppedScopes is { Count: > 0 } dropped)
             {
                 output.WriteNote(
-                    $"Scopes reduced to {outcome.Written.Scopes}: an application signs in with its resource's "
-                    + $"/.default alone, and Entra ID refuses {string.Join(" and ", dropped)} alongside it.");
+                    $"Scopes reduced to {outcome.Written.Scopes}: {outcome.Written.AuthenticationMode} asks for one "
+                    + $"resource's /.default and nothing else, and {string.Join(" and ", dropped)} would be refused.");
             }
             if (outcome.NotCarried is { Count: > 0 } notCarried)
             {
@@ -182,8 +189,8 @@ public static class ConfigCommand
         {
             throw new OsduException(
                 $"'{request.From}' uses authentication mode '{settings.AuthenticationMode}', which osducs "
-                + $"does not support. Pass --authentication-mode {AuthenticationModes.Interactive} or "
-                + $"{AuthenticationModes.ClientCredentials} to choose one it does.");
+                + $"does not support. Pass --authentication-mode {AuthenticationModes.Interactive}, "
+                + $"{AuthenticationModes.ClientCredentials} or {AuthenticationModes.Azure} to choose one it does.");
         }
         if (method == SignInMethod.ClientCredentials && given.User is not null)
         {
@@ -191,13 +198,14 @@ public static class ConfigCommand
                 $"--user does not apply to {AuthenticationModes.ClientCredentials}, which signs in as the "
                 + "application rather than an account.");
         }
-        // In its usual spelling, whatever the profile it was copied from said.
-        settings = settings with
+        if (method == SignInMethod.Azure && Blank(given.ClientId) is not null)
         {
-            AuthenticationMode = method == SignInMethod.ClientCredentials
-                ? AuthenticationModes.ClientCredentials
-                : AuthenticationModes.Interactive,
-        };
+            throw new OsduException(
+                $"--client-id does not apply to {AuthenticationModes.Azure}, which signs in through the Azure CLI "
+                + "or an identity Azure provides rather than an app registration of the profile's.");
+        }
+        // In its usual spelling, whatever the profile it was copied from said.
+        settings = settings with { AuthenticationMode = AuthenticationModes.Name(method) };
 
         // Named rather than dropped silently, with the file it was in when that is not the one
         // the rest of the list came from.
@@ -209,16 +217,25 @@ public static class ConfigCommand
             notCarried = [.. notCarried, CliConfig.SamePath(notCarriedFrom, file) ? key : $"{key} (in {file})"];
         }
 
-        // A browser profile's default account means nothing once it signs in as an application.
-        // Copied, it was refused, and nothing on the command line could clear it; only --user,
-        // which says it means something, is refused.
+        // A browser profile's default account means nothing once the copy signs in as an
+        // application. Copied, it was refused, and nothing on the command line could clear it;
+        // only --user, which says it means something, is refused. A profile signing in through
+        // Azure keeps it, as the account its commands are checked against.
         if (method == SignInMethod.ClientCredentials && settings.User is not null)
         {
             LeaveBehind("user", "User", source => source.User);
             settings = settings with { User = null };
         }
 
-        settings = Complete(settings, ask);
+        // Nor its client ID, once Azure's own sources do the signing in: kept, it would say an
+        // app registration is involved when none is.
+        if (method == SignInMethod.Azure && settings.ClientId is not null)
+        {
+            LeaveBehind("client_id", "ClientId", source => source.ClientId);
+            settings = settings with { ClientId = null };
+        }
+
+        settings = Complete(settings, ask, method);
         Validate(settings);
 
         // A secret is copied only into a profile that signs in with it, from a profile that
@@ -235,17 +252,15 @@ public static class ConfigCommand
             LeaveBehind("client_secret", "ClientSecret", source => source.ClientSecret);
 
         IReadOnlyList<string> droppedScopes = [];
-        if (method == SignInMethod.ClientCredentials)
+        if (method != SignInMethod.Interactive)
         {
-            (var scopes, droppedScopes) = ApplicationScopes(settings.Scopes!);
-
-            // Last, so nothing typed after it can be refused and the secret typed again.
-            settings = settings with
-            {
-                Scopes = scopes,
-                ClientSecret = copiedSecret ?? AskForSecret(askSecret, settings.ClientId!),
-            };
+            (var scope, droppedScopes) = ResourceScope(settings.Scopes!, method);
+            settings = settings with { Scopes = scope };
         }
+
+        // Last, so nothing typed after it can be refused and the secret typed again.
+        if (method == SignInMethod.ClientCredentials)
+            settings = settings with { ClientSecret = copiedSecret ?? AskForSecret(askSecret, settings.ClientId!) };
 
         Directory.CreateDirectory(CliConfig.NativeDirectory);
         WriteOwnerOnly(target, ToJson(settings), overwrite: request.Force);
@@ -259,39 +274,12 @@ public static class ConfigCommand
             target, settings, notCarriedFrom, notCarried, nothingConfigured, inUse, droppedScopes);
     }
 
-    /// <summary>
-    /// OpenID Connect scopes, which ask about the person signing in and so mean nothing to an
-    /// application.
-    /// </summary>
-    private static readonly HashSet<string> PersonScopes = new(StringComparer.OrdinalIgnoreCase)
-    {
-        "openid", "profile", "email", "offline_access",
-    };
-
-    /// <summary>
-    /// The scope an application signs in with, and the person scopes removed to get it.
-    /// </summary>
-    /// <remarks>
-    /// Entra ID takes exactly one scope for a client-credentials sign-in: the resource's own
-    /// <c>/.default</c>. Browser profiles commonly add <c>openid</c>, which it refuses there,
-    /// so turning one into an application profile with <c>--authentication-mode</c> made a
-    /// profile that failed at its first request. Person scopes are removed and said so;
-    /// anything else that is not a single <c>/.default</c> is refused, since which resource
-    /// was meant is not something to guess.
-    /// </remarks>
-    private static (string Scopes, IReadOnlyList<string> Dropped) ApplicationScopes(string scopes)
-    {
-        var all = scopes.Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries);
-        var resources = all.Where(scope => !PersonScopes.Contains(scope)).ToList();
-        if (resources is not [var resource] || !resource.EndsWith("/.default", StringComparison.OrdinalIgnoreCase))
-        {
-            throw new OsduException(
-                $"{AuthenticationModes.ClientCredentials} signs in with one scope, a resource's /.default such as "
-                + $"https://energy.azure.com/.default, not '{scopes}'. Pass --scopes with the one meant.");
-        }
-
-        return (resource, all.Where(PersonScopes.Contains).ToList());
-    }
+    /// <summary>The one scope <paramref name="method"/> signs in with; see <see cref="AuthenticationModes.ResourceScope"/>.</summary>
+    private static (string Scope, IReadOnlyList<string> Dropped) ResourceScope(string scopes, SignInMethod method) =>
+        AuthenticationModes.ResourceScope(scopes)
+        ?? throw new OsduException(
+            $"{AuthenticationModes.Name(method)} signs in with one scope, a resource's /.default such as "
+            + $"https://energy.azure.com/.default, not '{scopes}'. Pass --scopes with the one meant.");
 
     /// <summary>Whether the environment alone holds a configuration that loads.</summary>
     private static bool LoadsFromEnvironment()
@@ -420,10 +408,16 @@ public static class ConfigCommand
     /// Enter on the first prompt was only reported after every other value had been typed, and
     /// then thrown away with them. Only the end of input — <paramref name="ask"/> returning
     /// null — stops the asking.
+    ///
+    /// <para>A profile signing in through Azure has no client ID to ask for. Its authority
+    /// still is, since it names the tenant the Azure CLI is asked for a token from.</para>
     /// </remarks>
-    private static ProfileSettings Complete(ProfileSettings settings, Func<string, string?>? ask)
+    private static ProfileSettings Complete(ProfileSettings settings, Func<string, string?>? ask, SignInMethod method)
     {
-        foreach (var (label, get, with, _) in Required)
+        var required = Required
+            .Where(field => method != SignInMethod.Azure || field.Flag != "--client-id")
+            .ToList();
+        foreach (var (label, get, with, _) in required)
         {
             while (get(settings) is null && ask?.Invoke(label) is { } answer)
             {
@@ -432,7 +426,7 @@ public static class ConfigCommand
             }
         }
 
-        var missing = Required.Where(field => field.Get(settings) is null).Select(field => field.Flag).ToList();
+        var missing = required.Where(field => field.Get(settings) is null).Select(field => field.Flag).ToList();
         if (missing.Count > 0)
             throw new OsduException($"Missing {string.Join(", ", missing)}. Pass them, copy them with --from, or run in a terminal to be asked.");
 
@@ -450,9 +444,9 @@ public static class ConfigCommand
             if (!Uri.TryCreate(value, UriKind.Absolute, out var uri) || uri.Scheme is not ("https" or "http"))
                 throw new OsduException($"{flag} must be an absolute http or https URL, not '{value}'.");
         }
-        foreach (var (flag, value) in new[] { ("--partition", settings.DataPartitionId!), ("--client-id", settings.ClientId!) })
+        foreach (var (flag, value) in new[] { ("--partition", settings.DataPartitionId), ("--client-id", settings.ClientId) })
         {
-            if (value.Any(char.IsWhiteSpace))
+            if (value?.Any(char.IsWhiteSpace) == true)
                 throw new OsduException($"{flag} cannot contain spaces: '{value}'.");
         }
     }
@@ -468,10 +462,12 @@ public static class ConfigCommand
             ["Server"] = settings.Server,
             ["DataPartitionId"] = settings.DataPartitionId,
             ["Authority"] = settings.Authority,
-            ["ClientId"] = settings.ClientId,
-            ["Scopes"] = settings.Scopes,
-            ["AuthenticationMode"] = settings.AuthenticationMode,
         };
+        // None for a profile signing in through Azure, where `null` would read as a setting.
+        if (settings.ClientId is not null)
+            osdu["ClientId"] = settings.ClientId;
+        osdu["Scopes"] = settings.Scopes;
+        osdu["AuthenticationMode"] = settings.AuthenticationMode;
         if (settings.User is not null)
             osdu["User"] = settings.User;
         if (settings.ClientSecret is not null)
@@ -699,6 +695,12 @@ public static class ConfigCommand
             // a profile.
             if (signIn.Method == SignInMethod.ClientCredentials)
                 output.WriteMessage($"Authenticating as the application {config.ClientId}, with a client secret.");
+            else if (signIn.Method == SignInMethod.Azure)
+            {
+                output.WriteMessage(AzureSignInNote);
+                if (signIn.ProfileUser is { } user)
+                    output.WriteMessage($"Expected to be {user}; commands signed in as anyone else are refused.");
+            }
             else if (signIn.User is not null)
                 output.WriteMessage($"Authenticating as {signIn.User}.");
             if (CliConfig.PythonSelectedProfile() is not null)
@@ -754,6 +756,11 @@ public static class ConfigCommand
         return show;
     }
 
+    /// <summary>What a profile signing in through Azure does, for <c>config add</c> and <c>config use</c>.</summary>
+    private const string AzureSignInNote =
+        "Signs in through Azure: as you after `az login`, or in a pipeline or on Azure as its managed or "
+        + "workload identity, or the AZURE_CLIENT_ID, AZURE_TENANT_ID and AZURE_CLIENT_SECRET variables.";
+
     /// <summary>The settings <c>config show</c> lists. Separate from the command so they can be tested.</summary>
     /// <remarks>
     /// The secret is never shown, only whether there is one. Its last characters would be
@@ -765,13 +772,23 @@ public static class ConfigCommand
         yield return ("server", config.Server);
         yield return ("data-partition-id", config.DataPartitionId);
         yield return ("authority", config.Authority);
-        yield return ("client-id", config.ClientId);
+        yield return ("client-id", signIn.Method == SignInMethod.Azure
+            ? "(not used — Azure's own sources sign in)"
+            : config.ClientId);
         yield return ("scopes", config.Scopes);
         yield return ("authentication-mode", signIn.Method == SignInMethod.Unsupported
             ? $"{signIn.Mode} (not supported by osducs)"
             : signIn.Mode);
 
-        if (signIn.Method == SignInMethod.ClientCredentials)
+        if (signIn.Method == SignInMethod.Azure)
+        {
+            // Who actually signs in takes a token to find out, which `config show` does not
+            // fetch. OSDU_USER is not shown: it is not what an azure profile is checked against.
+            yield return ("user", signIn.ProfileUser is { } user
+                ? $"{user} (checked: commands signed in as anyone else are refused)"
+                : "(whoever `az login` or the environment says — `osducs account list` shows who)");
+        }
+        else if (signIn.Method == SignInMethod.ClientCredentials)
         {
             yield return ("client-secret", signIn.Secret is null
                 ? "(not set — set OSDU_CLIENT_SECRET, or ClientSecret in the profile)"

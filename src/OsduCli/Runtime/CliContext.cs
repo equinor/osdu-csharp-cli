@@ -23,13 +23,21 @@ public sealed class CliContext : IDisposable
 
     /// <summary>
     /// The interactive MSAL provider, for commands that report on sign-in state. Null when the
-    /// profile signs in as an application, which has no accounts to report on.
+    /// profile signs in some other way, and its cache of accounts is not what is used.
     /// </summary>
     public MsalInteractiveTokenProvider? Msal { get; }
 
     /// <summary>
+    /// The Azure provider, for commands that report who it signs in as. Null unless the
+    /// profile signs in through Azure.
+    /// </summary>
+    internal AzureTokenProvider? Azure { get; }
+
+    /// <summary>
     /// The account this invocation will authenticate as, from <c>--user</c> or the profile's
-    /// <c>user</c>, or null when neither said or the profile signs in as an application.
+    /// <c>user</c>, or null when neither said or the profile signs in as an application. For a
+    /// profile signing in through Azure it is the account expected, which is checked rather
+    /// than chosen.
     /// Resolved once here so that commands reporting on it cannot disagree with the provider
     /// actually doing the work.
     /// </summary>
@@ -37,13 +45,14 @@ public sealed class CliContext : IDisposable
 
     private CliContext(
         OsduClient client, OutputWriter output, OsduConfig config,
-        MsalInteractiveTokenProvider? msal, string? username)
+        MsalInteractiveTokenProvider? msal, string? username, AzureTokenProvider? azure = null)
     {
         Client = client;
         Output = output;
         Config = config;
         Msal = msal;
         Username = username;
+        Azure = azure;
     }
 
     /// <summary>
@@ -88,6 +97,26 @@ public sealed class CliContext : IDisposable
                 config,
                 msal: null,
                 username: null);
+        }
+
+        if (signIn.Method == SignInMethod.Azure)
+        {
+            // The account is chosen in Azure, so --user and the profile's `user` cannot choose
+            // it; they say which one is expected, and a command signed in as anyone else is
+            // refused. OSDU_USER is not consulted: see SignInSettings.ProfileUser.
+            var expected = requestedUser is not null
+                ? new AzureTokenProvider.ExpectedAccount(requestedUser, FromFlag: true)
+                : signIn.ProfileUser is { } profileUser
+                    ? new AzureTokenProvider.ExpectedAccount(profileUser, FromFlag: false)
+                    : null;
+            var azure = AzureTokenProvider.Create(config, expected);
+            return new CliContext(
+                new OsduClient(config, azure, loggerFactory),
+                new OutputWriter(format, Console.Out),
+                config,
+                msal: null,
+                username: expected?.User,
+                azure);
         }
 
         if (signIn.Method == SignInMethod.Unsupported)

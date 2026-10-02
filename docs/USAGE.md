@@ -58,7 +58,7 @@ required setting that was not given; in a script, a missing one is an error nami
 | `--authority` | Entra ID authority, `https://login.microsoftonline.com/<tenant-id>` |
 | `--client-id` | the app registration to sign in through — for a browser sign-in it must allow public-client sign-in with redirect URI `http://localhost` |
 | `--scopes` | OAuth scopes, space-separated |
-| `--authentication-mode` | `msal_interactive`, as you through a browser (the default), or `msal_non_interactive`, as the application with a client secret — see [Signing in as an application](#signing-in-as-an-application) |
+| `--authentication-mode` | `msal_interactive`, as you through a browser (the default); `msal_non_interactive`, as the application with a client secret — see [Signing in as an application](#signing-in-as-an-application); or `azure`, through `az login` or an identity Azure provides — see [Signing in through Azure](#signing-in-through-azure) |
 | `--user` | optional default account |
 | `--from <profile>` | copy every setting from an existing profile; flags override what is copied |
 | `--force` | replace a profile of the same name |
@@ -218,9 +218,65 @@ only you — and the Python CLI restricts only the profiles it wrote.
 An application has no accounts to choose between, so `--user` is refused with such a profile,
 and `account list` says so rather than listing the browser sign-ins.
 
-The Python CLI's other modes — `refresh_token`, and those named after a cloud provider — are
-not supported. A profile using one is refused with that said, rather than signed in through a
+The Python CLI's other modes — `refresh_token`, and those named after a cloud provider other
+than Azure — are not supported. A profile using one is refused with that said, rather than signed in through a
 browser instead.
+
+## Signing in through Azure
+
+`azure` signs in the way the Azure tools do, so the profile holds no secret and needs no app
+registration of its own. As a person you sign in once with the Azure CLI:
+
+```bash
+az login --tenant <tenant-id>
+osducs config add dev-az --from dev --authentication-mode azure
+osducs -c dev-az account list
+```
+
+```
+Account                                  In use
+---------------------------------------  ------
+name@equinor.com, through the Azure CLI  yes
+```
+
+In a pipeline, or a job running on Azure, the same profile signs in as the identity it already
+has. osducs tries these in order and uses the first that is there:
+
+1. `AZURE_TENANT_ID`, `AZURE_CLIENT_ID` and `AZURE_CLIENT_SECRET` — an application's secret,
+   kept in the pipeline's secret store rather than a file.
+2. A workload identity, such as a federated GitHub Actions or Kubernetes identity.
+3. The managed identity of the Azure machine it runs on.
+4. The Azure CLI, after `az login`, or `azure/login` in a pipeline.
+
+Visual Studio, VS Code, Azure PowerShell and the other places an Azure account can be signed
+in are deliberately not tried: any of them may hold some account, and osducs does not pick an
+identity by accident. `AZURE_TOKEN_CREDENTIALS` narrows the list further: `prod` for the
+first three, `dev` for the Azure CLI, or one of them by name, such as
+`AZURE_TOKEN_CREDENTIALS=AzureCliCredential`. A value naming a source osducs leaves out is
+refused rather than used.
+
+The profile's authority names the tenant, so the Azure CLI is asked for a token from that tenant
+whichever one it used last. Its scope names the resource, reduced to one `/.default` as for an
+application; a profile with no scope uses `AZURE_RESOURCE_ID`, as the Python CLI did. There is
+no client ID: `config add` leaves one copied from a browser profile behind.
+
+The Azure CLI has one active account for every tool that uses it, so `az login` as an admin
+account for one task would otherwise make every `azure` profile act as admin. A profile's
+`user` therefore stays, as the account its commands are checked against: Azure still chooses
+who signs in, and a command signed in as anyone else is refused before it sends anything.
+
+```
+error: This profile is for name@equinor.com, but Azure signed in as admin@equinor.com, through the Azure CLI. Sign in as name@equinor.com with `az login`, or remove `user` from the profile.
+```
+
+`--user` does the same for one command. `OSDU_USER` is not checked: exported for some other
+profile, it says nothing about this one. Without a `user`, whoever Azure signs in as is used,
+and `account list` shows who that is, or the mismatch.
+
+Whether a token from the Azure CLI is accepted depends on the environment's app registration.
+`https://energy.azure.com/.default` is asked for the shared Azure Data Manager for Energy
+resource; an instance with an app registration of its own must have consented to the Azure CLI,
+or the sign-in fails with `AADSTS65001` — see [TROUBLESHOOTING.md](TROUBLESHOOTING.md).
 
 ## Output
 
