@@ -214,9 +214,13 @@ public static class CliRunner
             // a profile signing in as an application will meet when the secret is rotated.
             // This escaped as a stack trace. The message is kept from its AADSTS code on,
             // which says what is wrong; MSAL puts a paragraph of general advice before it.
+            // Entra ID can put the trace and correlation IDs after it on lines of their own;
+            // they are kept, on the same line, since they are what Microsoft support asks for.
             var message = exception.Message;
             var code = message.IndexOf("AADSTS", StringComparison.Ordinal);
-            Console.Error.WriteLine($"error: sign-in failed. {(code > 0 ? message[code..] : message)}");
+            var cause = string.Join(' ', (code > 0 ? message[code..] : message)
+                .Split(['\r', '\n'], StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries));
+            Console.Error.WriteLine($"error: sign-in failed. {cause}");
             return 1;
         }
         catch (OsduException exception)

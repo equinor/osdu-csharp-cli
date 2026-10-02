@@ -173,6 +173,8 @@ public class ErrorPageTests
     [InlineData("<html><body><h1>Bad &amp; Gateway</h1><p>Try later</p></body></html>", "Bad & Gateway")]
     // Escaped text is text: tags go before entities are decoded, not after.
     [InlineData("<title>Invalid &lt;token&gt; in <b>header</b></title>", "Invalid <token> in header")]
+    // The first heading of whatever level.
+    [InlineData("<body><nav>Home</nav><h3>Gateway Timeout</h3><h1>Later</h1></body>", "Gateway Timeout")]
     // A title holding nothing is no title.
     [InlineData("<title> </title><h1>Service <b>down</b></h1>", "Service down")]
     // Neither: the visible text, without scripts, styles or comments.

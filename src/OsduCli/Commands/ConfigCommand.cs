@@ -248,7 +248,7 @@ public static class ConfigCommand
         }
 
         Directory.CreateDirectory(CliConfig.NativeDirectory);
-        WriteOwnerOnly(target, ToJson(settings));
+        WriteOwnerOnly(target, ToJson(settings), overwrite: request.Force);
 
         if (nothingConfigured)
             CliConfig.Select(request.Name);
@@ -485,36 +485,64 @@ public static class ConfigCommand
     /// Writes a profile that only its owner can read, from the moment it exists.
     /// </summary>
     /// <remarks>
-    /// Every profile, not only those holding a secret: a profile replaced with <c>--force</c>
-    /// may gain one, and restricting it after writing would leave a moment in which the secret
-    /// was readable. An existing file is restricted before anything is written to it.
+    /// <para>Every profile, not only those holding a secret: a profile replaced with
+    /// <c>--force</c> may gain one.</para>
+    ///
+    /// <para>Written to a new file beside it, then moved into place. The new file is created
+    /// exclusively, and restricted as it is created, so the secret is never in a file anyone
+    /// else can read; the move replaces the directory entry rather than writing through it, so
+    /// a symbolic link put where the profile goes is replaced, not followed. Writing in place
+    /// restricted the path and then opened it again to write, and in an
+    /// <c>OSDU_CONFIG_DIR</c> others can write to, a link swapped in between sent the secret
+    /// wherever it pointed. A move also means an interrupted write leaves the old profile
+    /// rather than half of the new one.</para>
     /// </remarks>
-    internal static void WriteOwnerOnly(string path, string contents)
+    /// <exception cref="OsduException">
+    /// When a file appeared at <paramref name="path"/> after it was checked for, and
+    /// <paramref name="overwrite"/> is false.
+    /// </exception>
+    internal static void WriteOwnerOnly(string path, string contents, bool overwrite)
     {
-        using var stream = OperatingSystem.IsWindows() ? CreateOwnerOnlyOnWindows(path) : CreateOwnerOnlyOnUnix(path);
-        using var writer = new StreamWriter(stream);
-        writer.Write(contents);
+        var temporary = Path.Combine(
+            Path.GetDirectoryName(Path.GetFullPath(path))!,
+            $".{Path.GetFileName(path)}.{Guid.NewGuid():N}.tmp");
+        try
+        {
+            using (var stream = OperatingSystem.IsWindows()
+                       ? CreateOwnerOnlyOnWindows(temporary)
+                       : CreateOwnerOnlyOnUnix(temporary))
+            using (var writer = new StreamWriter(stream))
+            {
+                writer.Write(contents);
+            }
+
+            File.Move(temporary, path, overwrite);
+        }
+        catch (IOException) when (!overwrite && File.Exists(path))
+        {
+            throw new OsduException($"{path} already exists. Pass --force to replace it.");
+        }
+        finally
+        {
+            // Gone already once moved; this is for a write or move that failed.
+            File.Delete(temporary);
+        }
     }
 
     [UnsupportedOSPlatform("windows")]
-    private static FileStream CreateOwnerOnlyOnUnix(string path)
-    {
-        const UnixFileMode ownerOnly = UnixFileMode.UserRead | UnixFileMode.UserWrite;
-        if (File.Exists(path))
-            File.SetUnixFileMode(path, ownerOnly);
-
-        return new FileStream(path, new FileStreamOptions
+    private static FileStream CreateOwnerOnlyOnUnix(string path) =>
+        new(path, new FileStreamOptions
         {
-            Mode = FileMode.Create,
+            Mode = FileMode.CreateNew,
             Access = FileAccess.Write,
-            UnixCreateMode = ownerOnly,
+            UnixCreateMode = UnixFileMode.UserRead | UnixFileMode.UserWrite,
         });
-    }
 
     /// <remarks>
     /// An access list naming only the current user, with nothing inherited from the folder.
     /// The folder's own permissions were trusted at first, which holds for the default under
-    /// the user's profile but not for an <c>OSDU_CONFIG_DIR</c> pointing somewhere shared.
+    /// the user's profile but not for an <c>OSDU_CONFIG_DIR</c> pointing somewhere shared. The
+    /// list is the file's own, so it goes with the file when it is moved into place.
     /// </remarks>
     [SupportedOSPlatform("windows")]
     private static FileStream CreateOwnerOnlyOnWindows(string path)
@@ -524,11 +552,7 @@ public static class ConfigCommand
         security.AddAccessRule(new FileSystemAccessRule(
             WindowsIdentity.GetCurrent().User!, FileSystemRights.FullControl, AccessControlType.Allow));
 
-        var file = new FileInfo(path);
-        if (file.Exists)
-            file.SetAccessControl(security);
-
-        return file.Create(FileMode.Create, FileSystemRights.FullControl, FileShare.None,
+        return new FileInfo(path).Create(FileMode.CreateNew, FileSystemRights.FullControl, FileShare.None,
             bufferSize: 4096, FileOptions.None, security);
     }
 

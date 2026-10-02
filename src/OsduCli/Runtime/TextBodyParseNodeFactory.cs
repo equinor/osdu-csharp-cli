@@ -155,17 +155,18 @@ internal sealed partial class TextBodyParseNode(string text, bool html) : IParse
             : summary[..MaxSummaryLength].TrimEnd() + "…";
     }
 
-    /// <summary>The first match's content, unless it is only whitespace and tags.</summary>
+    /// <summary>The first match's text, unless it is only whitespace and tags.</summary>
     private static string? Inner(Regex pattern, string html) =>
         pattern.Match(html) is { Success: true } match
-        && !string.IsNullOrWhiteSpace(Tag().Replace(match.Groups[1].Value, ""))
-            ? match.Groups[1].Value
+        && !string.IsNullOrWhiteSpace(Tag().Replace(match.Groups["text"].Value, ""))
+            ? match.Groups["text"].Value
             : null;
 
-    [GeneratedRegex(@"<title\b[^>]*>(.*?)</title\s*>", RegexOptions.IgnoreCase | RegexOptions.Singleline)]
+    [GeneratedRegex(@"<title\b[^>]*>(?<text>.*?)</title\s*>", RegexOptions.IgnoreCase | RegexOptions.Singleline)]
     private static partial Regex Title();
 
-    [GeneratedRegex(@"<h1\b[^>]*>(.*?)</h1\s*>", RegexOptions.IgnoreCase | RegexOptions.Singleline)]
+    /// <summary>The first heading of any level, in the order the page has them.</summary>
+    [GeneratedRegex(@"<h(?<level>[1-6])\b[^>]*>(?<text>.*?)</h\k<level>\s*>", RegexOptions.IgnoreCase | RegexOptions.Singleline)]
     private static partial Regex Heading();
 
     [GeneratedRegex(@"<(script|style)\b.*?</\1\s*>|<!--.*?-->", RegexOptions.IgnoreCase | RegexOptions.Singleline)]

@@ -233,6 +233,34 @@ public class ClientCredentialsTests : ConfigTestDirectories
     }
 
     [Fact]
+    public async Task ASignInRefusedOverSeveralLinesIsReportedOnOne()
+    {
+        // Entra ID can put the trace and correlation IDs on lines of their own. Kept, since
+        // support asks for them, but on the one line.
+        WriteApplicationProfile("test_admin");
+        var error = new StringWriter();
+        var original = Console.Error;
+        Console.SetError(error);
+        try
+        {
+            await CliRunner.RunAsync(Parse("-c", "test_admin"),
+                (_, _) => throw new MsalServiceException("invalid_client",
+                    "Original exception: AADSTS7000215: Invalid client secret provided.\r\n"
+                    + "Trace ID: 1111\r\nCorrelation ID: 2222\r\nTimestamp: 2026-10-02 12:00:00Z"),
+                TestContext.Current.CancellationToken);
+        }
+        finally
+        {
+            Console.SetError(original);
+        }
+
+        Assert.Equal(
+            "error: sign-in failed. AADSTS7000215: Invalid client secret provided. Trace ID: 1111 "
+            + "Correlation ID: 2222 Timestamp: 2026-10-02 12:00:00Z" + Environment.NewLine,
+            error.ToString());
+    }
+
+    [Fact]
     public async Task ARefusedSignInIsOneLineNamingTheCause()
     {
         // What a rotated secret looks like. It escaped as a stack trace.
@@ -529,6 +557,58 @@ public class ClientCredentialsTests : ConfigTestDirectories
 
         Assert.Equal(UnixFileMode.UserRead | UnixFileMode.UserWrite, File.GetUnixFileMode(existing));
         Assert.Equal(Secret, Written("test_admin")["ClientSecret"]!.GetValue<string>());
+    }
+
+    [Fact]
+    [UnsupportedOSPlatform("windows")]
+    public void ALinkInThePlaceOfAProfileIsReplacedNotWrittenThrough()
+    {
+        // Someone who can write to a shared OSDU_CONFIG_DIR puts a link where the profile goes,
+        // pointing at a file they can read. Writing in place sent the secret there.
+        Assert.SkipWhen(OperatingSystem.IsWindows(), "Creating links needs a privilege on Windows.");
+        var elsewhere = Path.Combine(Python, "elsewhere.txt");
+        File.WriteAllText(elsewhere, "untouched");
+        var target = Path.Combine(Native, "test_admin.json");
+        File.CreateSymbolicLink(target, elsewhere);
+        WriteApplicationProfile("source");
+
+        Add("test_admin", Nothing, from: "source", force: true);
+
+        Assert.Equal("untouched", File.ReadAllText(elsewhere));
+        Assert.Null(new FileInfo(target).LinkTarget);
+        Assert.Equal(Secret, Written("test_admin")["ClientSecret"]!.GetValue<string>());
+        Assert.Equal(UnixFileMode.UserRead | UnixFileMode.UserWrite, File.GetUnixFileMode(target));
+    }
+
+    [Fact]
+    [UnsupportedOSPlatform("windows")]
+    public void ALinkToAFileNotYetThereIsNotFollowed()
+    {
+        // The same, for a new profile: the link points at a file that does not exist yet, which
+        // creating the profile in place would have created, secret and all.
+        Assert.SkipWhen(OperatingSystem.IsWindows(), "Creating links needs a privilege on Windows.");
+        var stolen = Path.Combine(Python, "stolen.json");
+        File.CreateSymbolicLink(Path.Combine(Native, "test_admin.json"), stolen);
+        WriteApplicationProfile("source");
+
+        // .NET counts a link as existing even when what it points at does not, so this is the
+        // check for an existing profile; a link made after that check fails the move instead.
+        var exception = Assert.Throws<OsduException>(() => Add("test_admin", Nothing, from: "source"));
+
+        Assert.Contains("already exists", exception.Message);
+        Assert.False(File.Exists(stolen));
+    }
+
+    [Fact]
+    public void NoTemporaryFileIsLeftBehind()
+    {
+        WriteApplicationProfile("source");
+
+        Add("test_admin", Nothing, from: "source");
+        Add("test_admin", Nothing, from: "source", force: true);
+
+        Assert.Equal(["test_admin.json"],
+            Directory.EnumerateFileSystemEntries(Native).Select(Path.GetFileName).Where(name => name != "state.json"));
     }
 
     // ---- config show --------------------------------------------------------------------
