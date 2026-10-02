@@ -205,9 +205,15 @@ the profile is used, which is the way for a pipeline:
 OSDU_CLIENT_SECRET="$SECRET_FROM_THE_VAULT" osducs -c ci record search --kind "…"
 ```
 
-`osducs config show` says whether a secret is set, never what it is, and points out a profile
-holding one that other users on the machine can read. osducs restricts the profiles it writes
-itself; the Python CLI restricts only those it wrote.
+An application signs in with a single scope, its resource's `/.default`. Copying a browser
+profile removes `openid` and the other scopes that ask about a person, and says so; scopes
+naming more than one resource, or none, are refused until `--scopes` gives the one meant.
+A default account copied from a browser profile is left behind for the same reason.
+
+`osducs config show` says whether a secret is set, never what it is, and on Linux and macOS
+points out a profile holding one that other users on the machine can read. osducs writes its
+own profiles readable only by you — a file mode of 600, or on Windows an access list naming
+only you — and the Python CLI restricts only the profiles it wrote.
 
 An application has no accounts to choose between, so `--user` is refused with such a profile,
 and `account list` says so rather than listing the browser sign-ins.

@@ -89,17 +89,29 @@ internal sealed partial class TextBodyParseNode(string text, bool html) : IParse
             ? new Dictionary<string, string>()
             : new Dictionary<string, string> { ["message"] = summary };
         var result = Node(JsonSerializer.SerializeToElement(body)).GetObjectValue(factory);
-        if (result is Exception)
-            return result;
+        return result is Exception ? result : throw NotJson(summary);
+    }
 
+    /// <summary>
+    /// The body as a list of objects, when it is a JSON array under the wrong content type.
+    /// </summary>
+    /// <exception cref="OsduException">
+    /// Otherwise. An error is never a list, so this is a page where a successful response was
+    /// expected, and Kiota's text parser answered it with an exception that escaped as a stack
+    /// trace.
+    /// </exception>
+    public IEnumerable<T> GetCollectionOfObjectValues<T>(ParsableFactory<T> factory) where T : IParsable =>
+        Json('[') is { } json
+            ? Node(json).GetCollectionOfObjectValues(factory)
+            : throw NotJson(Summarise(text, html));
+
+    private OsduException NotJson(string summary)
+    {
         var what = html ? "an HTML page" : "text";
-        throw new OsduException(summary.Length == 0
+        return new OsduException(summary.Length == 0
             ? $"The service answered with empty {what} where JSON was expected."
             : $"The service answered with {what} where JSON was expected: {summary}");
     }
-
-    public IEnumerable<T> GetCollectionOfObjectValues<T>(ParsableFactory<T> factory) where T : IParsable =>
-        Json('[') is { } json ? Node(json).GetCollectionOfObjectValues(factory) : _text.GetCollectionOfObjectValues(factory);
 
     /// <summary>The body as JSON, when it starts with <paramref name="opening"/> and parses.</summary>
     private JsonElement? Json(char opening)
@@ -130,10 +142,11 @@ internal sealed partial class TextBodyParseNode(string text, bool html) : IParse
         var summary = body;
         if (html)
         {
+            // Tags removed before entities are decoded, so `&lt;token&gt;` is text that stays,
+            // not a tag made by decoding and then removed.
             var visible = Hidden().Replace(body, " ");
-            summary = WebUtility.HtmlDecode(
-                Inner(Title(), visible) ?? Inner(Heading(), visible) ?? Tag().Replace(visible, " "));
-            summary = Tag().Replace(summary, " ");
+            summary = WebUtility.HtmlDecode(Tag().Replace(
+                Inner(Title(), visible) ?? Inner(Heading(), visible) ?? visible, " "));
         }
 
         summary = Whitespace().Replace(summary, " ").Trim();

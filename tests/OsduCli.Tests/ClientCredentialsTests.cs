@@ -1,5 +1,7 @@
 using System.CommandLine;
 using System.Runtime.Versioning;
+using System.Security.AccessControl;
+using System.Security.Principal;
 using System.Text.Json.Nodes;
 using Equinor.OsduCli.Commands;
 using Equinor.OsduCli.Runtime;
@@ -390,14 +392,70 @@ public class ClientCredentialsTests : ConfigTestDirectories
     }
 
     [Fact]
-    public void ADefaultAccountIsRefusedForAnApplicationProfile()
+    public void UserIsRefusedWhenAddingAnApplicationProfile()
     {
         WriteApplicationProfile("test_admin");
 
         var exception = Assert.Throws<OsduException>(() =>
             Add("test_admin", Nothing with { User = "someone@equinor.com" }, from: "test_admin"));
 
-        Assert.Contains("does not apply", exception.Message);
+        Assert.Contains("--user does not apply", exception.Message);
+    }
+
+    [Fact]
+    public void ACopiedDefaultAccountIsLeftBehindWhenTheCopySignsInAsAnApplication()
+    {
+        // Refused at first, with nothing on the command line able to clear it, so a browser
+        // profile with a default account could not be turned into an application one.
+        WriteNativeProfile("dev", user: "someone@equinor.com");
+
+        var outcome = Add("ci", Nothing with { AuthenticationMode = "msal_non_interactive" }, from: "dev",
+            askSecret: _ => Secret);
+
+        Assert.Null(Written("ci")["User"]);
+        Assert.Equal(Path.Combine(Native, "dev.json"), outcome.NotCarriedFrom);
+        Assert.Equal(["User"], outcome.NotCarried);
+    }
+
+    [Fact]
+    public void PersonScopesAreRemovedFromAnApplicationProfile()
+    {
+        // A browser profile's `<resource>/.default openid`: Entra ID refuses openid in a
+        // client-credentials sign-in, so the copy failed at its first request.
+        WritePythonProfile("dev");
+
+        var outcome = Add("ci", Nothing with { AuthenticationMode = "msal_non_interactive" }, from: "dev",
+            askSecret: _ => Secret);
+
+        Assert.Equal("https://example.com/.default", Written("ci")["Scopes"]!.GetValue<string>());
+        Assert.Equal(["openid"], outcome.DroppedScopes);
+    }
+
+    [Theory]
+    [InlineData("https://example.com/.default https://other.example.com/.default")]
+    [InlineData("https://example.com/user_impersonation")]
+    [InlineData("openid profile")]
+    public void ScopesAnApplicationCannotSignInWithAreRefused(string scopes)
+    {
+        WritePythonProfile("dev");
+
+        var exception = Assert.Throws<OsduException>(() =>
+            Add("ci", Nothing with { AuthenticationMode = "msal_non_interactive", Scopes = scopes }, from: "dev",
+                askSecret: _ => throw new InvalidOperationException("refused before the secret is asked for")));
+
+        Assert.Contains("--scopes", exception.Message);
+        Assert.False(File.Exists(Path.Combine(Native, "ci.json")));
+    }
+
+    [Fact]
+    public void ABrowserProfileKeepsItsScopes()
+    {
+        WritePythonProfile("dev");
+
+        var outcome = Add("dev", Nothing, from: "dev");
+
+        Assert.Equal("https://example.com/.default openid", Written("dev")["Scopes"]!.GetValue<string>());
+        Assert.Empty(outcome.DroppedScopes);
     }
 
     [Fact]
@@ -411,6 +469,32 @@ public class ClientCredentialsTests : ConfigTestDirectories
 
         Assert.Equal(UnixFileMode.UserRead | UnixFileMode.UserWrite,
             File.GetUnixFileMode(Path.Combine(Native, "test_admin.json")));
+    }
+
+    [Fact]
+    [SupportedOSPlatform("windows")]
+    public void OnWindowsOnlyTheOwnerIsGrantedAccess()
+    {
+        // Explicit rather than inherited: OSDU_CONFIG_DIR can point at a shared folder.
+        Assert.SkipUnless(OperatingSystem.IsWindows(), "Windows access lists only.");
+        var existing = WriteNativeProfile("test_admin");
+        WriteApplicationProfile("source");
+
+        Add("test_admin", Nothing, from: "source", force: true);
+        Add("fresh", Nothing, from: "source");
+
+        foreach (var path in new[] { existing, Path.Combine(Native, "fresh.json") })
+        {
+            var security = new FileInfo(path).GetAccessControl();
+            var rules = security.GetAccessRules(includeExplicit: true, includeInherited: true, typeof(SecurityIdentifier))
+                .Cast<FileSystemAccessRule>()
+                .ToList();
+
+            Assert.True(security.AreAccessRulesProtected);
+            var rule = Assert.Single(rules);
+            Assert.Equal(WindowsIdentity.GetCurrent().User, rule.IdentityReference);
+            Assert.Equal(AccessControlType.Allow, rule.AccessControlType);
+        }
     }
 
     [Fact]

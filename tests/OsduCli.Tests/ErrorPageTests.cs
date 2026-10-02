@@ -3,6 +3,7 @@ using System.Text;
 using Equinor.OsduCli.Runtime;
 using Equinor.OsduCsharpClient.Facade;
 using Equinor.OsduCsharpClient.Legal;
+using Equinor.OsduCsharpClient.Legal.Models;
 using Microsoft.Kiota.Abstractions;
 using Microsoft.Kiota.Abstractions.Authentication;
 using Microsoft.Kiota.Abstractions.Serialization;
@@ -119,6 +120,30 @@ public class ErrorPageTests
     }
 
     [Fact]
+    public void APageWhereAListWasExpectedIsReported()
+    {
+        // Kiota's text parser threw for a list, which escaped as a stack trace.
+        var node = new TextBodyParseNode("<html><title>Sign in to your account</title></html>", html: true);
+
+        var exception = Assert.Throws<OsduException>(() =>
+            node.GetCollectionOfObjectValues(AppError.CreateFromDiscriminatorValue));
+
+        Assert.Equal(
+            "The service answered with an HTML page where JSON was expected: Sign in to your account",
+            exception.Message);
+    }
+
+    [Fact]
+    public void AJsonListUnderATextContentTypeIsReadAsJson()
+    {
+        var node = new TextBodyParseNode("""[{"message":"a"},{"message":"b"}]""", html: false);
+
+        var errors = node.GetCollectionOfObjectValues(AppError.CreateFromDiscriminatorValue).ToList();
+
+        Assert.Equal(["a", "b"], errors.Select(error => error.Message));
+    }
+
+    [Fact]
     public void AClientRegisteringKiotasTextParserDoesNotDisplaceThisOne()
     {
         // Registered when the context is built, before any client; a client registers its
@@ -146,6 +171,8 @@ public class ErrorPageTests
     [InlineData(GatewayPage, "401 - Unauthorized: Access is denied due to invalid credentials.")]
     // No title: the first heading, with entities decoded.
     [InlineData("<html><body><h1>Bad &amp; Gateway</h1><p>Try later</p></body></html>", "Bad & Gateway")]
+    // Escaped text is text: tags go before entities are decoded, not after.
+    [InlineData("<title>Invalid &lt;token&gt; in <b>header</b></title>", "Invalid <token> in header")]
     // A title holding nothing is no title.
     [InlineData("<title> </title><h1>Service <b>down</b></h1>", "Service down")]
     // Neither: the visible text, without scripts, styles or comments.

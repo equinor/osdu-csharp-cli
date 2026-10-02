@@ -83,6 +83,10 @@ Entra ID refused the sign-in, and the code says why. The common ones:
   redirect URI `http://localhost`.
 - **`AADSTS700016` Application … was not found.** The profile's client ID or authority is
   wrong, or names a different tenant.
+- **`AADSTS1002012` or `AADSTS70011`, a scope that is not valid.** An application signs in
+  with one scope, its resource's `/.default`, and nothing else: no `openid`, and no second
+  resource. `config add` sees to that for profiles it writes; a profile written by hand or by
+  the Python CLI needs its scopes corrected.
 
 ## `404 No static resource …`
 

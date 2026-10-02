@@ -1,5 +1,8 @@
 using System.CommandLine;
 using System.CommandLine.Completions;
+using System.Runtime.Versioning;
+using System.Security.AccessControl;
+using System.Security.Principal;
 using System.Text;
 using System.Text.Json;
 using System.Text.Json.Nodes;
@@ -97,7 +100,13 @@ public static class ConfigCommand
                     ? $"Signs in as the application {outcome.Written.ClientId}. No client secret is stored, "
                       + "so set OSDU_CLIENT_SECRET when using it."
                     : $"Signs in as the application {outcome.Written.ClientId}, with the client secret stored "
-                      + (OperatingSystem.IsWindows() ? "in the profile." : "in the profile, which only you can read."));
+                      + "in the profile, which only you can read.");
+            }
+            if (outcome.DroppedScopes is { Count: > 0 } dropped)
+            {
+                output.WriteNote(
+                    $"Scopes reduced to {outcome.Written.Scopes}: an application signs in with its resource's "
+                    + $"/.default alone, and Entra ID refuses {string.Join(" and ", dropped)} alongside it.");
             }
             if (outcome.NotCarried is { Count: > 0 } notCarried)
             {
@@ -126,7 +135,7 @@ public static class ConfigCommand
 
     internal sealed record AddOutcome(
         string Path, ProfileSettings Written, string? NotCarriedFrom, IReadOnlyList<string> NotCarried,
-        bool Selected, bool AlreadyInUse);
+        bool Selected, bool AlreadyInUse, IReadOnlyList<string> DroppedScopes);
 
     /// <summary>The Python profile keys osducs reads. Anything else in one is not copied.</summary>
     private static readonly HashSet<string> Carried = new(StringComparer.OrdinalIgnoreCase)
@@ -157,7 +166,7 @@ public static class ConfigCommand
         var nothingConfigured = !CliConfig.Resolve(null).Any(File.Exists)
             && !LoadsFromEnvironment();
 
-        var (seed, secretFrom, notCarriedFrom, notCarried) = Copy(request.From);
+        var (seed, files, notCarriedFrom, notCarried) = Copy(request.From);
         var given = request.Given;
         var settings = new ProfileSettings(
             Blank(given.Server) ?? seed.Server,
@@ -176,11 +185,11 @@ public static class ConfigCommand
                 + $"does not support. Pass --authentication-mode {AuthenticationModes.Interactive} or "
                 + $"{AuthenticationModes.ClientCredentials} to choose one it does.");
         }
-        if (method == SignInMethod.ClientCredentials && settings.User is not null)
+        if (method == SignInMethod.ClientCredentials && given.User is not null)
         {
             throw new OsduException(
-                $"A default account (--user, or `user` in the profile copied) does not apply to "
-                + $"{AuthenticationModes.ClientCredentials}, which signs in as the application.");
+                $"--user does not apply to {AuthenticationModes.ClientCredentials}, which signs in as the "
+                + "application rather than an account.");
         }
         // In its usual spelling, whatever the profile it was copied from said.
         settings = settings with
@@ -189,26 +198,45 @@ public static class ConfigCommand
                 ? AuthenticationModes.ClientCredentials
                 : AuthenticationModes.Interactive,
         };
-        if (method == SignInMethod.Interactive && secretFrom is not null)
+
+        // Named rather than dropped silently, with the file it was in when that is not the one
+        // the rest of the list came from.
+        void LeaveBehind(string pythonKey, string jsonKey, Func<ProfileSettings, object?> value)
         {
-            // A browser sign-in has no use for a secret, so one left over in the source
-            // profile is not spread to another file.
-            var key = CliConfig.IsJson(secretFrom) ? "ClientSecret" : "client_secret";
-            notCarriedFrom ??= secretFrom;
-            notCarried = [.. notCarried,
-                CliConfig.SamePath(notCarriedFrom, secretFrom) ? key : $"{key} (in {secretFrom})"];
+            var file = files.Last(path => value(CliConfig.ReadFiles([path])) is not null);
+            var key = CliConfig.IsJson(file) ? jsonKey : pythonKey;
+            notCarriedFrom ??= file;
+            notCarried = [.. notCarried, CliConfig.SamePath(notCarriedFrom, file) ? key : $"{key} (in {file})"];
+        }
+
+        // A browser sign-in has no use for a secret, so one left over in the source profile is
+        // not spread to another file.
+        if (method == SignInMethod.Interactive && seed.ClientSecret is not null)
+            LeaveBehind("client_secret", "ClientSecret", source => source.ClientSecret);
+
+        // A browser profile's default account means nothing once it signs in as an application.
+        // Copied, it was refused, and nothing on the command line could clear it; only --user,
+        // which says it means something, is refused.
+        if (method == SignInMethod.ClientCredentials && settings.User is not null)
+        {
+            LeaveBehind("user", "User", source => source.User);
+            settings = settings with { User = null };
         }
 
         settings = Complete(settings, ask);
         Validate(settings);
 
-        // Last, so nothing typed after it can be refused and the secret typed again. Copied
-        // only with the client ID it was issued for: given another, it is that application's
-        // secret that is wanted.
+        IReadOnlyList<string> droppedScopes = [];
         if (method == SignInMethod.ClientCredentials)
         {
+            (var scopes, droppedScopes) = ApplicationScopes(settings.Scopes!);
+
+            // Last, so nothing typed after it can be refused and the secret typed again.
+            // Copied only with the client ID it was issued for: given another, it is that
+            // application's secret that is wanted.
             settings = settings with
             {
+                Scopes = scopes,
                 ClientSecret = (settings.ClientId == seed.ClientId ? seed.ClientSecret : null)
                                ?? AskForSecret(askSecret, settings.ClientId!),
             };
@@ -222,7 +250,42 @@ public static class ConfigCommand
 
         var inUse = !nothingConfigured && InEffect(target);
 
-        return new AddOutcome(target, settings, notCarriedFrom, notCarried, nothingConfigured, inUse);
+        return new AddOutcome(
+            target, settings, notCarriedFrom, notCarried, nothingConfigured, inUse, droppedScopes);
+    }
+
+    /// <summary>
+    /// OpenID Connect scopes, which ask about the person signing in and so mean nothing to an
+    /// application.
+    /// </summary>
+    private static readonly HashSet<string> PersonScopes = new(StringComparer.OrdinalIgnoreCase)
+    {
+        "openid", "profile", "email", "offline_access",
+    };
+
+    /// <summary>
+    /// The scope an application signs in with, and the person scopes removed to get it.
+    /// </summary>
+    /// <remarks>
+    /// Entra ID takes exactly one scope for a client-credentials sign-in: the resource's own
+    /// <c>/.default</c>. Browser profiles commonly add <c>openid</c>, which it refuses there,
+    /// so turning one into an application profile with <c>--authentication-mode</c> made a
+    /// profile that failed at its first request. Person scopes are removed and said so;
+    /// anything else that is not a single <c>/.default</c> is refused, since which resource
+    /// was meant is not something to guess.
+    /// </remarks>
+    private static (string Scopes, IReadOnlyList<string> Dropped) ApplicationScopes(string scopes)
+    {
+        var all = scopes.Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries);
+        var resources = all.Where(scope => !PersonScopes.Contains(scope)).ToList();
+        if (resources is not [var resource] || !resource.EndsWith("/.default", StringComparison.OrdinalIgnoreCase))
+        {
+            throw new OsduException(
+                $"{AuthenticationModes.ClientCredentials} signs in with one scope, a resource's /.default such as "
+                + $"https://energy.azure.com/.default, not '{scopes}'. Pass --scopes with the one meant.");
+        }
+
+        return (resource, all.Where(PersonScopes.Contains).ToList());
     }
 
     /// <summary>Whether the environment alone holds a configuration that loads.</summary>
@@ -282,14 +345,14 @@ public static class ConfigCommand
         StringComparer.OrdinalIgnoreCase);
 
     /// <summary>
-    /// What <c>--from</c> copies, the file its client secret came from, if it has one, and the
-    /// keys it leaves behind.
+    /// What <c>--from</c> copies, the files it read, lowest precedence first, and the keys it
+    /// leaves behind.
     /// </summary>
-    private static (ProfileSettings Seed, string? SecretFrom, string? NotCarriedFrom, IReadOnlyList<string> NotCarried)
+    private static (ProfileSettings Seed, IReadOnlyList<string> Files, string? NotCarriedFrom, IReadOnlyList<string> NotCarried)
         Copy(string? from)
     {
         if (from is null)
-            return (ProfileSettings.Empty, null, null, []);
+            return (ProfileSettings.Empty, [], null, []);
 
         var files = CliConfig.Candidates(from).Where(File.Exists).ToList();
         if (files.Count == 0)
@@ -319,7 +382,7 @@ public static class ConfigCommand
             ClientSecret = winner.ClientSecret,
         };
 
-        return (settings, winner.ClientSecret is null ? null : files[^1], python, notCarried);
+        return (settings, files, python, notCarried);
     }
 
     /// <summary>
@@ -418,31 +481,50 @@ public static class ConfigCommand
     /// </summary>
     /// <remarks>
     /// Every profile, not only those holding a secret: a profile replaced with <c>--force</c>
-    /// may gain one, and setting the permission after writing would leave a moment in which
-    /// the secret was readable. An existing file is restricted before anything is written to
-    /// it. Windows is left to the inherited permissions of the user's profile folder, which
-    /// already keep other users out.
+    /// may gain one, and restricting it after writing would leave a moment in which the secret
+    /// was readable. An existing file is restricted before anything is written to it.
     /// </remarks>
     internal static void WriteOwnerOnly(string path, string contents)
     {
-        if (OperatingSystem.IsWindows())
-        {
-            File.WriteAllText(path, contents);
-            return;
-        }
+        using var stream = OperatingSystem.IsWindows() ? CreateOwnerOnlyOnWindows(path) : CreateOwnerOnlyOnUnix(path);
+        using var writer = new StreamWriter(stream);
+        writer.Write(contents);
+    }
 
+    [UnsupportedOSPlatform("windows")]
+    private static FileStream CreateOwnerOnlyOnUnix(string path)
+    {
         const UnixFileMode ownerOnly = UnixFileMode.UserRead | UnixFileMode.UserWrite;
         if (File.Exists(path))
             File.SetUnixFileMode(path, ownerOnly);
 
-        using var stream = new FileStream(path, new FileStreamOptions
+        return new FileStream(path, new FileStreamOptions
         {
             Mode = FileMode.Create,
             Access = FileAccess.Write,
             UnixCreateMode = ownerOnly,
         });
-        using var writer = new StreamWriter(stream);
-        writer.Write(contents);
+    }
+
+    /// <remarks>
+    /// An access list naming only the current user, with nothing inherited from the folder.
+    /// The folder's own permissions were trusted at first, which holds for the default under
+    /// the user's profile but not for an <c>OSDU_CONFIG_DIR</c> pointing somewhere shared.
+    /// </remarks>
+    [SupportedOSPlatform("windows")]
+    private static FileStream CreateOwnerOnlyOnWindows(string path)
+    {
+        var security = new FileSecurity();
+        security.SetAccessRuleProtection(isProtected: true, preserveInheritance: false);
+        security.AddAccessRule(new FileSystemAccessRule(
+            WindowsIdentity.GetCurrent().User!, FileSystemRights.FullControl, AccessControlType.Allow));
+
+        var file = new FileInfo(path);
+        if (file.Exists)
+            file.SetAccessControl(security);
+
+        return file.Create(FileMode.Create, FileSystemRights.FullControl, FileShare.None,
+            bufferSize: 4096, FileOptions.None, security);
     }
 
     private static string? Blank(string? value) => string.IsNullOrWhiteSpace(value) ? null : value.Trim();
