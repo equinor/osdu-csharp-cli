@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.10.0](https://github.com/equinor/osdu-csharp-cli/compare/v0.9.0...v0.10.0) (2026-10-02)
+
+
+### Features
+
+* **config:** sign in with a client secret for msal_non_interactive profiles ([#47](https://github.com/equinor/osdu-csharp-cli/issues/47)) ([a21ce15](https://github.com/equinor/osdu-csharp-cli/commit/a21ce15533e979adfa7ff4a3f561fa677ee86e1c))
+
 ## [0.9.0](https://github.com/equinor/osdu-csharp-cli/compare/v0.8.0...v0.9.0) (2026-10-01)
 
 
