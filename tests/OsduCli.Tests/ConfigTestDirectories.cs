@@ -19,8 +19,10 @@ public abstract class ConfigTestDirectories : IDisposable
         "OSDU_CONFIG_DIR", "OSDUCLI_CONFIG_DIR",
         "OSDU_SERVER", "OSDU_DATA_PARTITION_ID", "OSDU_AUTHORITY",
         "OSDU_CLIENT_ID", "OSDU_SCOPES", "OSDU_USER",
+        "OSDU_AUTHENTICATION_MODE", "OSDU_CLIENT_SECRET",
         "Osdu__Server", "Osdu__DataPartitionId", "Osdu__Authority",
         "Osdu__ClientId", "Osdu__Scopes", "Osdu__User",
+        "Osdu__AuthenticationMode", "Osdu__ClientSecret",
     ];
 
     private readonly Dictionary<string, string?> _saved = new();

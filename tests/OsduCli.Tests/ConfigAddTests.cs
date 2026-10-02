@@ -142,7 +142,7 @@ public class ConfigAddTests : ConfigTestDirectories
         Assert.Equal("pypartition", config.DataPartitionId);
         Assert.Equal("azure@equinor.com", user);
         Assert.Equal(Path.Combine(Python, "dev"), outcome.NotCarriedFrom);
-        Assert.Equal(["storage_url", "acl_owner", "authentication_mode"], outcome.NotCarried);
+        Assert.Equal(["storage_url", "acl_owner"], outcome.NotCarried);
     }
 
     [Fact]

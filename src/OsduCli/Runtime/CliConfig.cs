@@ -76,6 +76,12 @@ public static class CliConfig
     /// </remarks>
     internal const string UserKey = OsduConfig.DefaultSectionName + ":User";
 
+    /// <summary>The configuration key for how a profile signs in; see <see cref="AuthenticationModes"/>.</summary>
+    internal const string AuthenticationModeKey = OsduConfig.DefaultSectionName + ":AuthenticationMode";
+
+    /// <summary>The configuration key for the client secret <c>msal_non_interactive</c> signs in with.</summary>
+    internal const string ClientSecretKey = OsduConfig.DefaultSectionName + ":ClientSecret";
+
     private static readonly Dictionary<string, string> EnvAliases = new()
     {
         ["OSDU_SERVER"] = "Osdu:Server",
@@ -84,17 +90,24 @@ public static class CliConfig
         ["OSDU_CLIENT_ID"] = "Osdu:ClientId",
         ["OSDU_SCOPES"] = "Osdu:Scopes",
         ["OSDU_USER"] = UserKey,
+        ["OSDU_AUTHENTICATION_MODE"] = AuthenticationModeKey,
+        // The way to give a profile its secret without writing it to a file, which is what a
+        // pipeline wants: the profile holds the rest, and the secret comes from the pipeline's
+        // own secret store.
+        ["OSDU_CLIENT_SECRET"] = ClientSecretKey,
     };
 
     public static OsduConfig Load(string? config) => Load(config, out _);
 
     /// <summary>
-    /// The environment variables currently setting one of the six profile settings, in either
+    /// The environment variables currently setting one of the profile settings, in either
     /// spelling. They override every file, so commands that talk about files mention them.
     /// </summary>
+    /// <remarks>Names only: one of them may hold a client secret.</remarks>
     internal static IReadOnlyList<string> EnvironmentOverrides()
     {
-        string[] native = ["Server", "DataPartitionId", "Authority", "ClientId", "Scopes", "User"];
+        string[] native = ["Server", "DataPartitionId", "Authority", "ClientId", "Scopes", "User",
+            "AuthenticationMode", "ClientSecret"];
         return EnvAliases.Keys
             .Concat(native.Select(key => $"{OsduConfig.DefaultSectionName}__{key}"))
             .Where(name => !string.IsNullOrEmpty(Environment.GetEnvironmentVariable(name)))
@@ -111,30 +124,71 @@ public static class CliConfig
     /// </remarks>
     public static OsduConfig Load(string? config, out string? username)
     {
+        var loaded = LoadWithSignIn(config, out var signIn);
+        username = signIn.User;
+        return loaded;
+    }
+
+    /// <summary>Loads the configuration, and reports how it signs in and as whom.</summary>
+    /// <remarks>
+    /// <para>The default account, the authentication mode and the client secret are not part
+    /// of <see cref="OsduConfig"/>, which models a service endpoint rather than who is talking
+    /// to it, so they come back separately rather than being forced into a type that has no
+    /// place for them.</para>
+    ///
+    /// <para>The mode and the secret are read from the profile in effect — the last file
+    /// <see cref="Resolve"/> lists that exists — and from the environment, never from a file
+    /// beneath it. Layered like the other settings, a Python default <c>config</c> set to
+    /// <c>msal_non_interactive</c> would turn every JSON profile written before osducs had this
+    /// setting into an application sign-in with that file's secret: a change of identity that
+    /// nobody asked for and nothing would show.</para>
+    /// </remarks>
+    internal static OsduConfig LoadWithSignIn(string? config, out SignInSettings signIn)
+    {
         var candidates = Resolve(config);
 
+        var environment = new ConfigurationBuilder()
+            .AddEnvironmentVariables()
+            .AddInMemoryCollection(AliasedEnvironment()!)
+            .Build();
+
+        var configuration = FromFiles(candidates)
+            .AddConfiguration(environment)
+            .Build();
+
+        if (!configuration.GetSection(OsduConfig.DefaultSectionName).Exists())
+            throw new OsduException(NothingFoundMessage(config, candidates));
+
+        var profile = candidates.LastOrDefault(File.Exists) is { } inEffect
+            ? ReadFiles([inEffect])
+            : ProfileSettings.Empty;
+        var mode = Blank(environment[AuthenticationModeKey]) ?? profile.AuthenticationMode;
+        var secret = Blank(environment[ClientSecretKey]) is { } fromEnvironment
+            ? new ClientSecret(fromEnvironment)
+            : profile.ClientSecret;
+
+        signIn = new SignInSettings(
+            AuthenticationModes.Parse(mode), mode ?? AuthenticationModes.Interactive,
+            NormaliseUsername(configuration[UserKey]), secret);
+
+        return OsduConfig.FromConfiguration(configuration);
+    }
+
+    /// <summary>
+    /// The <c>OSDU_*</c> variables that are set, keyed by the configuration key each stands for.
+    /// </summary>
+    private static Dictionary<string, string> AliasedEnvironment() =>
         // Maps OSDU_SERVER -> "Osdu:Server". The tuple elements are named because the
         // obvious shorthand silently produced {envValue: envValue}, which built a
         // configuration full of nonsense keys and made these aliases do nothing.
-        var aliased = EnvAliases
+        EnvAliases
             .Select(alias => (
                 ConfigKey: alias.Value,
                 Value: Environment.GetEnvironmentVariable(alias.Key)))
             .Where(entry => !string.IsNullOrEmpty(entry.Value))
             .ToDictionary(entry => entry.ConfigKey, entry => entry.Value!);
 
-        var configuration = FromFiles(candidates)
-            .AddEnvironmentVariables()
-            .AddInMemoryCollection(aliased!)
-            .Build();
-
-        if (!configuration.GetSection(OsduConfig.DefaultSectionName).Exists())
-            throw new OsduException(NothingFoundMessage(config, candidates));
-
-        username = NormaliseUsername(configuration[UserKey]);
-
-        return OsduConfig.FromConfiguration(configuration);
-    }
+    private static string? Blank(string? value) => string.IsNullOrWhiteSpace(value) ? null : value.Trim();
 
     /// <summary>The settings a profile's files hold, before environment variables and validation.</summary>
     /// <remarks>
@@ -152,15 +206,13 @@ public static class CliConfig
         var configuration = FromFiles(paths).Build();
         // Blank is absent. A JSON profile holding `"Scopes": "   "` was otherwise copied by
         // --from as a value, so nothing asked for it and the new profile could not sign in.
-        string? Value(string key) =>
-            configuration[$"{OsduConfig.DefaultSectionName}:{key}"] is { } value
-            && !string.IsNullOrWhiteSpace(value)
-                ? value.Trim()
-                : null;
+        string? Value(string key) => Blank(configuration[$"{OsduConfig.DefaultSectionName}:{key}"]);
 
         return new ProfileSettings(
             Value("Server"), Value("DataPartitionId"), Value("Authority"),
-            Value("ClientId"), Value("Scopes"), NormaliseUsername(configuration[UserKey]));
+            Value("ClientId"), Value("Scopes"), NormaliseUsername(configuration[UserKey]),
+            Value("AuthenticationMode"),
+            Value("ClientSecret") is { } secret ? new ClientSecret(secret) : null);
     }
 
     private static IConfigurationBuilder FromFiles(IEnumerable<string> paths)
@@ -471,7 +523,11 @@ public static class CliConfig
     }
 }
 
-/// <summary>The six settings a profile can hold, any of which may be missing.</summary>
+/// <summary>The settings a profile can hold, any of which may be missing.</summary>
 internal sealed record ProfileSettings(
     string? Server, string? DataPartitionId, string? Authority,
-    string? ClientId, string? Scopes, string? User);
+    string? ClientId, string? Scopes, string? User,
+    string? AuthenticationMode = null, ClientSecret? ClientSecret = null)
+{
+    internal static readonly ProfileSettings Empty = new(null, null, null, null, null, null);
+}

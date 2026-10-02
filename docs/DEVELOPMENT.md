@@ -53,7 +53,9 @@ Both packages come from GitHub Packages, which needs a token even though they ar
 | `Runtime/CliContext.cs` | Per-command state: the loaded configuration, the signed-in `OsduClient` and the output writer. |
 | `Runtime/CliConfig.cs` | Finds and loads the configuration: osducs's JSON profiles, the Python CLI's profiles, the selection and environment variables. |
 | `Runtime/OsduCliIniConfiguration.cs` | Reads a Python CLI profile. |
+| `Runtime/SignIn.cs` | How a profile signs in: through a browser, or as an application with a client secret. |
 | `Runtime/AccountScopedTokenProvider.cs` | Refuses to guess when more than one account is signed in and none was chosen. |
+| `Runtime/TextBodyParseNodeFactory.cs` | Reads an HTML or plain-text error page, so it becomes a one-line error rather than a crash. |
 | `Runtime/OutputWriter.cs`, `OutputSpec.cs`, `OsduJson.cs` | Turn a response into a table or JSON. |
 | `Runtime/CliHelp.cs` | Renders `--help`; the library's own help cannot be customised. |
 | `Runtime/GlobalOptions.cs` | `--output`, `--config`, `--user`, `--debug`: the options every command has. |
@@ -68,15 +70,18 @@ because no service has needed one.
 
 1. `Program.cs` parses the command line. A parse error, a missing required option or a wrong enum
    value stops here, before any configuration is read or any network call is made.
-2. `CliRunner` builds a `CliContext`. `CliConfig` loads the configuration, and an MSAL token
-   provider is set up with the sign-in cache at `~/.osdu/msal_cache.bin`, or
-   `OSDU_MSAL_CACHE_PATH`.
+2. `CliRunner` builds a `CliContext`. `CliConfig` loads the configuration, and the profile's
+   authentication mode picks the MSAL token provider: the interactive one, with the sign-in
+   cache at `~/.osdu/msal_cache.bin` or `OSDU_MSAL_CACHE_PATH`, or for `msal_non_interactive`
+   the client-credentials one, with the profile's client secret.
 3. The generated code builds the request from the options and calls the client. The first call
-   signs in: silently from the cache, or by opening a browser.
+   signs in: silently from the cache, by opening a browser, or with the client secret.
 4. `OsduJson` turns the response into JSON, and `OutputWriter` prints it as the manifest's
    `output:` says.
 5. `CliRunner` catches what can go wrong: a service error becomes one line naming the status and
-   the service's message, and a 403 also names the roles the spec says the operation needs.
+   the service's message, and a 403 also names the roles the spec says the operation needs. An
+   error page in HTML or plain text gives its title as the message, and a sign-in Entra ID
+   refuses gives its `AADSTS` code.
    `--debug` shows each request and response, with the `Authorization` header redacted.
 
 ## Tests

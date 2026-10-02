@@ -1,5 +1,6 @@
 using System.CommandLine;
 using System.CommandLine.Completions;
+using System.Text;
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using Equinor.OsduCli.Runtime;
@@ -52,11 +53,18 @@ public static class ConfigCommand
             Description = "Copy settings from an existing profile, osducs or Python. Options given alongside override what is copied.",
         };
         from.CompletionSources.Add(_ => Profiles().Select(p => p.Name).Distinct().Select(n => new CompletionItem(n)));
+        var mode = new Option<string>("--authentication-mode")
+        {
+            Description = $"How the profile signs in: {AuthenticationModes.Interactive}, as you through a browser (the default), "
+                + $"or {AuthenticationModes.ClientCredentials}, as the application with a client secret. The secret is "
+                + "copied with --from or asked for without being shown, never given as an option.",
+        };
+        mode.AcceptAnyCasingFromAmong(AuthenticationModes.Supported);
         var force = new Option<bool>("--force") { Description = "Replace a profile of the same name." };
 
         var add = new Command("add", "Create a profile. Prompts for any setting not given when run in a terminal. --user sets the profile's default account.")
         {
-            name, server, partition, authority, clientId, scopes, from, force,
+            name, server, partition, authority, clientId, scopes, mode, from, force,
         };
 
         add.SetAction(parseResult => CliRunner.Run(parseResult, () =>
@@ -69,17 +77,28 @@ public static class ConfigCommand
                     parseResult.GetValue(scopes),
                     // The global --user, read as the profile's default account: the same flag
                     // with the same meaning, remembered instead of used once.
-                    CliConfig.NormaliseUsername(parseResult.GetValue(GlobalOptions.User))),
+                    CliConfig.NormaliseUsername(parseResult.GetValue(GlobalOptions.User)),
+                    parseResult.GetValue(mode)),
                 parseResult.GetValue(from),
                 parseResult.GetValue(force));
 
             // Prompting needs someone to answer. With input redirected, a missing setting is
             // an error naming the flag instead of a read that waits on nothing.
-            var outcome = Add(request, Console.IsInputRedirected ? null : Ask);
+            var outcome = Console.IsInputRedirected
+                ? Add(request, ask: null)
+                : Add(request, Ask, AskSecret);
 
             var output = Writer(parseResult);
             output.WriteMessage(
                 $"Created {outcome.Path}: {outcome.Written.Server}, partition {outcome.Written.DataPartitionId}");
+            if (AuthenticationModes.Parse(outcome.Written.AuthenticationMode) == SignInMethod.ClientCredentials)
+            {
+                output.WriteNote(outcome.Written.ClientSecret is null
+                    ? $"Signs in as the application {outcome.Written.ClientId}. No client secret is stored, "
+                      + "so set OSDU_CLIENT_SECRET when using it."
+                    : $"Signs in as the application {outcome.Written.ClientId}, with the client secret stored "
+                      + (OperatingSystem.IsWindows() ? "in the profile." : "in the profile, which only you can read."));
+            }
             if (outcome.NotCarried is { Count: > 0 } notCarried)
             {
                 // Named rather than dropped silently: someone migrating should be able to see
@@ -113,13 +132,16 @@ public static class ConfigCommand
     private static readonly HashSet<string> Carried = new(StringComparer.OrdinalIgnoreCase)
     {
         "server", "data_partition_id", "authority", "client_id", "scopes", "user",
+        "authentication_mode", "client_secret",
     };
 
     /// <summary>
     /// Creates a JSON profile. Separated from the command so the rules can be tested without a
-    /// console; <paramref name="ask"/> is null when nobody is there to answer a prompt.
+    /// console; <paramref name="ask"/> is null when nobody is there to answer a prompt, and
+    /// <paramref name="askSecret"/> asks without showing what is typed.
     /// </summary>
-    internal static AddOutcome Add(AddRequest request, Func<string, string?>? ask)
+    internal static AddOutcome Add(
+        AddRequest request, Func<string, string?>? ask, Func<string, string?>? askSecret = null)
     {
         CheckName(request.Name);
 
@@ -135,7 +157,7 @@ public static class ConfigCommand
         var nothingConfigured = !CliConfig.Resolve(null).Any(File.Exists)
             && !LoadsFromEnvironment();
 
-        var (seed, notCarriedFrom, notCarried) = Copy(request.From);
+        var (seed, secretFrom, notCarriedFrom, notCarried) = Copy(request.From);
         var given = request.Given;
         var settings = new ProfileSettings(
             Blank(given.Server) ?? seed.Server,
@@ -143,13 +165,57 @@ public static class ConfigCommand
             Blank(given.Authority) ?? seed.Authority,
             Blank(given.ClientId) ?? seed.ClientId,
             Blank(given.Scopes) ?? seed.Scopes,
-            given.User ?? seed.User);
+            given.User ?? seed.User,
+            Blank(given.AuthenticationMode) ?? seed.AuthenticationMode ?? AuthenticationModes.Interactive);
+
+        var method = AuthenticationModes.Parse(settings.AuthenticationMode);
+        if (method == SignInMethod.Unsupported)
+        {
+            throw new OsduException(
+                $"'{request.From}' uses authentication mode '{settings.AuthenticationMode}', which osducs "
+                + $"does not support. Pass --authentication-mode {AuthenticationModes.Interactive} or "
+                + $"{AuthenticationModes.ClientCredentials} to choose one it does.");
+        }
+        if (method == SignInMethod.ClientCredentials && settings.User is not null)
+        {
+            throw new OsduException(
+                $"A default account (--user, or `user` in the profile copied) does not apply to "
+                + $"{AuthenticationModes.ClientCredentials}, which signs in as the application.");
+        }
+        // In its usual spelling, whatever the profile it was copied from said.
+        settings = settings with
+        {
+            AuthenticationMode = method == SignInMethod.ClientCredentials
+                ? AuthenticationModes.ClientCredentials
+                : AuthenticationModes.Interactive,
+        };
+        if (method == SignInMethod.Interactive && secretFrom is not null)
+        {
+            // A browser sign-in has no use for a secret, so one left over in the source
+            // profile is not spread to another file.
+            var key = CliConfig.IsJson(secretFrom) ? "ClientSecret" : "client_secret";
+            notCarriedFrom ??= secretFrom;
+            notCarried = [.. notCarried,
+                CliConfig.SamePath(notCarriedFrom, secretFrom) ? key : $"{key} (in {secretFrom})"];
+        }
 
         settings = Complete(settings, ask);
         Validate(settings);
 
+        // Last, so nothing typed after it can be refused and the secret typed again. Copied
+        // only with the client ID it was issued for: given another, it is that application's
+        // secret that is wanted.
+        if (method == SignInMethod.ClientCredentials)
+        {
+            settings = settings with
+            {
+                ClientSecret = (settings.ClientId == seed.ClientId ? seed.ClientSecret : null)
+                               ?? AskForSecret(askSecret, settings.ClientId!),
+            };
+        }
+
         Directory.CreateDirectory(CliConfig.NativeDirectory);
-        File.WriteAllText(target, ToJson(settings));
+        WriteOwnerOnly(target, ToJson(settings));
 
         if (nothingConfigured)
             CliConfig.Select(request.Name);
@@ -215,11 +281,15 @@ public static class ConfigCommand
             .Concat(Enumerable.Range(0, 10).SelectMany(n => new[] { $"COM{n}", $"LPT{n}" })),
         StringComparer.OrdinalIgnoreCase);
 
-    private static (ProfileSettings Seed, string? NotCarriedFrom, IReadOnlyList<string> NotCarried) Copy(string? from)
+    /// <summary>
+    /// What <c>--from</c> copies, the file its client secret came from, if it has one, and the
+    /// keys it leaves behind.
+    /// </summary>
+    private static (ProfileSettings Seed, string? SecretFrom, string? NotCarriedFrom, IReadOnlyList<string> NotCarried)
+        Copy(string? from)
     {
-        var empty = new ProfileSettings(null, null, null, null, null, null);
         if (from is null)
-            return (empty, null, []);
+            return (ProfileSettings.Empty, null, null, []);
 
         var files = CliConfig.Candidates(from).Where(File.Exists).ToList();
         if (files.Count == 0)
@@ -229,7 +299,7 @@ public static class ConfigCommand
         }
 
         // Only a Python profile carries keys osducs has no use for; a JSON profile holds the
-        // six settings and nothing else.
+        // profile settings and nothing else.
         var python = files.FirstOrDefault(file => !CliConfig.IsJson(file));
         var notCarried = python is null
             ? []
@@ -239,8 +309,29 @@ public static class ConfigCommand
                 .Distinct(StringComparer.OrdinalIgnoreCase)
                 .ToList();
 
-        return (CliConfig.ReadFiles(files), python, notCarried);
+        // The mode and the secret come from the file that wins for this name, as they do when
+        // the profile is used: a JSON profile does not inherit them from the Python profile it
+        // overrides. See CliConfig.LoadWithSignIn.
+        var winner = CliConfig.ReadFiles([files[^1]]);
+        var settings = CliConfig.ReadFiles(files) with
+        {
+            AuthenticationMode = winner.AuthenticationMode,
+            ClientSecret = winner.ClientSecret,
+        };
+
+        return (settings, winner.ClientSecret is null ? null : files[^1], python, notCarried);
     }
+
+    /// <summary>
+    /// Asks for the client secret, or returns null when nobody can be asked or nothing is
+    /// typed: a profile without one gets it from <c>OSDU_CLIENT_SECRET</c> when it is used.
+    /// </summary>
+    private static ClientSecret? AskForSecret(Func<string, string?>? askSecret, string clientId) =>
+        Blank(askSecret?.Invoke(
+                $"Client secret for {clientId} (not shown; leave blank to give it in OSDU_CLIENT_SECRET instead)"))
+            is { } secret
+            ? new ClientSecret(secret)
+            : null;
 
     private static readonly (string Label, Func<ProfileSettings, string?> Get, Func<ProfileSettings, string, ProfileSettings> With, string Flag)[] Required =
     [
@@ -298,6 +389,10 @@ public static class ConfigCommand
         }
     }
 
+    /// <remarks>
+    /// The mode is always written, even when it is the default. A profile without one is read
+    /// as interactive, but saying so in the file means nobody has to know that.
+    /// </remarks>
     private static string ToJson(ProfileSettings settings)
     {
         var osdu = new JsonObject
@@ -307,12 +402,47 @@ public static class ConfigCommand
             ["Authority"] = settings.Authority,
             ["ClientId"] = settings.ClientId,
             ["Scopes"] = settings.Scopes,
+            ["AuthenticationMode"] = settings.AuthenticationMode,
         };
         if (settings.User is not null)
             osdu["User"] = settings.User;
+        if (settings.ClientSecret is not null)
+            osdu["ClientSecret"] = settings.ClientSecret.Value;
 
         return new JsonObject { [OsduConfig.DefaultSectionName] = osdu }
             .ToJsonString(new JsonSerializerOptions { WriteIndented = true }) + Environment.NewLine;
+    }
+
+    /// <summary>
+    /// Writes a profile that only its owner can read, from the moment it exists.
+    /// </summary>
+    /// <remarks>
+    /// Every profile, not only those holding a secret: a profile replaced with <c>--force</c>
+    /// may gain one, and setting the permission after writing would leave a moment in which
+    /// the secret was readable. An existing file is restricted before anything is written to
+    /// it. Windows is left to the inherited permissions of the user's profile folder, which
+    /// already keep other users out.
+    /// </remarks>
+    internal static void WriteOwnerOnly(string path, string contents)
+    {
+        if (OperatingSystem.IsWindows())
+        {
+            File.WriteAllText(path, contents);
+            return;
+        }
+
+        const UnixFileMode ownerOnly = UnixFileMode.UserRead | UnixFileMode.UserWrite;
+        if (File.Exists(path))
+            File.SetUnixFileMode(path, ownerOnly);
+
+        using var stream = new FileStream(path, new FileStreamOptions
+        {
+            Mode = FileMode.Create,
+            Access = FileAccess.Write,
+            UnixCreateMode = ownerOnly,
+        });
+        using var writer = new StreamWriter(stream);
+        writer.Write(contents);
     }
 
     private static string? Blank(string? value) => string.IsNullOrWhiteSpace(value) ? null : value.Trim();
@@ -321,6 +451,39 @@ public static class ConfigCommand
     {
         Console.Out.Write($"{label}: ");
         return Console.ReadLine();
+    }
+
+    /// <summary>Like <see cref="Ask"/>, without showing what is typed.</summary>
+    /// <remarks>
+    /// Typed rather than given as an option, so the secret stays out of shell history and the
+    /// process list. The Python CLI's <c>config update</c> showed it as it was typed.
+    /// </remarks>
+    private static string? AskSecret(string label)
+    {
+        Console.Out.Write($"{label}: ");
+        var secret = new StringBuilder();
+        while (true)
+        {
+            var key = Console.ReadKey(intercept: true);
+            switch (key.Key)
+            {
+                case ConsoleKey.Enter:
+                    Console.Out.WriteLine();
+                    return secret.ToString();
+                case ConsoleKey.Backspace:
+                    if (secret.Length > 0)
+                        secret.Length--;
+                    break;
+                // Ctrl+D, as at any other prompt, ends the input.
+                case ConsoleKey.D when key.Modifiers.HasFlag(ConsoleModifiers.Control):
+                    Console.Out.WriteLine();
+                    return secret.Length > 0 ? secret.ToString() : null;
+                default:
+                    if (!char.IsControl(key.KeyChar))
+                        secret.Append(key.KeyChar);
+                    break;
+            }
+        }
     }
 
     // ---- config list --------------------------------------------------------------------
@@ -407,10 +570,12 @@ public static class ConfigCommand
                     $"No profile named '{requested}'. Run `osducs config list` to see what there is.");
             }
 
-            // Validated before it is recorded: selecting a profile that does not parse would
-            // break every later command with an error pointing at the config rather than at
-            // the moment the choice was made.
-            CliConfig.Load(requested, out var username);
+            // Validated before it is recorded: selecting a profile that does not parse, or
+            // that signs in in a way osducs cannot, would break every later command with an
+            // error pointing at the config rather than at the moment the choice was made.
+            var config = CliConfig.LoadWithSignIn(requested, out var signIn);
+            if (signIn.Method == SignInMethod.Unsupported)
+                throw new OsduException(AuthenticationModes.UnsupportedMessage(signIn.Mode));
             var settings = CliConfig.ReadProfile(requested);
 
             // A name is recorded as a name, so the selection follows whichever file wins for
@@ -419,12 +584,12 @@ public static class ConfigCommand
 
             var output = Writer(parseResult);
             output.WriteMessage($"Now using {requested}: {settings.Server}, partition {settings.DataPartitionId}");
-            if (username is not null)
-            {
-                // Switching environment can switch identity, which is not obvious from the
-                // name of a profile.
-                output.WriteMessage($"Authenticating as {username}.");
-            }
+            // Switching environment can switch identity, which is not obvious from the name of
+            // a profile.
+            if (signIn.Method == SignInMethod.ClientCredentials)
+                output.WriteMessage($"Authenticating as the application {config.ClientId}, with a client secret.");
+            else if (signIn.User is not null)
+                output.WriteMessage($"Authenticating as {signIn.User}.");
             if (CliConfig.PythonSelectedProfile() is not null)
                 output.WriteNote("The Python CLI's selection is unchanged; osducs no longer follows it.");
 
@@ -443,24 +608,14 @@ public static class ConfigCommand
         show.SetAction(parseResult => CliRunner.Run(parseResult, () =>
         {
             var requested = parseResult.GetValue(GlobalOptions.Config);
-            var config = CliConfig.Load(requested, out var username);
+            var config = CliConfig.LoadWithSignIn(requested, out var signIn);
             var output = Writer(parseResult);
 
             // One row per setting rather than one object, so table output reads as a list of
             // settings and JSON output stays a shape a script can iterate.
             var settings = new JsonArray();
-            foreach (var (setting, value) in new[]
-                     {
-                         ("server", config.Server),
-                         ("data-partition-id", config.DataPartitionId),
-                         ("authority", config.Authority),
-                         ("client-id", config.ClientId),
-                         ("scopes", config.Scopes),
-                         ("user", username ?? "(none — osducs will use the only signed-in account)"),
-                     })
-            {
+            foreach (var (setting, value) in Rows(config, signIn))
                 settings.Add(new JsonObject { ["setting"] = setting, ["value"] = value });
-            }
 
             output.Write(settings.ToJsonString(), OutputSpec.Table(
                 null, ("Setting", "setting"), ("Value", "value")));
@@ -473,6 +628,12 @@ public static class ConfigCommand
                 output.WriteNote($"  [{mark}] {candidate}");
             }
             output.WriteNote("Later files win. Environment variables win over all of them.");
+            foreach (var file in ReadableByOthers(CliConfig.Candidates(requested)))
+            {
+                output.WriteNote(
+                    $"{file} holds a client secret that other users on this machine can read. "
+                    + $"Restrict it with `chmod 600 {file}`.");
+            }
             if (string.IsNullOrWhiteSpace(requested))
                 output.WriteNote(SelectionNote());
             EnvironmentNote(output);
@@ -480,6 +641,62 @@ public static class ConfigCommand
         }));
 
         return show;
+    }
+
+    /// <summary>The settings <c>config show</c> lists. Separate from the command so they can be tested.</summary>
+    /// <remarks>
+    /// The secret is never shown, only whether there is one. Its last characters would be
+    /// enough to tell two secrets apart, but they are also a part of it, in a terminal's
+    /// scrollback and in whatever a user pastes when asking for help.
+    /// </remarks>
+    internal static IEnumerable<(string Setting, string? Value)> Rows(OsduConfig config, SignInSettings signIn)
+    {
+        yield return ("server", config.Server);
+        yield return ("data-partition-id", config.DataPartitionId);
+        yield return ("authority", config.Authority);
+        yield return ("client-id", config.ClientId);
+        yield return ("scopes", config.Scopes);
+        yield return ("authentication-mode", signIn.Method == SignInMethod.Unsupported
+            ? $"{signIn.Mode} (not supported by osducs)"
+            : signIn.Mode);
+
+        if (signIn.Method == SignInMethod.ClientCredentials)
+        {
+            yield return ("client-secret", signIn.Secret is null
+                ? "(not set — set OSDU_CLIENT_SECRET, or ClientSecret in the profile)"
+                : "(set, hidden)");
+            yield return ("user", signIn.User is null
+                ? "(none — signs in as the application)"
+                : $"{signIn.User} (not used — signs in as the application)");
+        }
+        else
+        {
+            yield return ("user", signIn.User ?? "(none — osducs will use the only signed-in account)");
+        }
+    }
+
+    /// <summary>
+    /// The files among <paramref name="files"/> that hold a client secret and that users other
+    /// than their owner can read or change.
+    /// </summary>
+    /// <remarks>
+    /// osducs writes its own profiles owner-only, so this mostly finds Python CLI profiles:
+    /// that tool restricts a profile only when it writes one itself, and leaves a profile made
+    /// any other way as it is. Windows is skipped; there a file in the user's profile folder
+    /// is the user's unless someone has gone out of their way to share it.
+    /// </remarks>
+    internal static IEnumerable<string> ReadableByOthers(IEnumerable<string> files)
+    {
+        if (OperatingSystem.IsWindows())
+            yield break;
+
+        const UnixFileMode others = UnixFileMode.GroupRead | UnixFileMode.GroupWrite
+                                    | UnixFileMode.OtherRead | UnixFileMode.OtherWrite;
+        foreach (var file in files.Where(File.Exists))
+        {
+            if (Read(file)?.ClientSecret is not null && (File.GetUnixFileMode(file) & others) != 0)
+                yield return file;
+        }
     }
 
     // ---- shared -------------------------------------------------------------------------

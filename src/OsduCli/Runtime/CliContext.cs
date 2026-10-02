@@ -21,19 +21,23 @@ public sealed class CliContext : IDisposable
     /// <summary>The configuration this invocation resolved, for commands that report it.</summary>
     public OsduConfig Config { get; }
 
-    /// <summary>The MSAL provider, for commands that report on sign-in state.</summary>
-    public MsalInteractiveTokenProvider Msal { get; }
+    /// <summary>
+    /// The interactive MSAL provider, for commands that report on sign-in state. Null when the
+    /// profile signs in as an application, which has no accounts to report on.
+    /// </summary>
+    public MsalInteractiveTokenProvider? Msal { get; }
 
     /// <summary>
     /// The account this invocation will authenticate as, from <c>--user</c> or the profile's
-    /// <c>user</c>, or null when neither said. Resolved once here so that commands
-    /// reporting on it cannot disagree with the provider actually doing the work.
+    /// <c>user</c>, or null when neither said or the profile signs in as an application.
+    /// Resolved once here so that commands reporting on it cannot disagree with the provider
+    /// actually doing the work.
     /// </summary>
     public string? Username { get; }
 
     private CliContext(
         OsduClient client, OutputWriter output, OsduConfig config,
-        MsalInteractiveTokenProvider msal, string? username)
+        MsalInteractiveTokenProvider? msal, string? username)
     {
         Client = client;
         Output = output;
@@ -52,14 +56,15 @@ public sealed class CliContext : IDisposable
     {
         ApiClientBuilder.RegisterDefaultSerializer<JsonSerializationWriterFactory>();
         ApiClientBuilder.RegisterDefaultDeserializer<JsonParseNodeFactory>();
+        TextBodyParseNodeFactory.Register();
 
-        var config = CliConfig.Load(parseResult.GetValue(GlobalOptions.Config), out var configuredUser);
+        var config = CliConfig.LoadWithSignIn(parseResult.GetValue(GlobalOptions.Config), out var signIn);
 
         // An explicit --user beats the profile's default, which beats no opinion at all.
         // Normalised through the same helper the profile value goes through, so a blank or
         // padded flag cannot mean something different from a blank or padded config entry.
-        var username = CliConfig.NormaliseUsername(parseResult.GetValue(GlobalOptions.User))
-                       ?? configuredUser;
+        var requestedUser = CliConfig.NormaliseUsername(parseResult.GetValue(GlobalOptions.User));
+        var username = requestedUser ?? signIn.User;
 
         var format = string.Equals(parseResult.GetValue(GlobalOptions.Output), "json",
             StringComparison.OrdinalIgnoreCase)
@@ -74,6 +79,19 @@ public sealed class CliContext : IDisposable
                 .AddFilter("Equinor.OsduCsharpClient", LogLevel.Debug)
                 .AddConsole(options => options.LogToStandardErrorThreshold = LogLevel.Trace))
             : null;
+
+        if (signIn.Method == SignInMethod.ClientCredentials)
+        {
+            return new CliContext(
+                new OsduClient(config, ClientCredentials(config, signIn, requestedUser, loggerFactory), loggerFactory),
+                new OutputWriter(format, Console.Out),
+                config,
+                msal: null,
+                username: null);
+        }
+
+        if (signIn.Method == SignInMethod.Unsupported)
+            throw new OsduException(AuthenticationModes.UnsupportedMessage(signIn.Mode));
 
         // Client 2.0.0 made the core package authentication-agnostic: it no longer bundles
         // MSAL, and `OsduClient` no longer falls back to interactive sign-in. Choosing a
@@ -92,6 +110,40 @@ public sealed class CliContext : IDisposable
             config,
             msal,
             username);
+    }
+
+    /// <summary>
+    /// Signs in as the application, with the client secret, as the Python CLI's
+    /// <c>msal_non_interactive</c> does.
+    /// </summary>
+    /// <remarks>
+    /// <para>No browser and no account: the token is the application's own. Nothing is cached
+    /// on disk either, as in the Python CLI; a token is fetched once per command.</para>
+    ///
+    /// <para><c>--user</c> is refused rather than ignored, since whoever passed it expects to
+    /// act as that account and would not. A <c>user</c> in the profile or the environment is
+    /// only a default, so it is passed over: refusing it would break a pipeline for an
+    /// <c>OSDU_USER</c> exported for some other profile.</para>
+    /// </remarks>
+    internal static MsalClientCredentialsTokenProvider ClientCredentials(
+        OsduConfig config, SignInSettings signIn, string? requestedUser, ILoggerFactory? loggerFactory)
+    {
+        if (requestedUser is not null)
+        {
+            throw new OsduException(
+                $"--user does not apply: this profile signs in as the application {config.ClientId} "
+                + $"with a client secret ({AuthenticationModes.ClientCredentials}), not as an account.");
+        }
+
+        if (signIn.Secret is null)
+        {
+            throw new OsduException(
+                $"This profile signs in with a client secret ({AuthenticationModes.ClientCredentials}), "
+                + "but none is set. Set OSDU_CLIENT_SECRET, or ClientSecret in the profile "
+                + "(client_secret in a Python CLI profile).");
+        }
+
+        return new MsalClientCredentialsTokenProvider(config, signIn.Secret.Value, loggerFactory);
     }
 
     /// <summary>Reads and returns the contents of a JSON file passed via a command option.</summary>

@@ -153,7 +153,9 @@ If osducs has no other configuration yet — no profile it would read by default
 that still exists, and no `OSDU_*` variables — the profile you create is selected. Otherwise `config add` leaves
 the environment you are on alone, and `osducs config use <profile>` switches.
 Setting `OSDU_SERVER`, `OSDU_DATA_PARTITION_ID`, `OSDU_AUTHORITY`, `OSDU_CLIENT_ID` and
-`OSDU_SCOPES` works too, with no file at all.
+`OSDU_SCOPES` works too, with no file at all. A profile can also sign in as an application
+with a client secret, as the Python CLI's `msal_non_interactive` does — see
+[docs/USAGE.md](docs/USAGE.md#signing-in-as-an-application).
 
 **Moving from the Python CLI** is one command per profile:
 
@@ -199,7 +201,8 @@ Since client 2.0.0 the core package is authentication-agnostic — it bundles no
 library and `OsduClient` takes an `ITokenProvider` rather than defaulting to one. The CLI
 therefore also references `Equinor.OsduCsharpClient.Msal` and selects
 `MsalInteractiveTokenProvider`, which is the right answer for a tool driven by a person at a
-terminal. Sign-in is cached, OS-encrypted, under `~/.osdu`.
+terminal. Sign-in is cached, OS-encrypted, under `~/.osdu`. A profile set to sign in as an
+application gets `MsalClientCredentialsTokenProvider` instead.
 
 ## The manifest is the point
 
