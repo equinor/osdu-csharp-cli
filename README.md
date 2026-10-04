@@ -8,7 +8,7 @@ single self-contained binary for Windows, macOS and Linux.
 osducs record search --kind "osdu:wks:master-data--Well:*" --query 'data.FacilityName:GB*' -f id -f data.FacilityName
 osducs record aggregate --kind "osdu:wks:*:*" --by kind
 osducs legaltag list
-osducs group member add --group <group-email> --member name@equinor.com --role MEMBER
+osducs group member add --group users.datalake.viewers@dev.dataservices.energy --member name@equinor.com --role MEMBER
 ```
 
 ## Why use it
