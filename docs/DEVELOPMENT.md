@@ -53,7 +53,8 @@ Both packages come from GitHub Packages, which needs a token even though they ar
 | `Runtime/CliContext.cs` | Per-command state: the loaded configuration, the signed-in `OsduClient` and the output writer. |
 | `Runtime/CliConfig.cs` | Finds and loads the configuration: osducs's JSON profiles, the Python CLI's profiles, the selection and environment variables. |
 | `Runtime/OsduCliIniConfiguration.cs` | Reads a Python CLI profile. |
-| `Runtime/SignIn.cs` | How a profile signs in: through a browser, or as an application with a client secret. |
+| `Runtime/SignIn.cs` | How a profile signs in: through a browser, as an application with a client secret, or through Azure. |
+| `Runtime/AzureTokenProvider.cs` | Signs in through `az login`, a managed or workload identity, or `AZURE_*` variables, for the `azure` mode. |
 | `Runtime/AccountScopedTokenProvider.cs` | Refuses to guess when more than one account is signed in and none was chosen. |
 | `Runtime/TextBodyParseNodeFactory.cs` | Reads an HTML or plain-text error page, so it becomes a one-line error rather than a crash. |
 | `Runtime/OutputWriter.cs`, `OutputSpec.cs`, `OsduJson.cs` | Turn a response into a table or JSON. |
@@ -73,9 +74,11 @@ because no service has needed one.
 2. `CliRunner` builds a `CliContext`. `CliConfig` loads the configuration, and the profile's
    authentication mode picks the MSAL token provider: the interactive one, with the sign-in
    cache at `~/.osdu/msal_cache.bin` or `OSDU_MSAL_CACHE_PATH`, or for `msal_non_interactive`
-   the client-credentials one, with the profile's client secret.
+   the client-credentials one, with the profile's client secret. For `azure` it is
+   `AzureTokenProvider`, over Azure.Identity, which keeps nothing on disk of its own.
 3. The generated code builds the request from the options and calls the client. The first call
-   signs in: silently from the cache, by opening a browser, or with the client secret.
+   signs in: silently from the cache, by opening a browser, with the client secret, or through
+   Azure.
 4. `OsduJson` turns the response into JSON, and `OutputWriter` prints it as the manifest's
    `output:` says.
 5. `CliRunner` catches what can go wrong: a service error becomes one line naming the status and

@@ -1,0 +1,576 @@
+using System.CommandLine;
+using System.Text;
+using System.Text.Json;
+using System.Text.Json.Nodes;
+using Azure.Core;
+using Azure.Identity;
+using Equinor.OsduCli.Commands;
+using Equinor.OsduCli.Runtime;
+using Equinor.OsduCsharpClient.Facade;
+using Xunit;
+
+namespace OsduCli.Tests;
+
+/// <summary>
+/// Profiles that sign in through Azure's own sources — the Python CLI's <c>azure</c> mode:
+/// an <c>az login</c> session, a managed or workload identity, or <c>AZURE_*</c> variables.
+/// </summary>
+[Collection(nameof(EnvironmentCollection))]
+public class AzureSignInTests : ConfigTestDirectories
+{
+    private const string Tenant = "3aa4a235-b6e2-48d5-9195-7fcf05b459b0";
+
+    private static readonly ProfileSettings Nothing = ProfileSettings.Empty;
+
+    private string WriteAzureProfile(string name, params string[] extra) =>
+        WritePythonProfile(name, "https://python.example.com", ["authentication_mode = azure", .. extra]);
+
+    private static ParseResult Parse(params string[] args)
+    {
+        var root = new RootCommand("osducs");
+        GlobalOptions.AddTo(root);
+        return root.Parse(args);
+    }
+
+    private static ConfigCommand.AddOutcome Add(
+        string name, ProfileSettings given, string? from = null,
+        Func<string, string?>? ask = null) =>
+        ConfigCommand.Add(new ConfigCommand.AddRequest(name, given, from, Force: false), ask,
+            askSecret: _ => throw new InvalidOperationException("an azure profile has no secret to ask for"));
+
+    private JsonObject Written(string name) =>
+        (JsonObject)JsonNode.Parse(File.ReadAllText(Path.Combine(Native, name + ".json")))!["Osdu"]!;
+
+    private static OsduConfig Config(string? scopes = null, string? authority = null) => new()
+    {
+        Server = "https://osdu.example.com",
+        DataPartitionId = "p",
+        Scopes = scopes ?? string.Empty,
+        Authority = authority ?? string.Empty,
+    };
+
+    // ---- reading and signing in ---------------------------------------------------------
+
+    [Theory]
+    [InlineData("azure")]
+    [InlineData("AZURE")]
+    public void TheModeIsRead(string mode)
+    {
+        WritePythonProfile("dev", extra: $"authentication_mode = {mode}");
+
+        CliConfig.LoadWithSignIn("dev", out var signIn);
+
+        Assert.Equal(nameof(SignInMethod.Azure), signIn.Method.ToString());
+    }
+
+    [Fact]
+    public void AnAzureProfileSignsInWithoutABrowserOrAnAccount()
+    {
+        WriteAzureProfile("dev");
+
+        using var context = CliContext.Create(Parse("-c", "dev"));
+
+        Assert.Null(context.Msal);
+        Assert.Null(context.Username);
+        // The profile's `<resource>/.default openid`, reduced to what Azure is asked for.
+        Assert.Equal("https://example.com/.default", context.Azure?.Scope);
+    }
+
+    [Fact]
+    public void UserIsTheAccountExpected()
+    {
+        // Azure chooses the account; --user can only say which one the command must run as.
+        WriteAzureProfile("dev", "user = profile@equinor.com");
+
+        using var context = CliContext.Create(Parse("-c", "dev", "--user", "someone@equinor.com"));
+
+        Assert.Equal(new AzureTokenProvider.ExpectedAccount("someone@equinor.com", FromFlag: true), context.Azure?.Expected);
+    }
+
+    [Fact]
+    public void TheProfilesUserIsTheAccountExpected()
+    {
+        WriteAzureProfile("dev", "user = profile@equinor.com");
+
+        using var context = CliContext.Create(Parse("-c", "dev"));
+
+        Assert.Equal(new AzureTokenProvider.ExpectedAccount("profile@equinor.com", FromFlag: false), context.Azure?.Expected);
+    }
+
+    [Theory]
+    [InlineData("OSDU_USER")]
+    [InlineData("Osdu__User")]
+    public void TheEnvironmentsUserIsNotChecked(string variable)
+    {
+        // Exported for some other profile, it is no statement about this one.
+        WriteAzureProfile("dev");
+        Environment.SetEnvironmentVariable(variable, "someone@equinor.com");
+
+        using var context = CliContext.Create(Parse("-c", "dev"));
+
+        Assert.Null(context.Azure?.Expected);
+    }
+
+    [Theory]
+    [InlineData("https://energy.azure.com/.default", "https://energy.azure.com/.default")]
+    [InlineData("https://energy.azure.com/.default openid", "https://energy.azure.com/.default")]
+    [InlineData("openid 5a1178c2-5867-4a34-8fb8-216164e30b5f/.default profile",
+        "5a1178c2-5867-4a34-8fb8-216164e30b5f/.default")]
+    public void TheScopeIsTheProfilesOneResource(string scopes, string expected)
+    {
+        Assert.Equal(expected, AzureTokenProvider.ScopeFor(Config(scopes)));
+    }
+
+    [Theory]
+    [InlineData("a/.default b/.default")]
+    [InlineData("https://example.com/user_impersonation")]
+    public void ScopesNamingNoSingleResourceAreRefused(string scopes)
+    {
+        var exception = Assert.Throws<OsduException>(() => AzureTokenProvider.ScopeFor(Config(scopes)));
+
+        Assert.Contains("Correct Scopes in the profile", exception.Message);
+    }
+
+    [Fact]
+    public void AProfileWithoutScopesUsesAzureResourceId()
+    {
+        // Where the Python CLI's azure mode found its resource, so its profiles work as they are.
+        Environment.SetEnvironmentVariable("AZURE_RESOURCE_ID", "5a1178c2-5867-4a34-8fb8-216164e30b5f");
+
+        Assert.Equal("5a1178c2-5867-4a34-8fb8-216164e30b5f/.default", AzureTokenProvider.ScopeFor(Config()));
+    }
+
+    [Theory]
+    [InlineData(null)]
+    // Only spaces made the scope "/.default".
+    [InlineData("   ")]
+    public void AProfileWithoutScopesOrAzureResourceIdSaysWhatIsMissing(string? resource)
+    {
+        Environment.SetEnvironmentVariable("AZURE_RESOURCE_ID", resource);
+
+        var exception = Assert.Throws<OsduException>(() => AzureTokenProvider.ScopeFor(Config()));
+
+        Assert.Contains("AZURE_RESOURCE_ID", exception.Message);
+    }
+
+    [Theory]
+    [InlineData("https://login.microsoftonline.com/" + Tenant, Tenant)]
+    [InlineData("https://login.microsoftonline.com/" + Tenant + "/v2.0", Tenant)]
+    [InlineData("https://login.microsoftonline.com/equinor.onmicrosoft.com/", "equinor.onmicrosoft.com")]
+    [InlineData("https://login.microsoftonline.com/common", null)]
+    [InlineData("https://login.microsoftonline.com/organizations/", null)]
+    [InlineData("https://login.microsoftonline.com/", null)]
+    [InlineData("", null)]
+    [InlineData(null, null)]
+    public void TheTenantComesFromTheAuthority(string? authority, string? expected)
+    {
+        Assert.Equal(expected, AzureTokenProvider.TenantOf(authority));
+    }
+
+    [Theory]
+    [InlineData(null)]
+    [InlineData("")]
+    [InlineData(" dev ")]
+    [InlineData("dev")]
+    [InlineData("prod")]
+    [InlineData("AzureCliCredential")]
+    [InlineData("managedidentitycredential")]
+    [InlineData("EnvironmentCredential")]
+    [InlineData("WorkloadIdentityCredential")]
+    public void AzureTokenCredentialsMayNarrowTheSources(string? selection)
+    {
+        Environment.SetEnvironmentVariable("AZURE_TOKEN_CREDENTIALS", selection);
+
+        var provider = AzureTokenProvider.Create(Config("https://energy.azure.com/.default"));
+
+        Assert.Equal("https://energy.azure.com/.default", provider.Scope);
+    }
+
+    [Theory]
+    // Built by Azure.Identity whatever the exclusions say: sources left out on purpose.
+    [InlineData("VisualStudioCredential")]
+    [InlineData("InteractiveBrowserCredential")]
+    [InlineData("AzurePowerShellCredential")]
+    // Unknown to Azure.Identity, which threw an unhandled exception.
+    [InlineData("bogus")]
+    public void AzureTokenCredentialsMayNotBringBackAnExcludedSource(string selection)
+    {
+        Environment.SetEnvironmentVariable("AZURE_TOKEN_CREDENTIALS", selection);
+
+        var exception = Assert.Throws<OsduException>(() =>
+            AzureTokenProvider.Create(Config("https://energy.azure.com/.default")));
+
+        Assert.StartsWith($"AZURE_TOKEN_CREDENTIALS={selection} would sign in through a source", exception.Message);
+    }
+
+    [Fact]
+    public void AzureTokenCredentialsOfOnlySpacesIsRefused()
+    {
+        // Azure.Identity trims it to nothing and throws.
+        Environment.SetEnvironmentVariable("AZURE_TOKEN_CREDENTIALS", "   ");
+
+        var exception = Assert.Throws<OsduException>(() =>
+            AzureTokenProvider.Create(Config("https://energy.azure.com/.default")));
+
+        Assert.Contains("nothing but spaces", exception.Message);
+    }
+
+    // ---- tokens ---------------------------------------------------------------------------
+
+    private sealed class Clock(DateTimeOffset now) : TimeProvider
+    {
+        public DateTimeOffset Now { get; set; } = now;
+        public override DateTimeOffset GetUtcNow() => Now;
+    }
+
+    private sealed class Credential(Func<TokenRequestContext, AccessToken> answer) : TokenCredential
+    {
+        public List<string[]> Requests { get; } = [];
+
+        public override AccessToken GetToken(TokenRequestContext requestContext, CancellationToken cancellationToken)
+        {
+            Requests.Add(requestContext.Scopes);
+            return answer(requestContext);
+        }
+
+        public override ValueTask<AccessToken> GetTokenAsync(
+            TokenRequestContext requestContext, CancellationToken cancellationToken) =>
+            ValueTask.FromResult(GetToken(requestContext, cancellationToken));
+    }
+
+    private static readonly DateTimeOffset Start = new(2026, 10, 2, 12, 0, 0, TimeSpan.Zero);
+
+    [Fact]
+    public async Task ATokenIsReusedUntilItIsAboutToExpire()
+    {
+        // The Azure CLI source runs `az` for every token, and the client asks once per request.
+        var issued = 0;
+        var credential = new Credential(_ => new AccessToken($"token-{++issued}", Start.AddHours(1)));
+        var clock = new Clock(Start);
+        var provider = new AzureTokenProvider(credential, "https://energy.azure.com/.default", clock: clock);
+        var cancel = TestContext.Current.CancellationToken;
+
+        Assert.Equal("token-1", await provider.GetTokenAsync(cancel));
+        clock.Now = Start.AddMinutes(54);
+        Assert.Equal("token-1", await provider.GetTokenAsync(cancel));
+        clock.Now = Start.AddMinutes(56);
+        Assert.Equal("token-2", await provider.GetTokenAsync(cancel));
+
+        Assert.Equal(2, credential.Requests.Count);
+        Assert.All(credential.Requests, scopes => Assert.Equal(["https://energy.azure.com/.default"], scopes));
+    }
+
+    /// <summary>What <see cref="DefaultAzureCredential"/> says when no source can sign in.</summary>
+    private const string NothingAvailable =
+        "DefaultAzureCredential failed to retrieve a token from the included credentials. See the troubleshooting "
+        + "guide for more information. https://aka.ms/azsdk/net/identity/defaultazurecredential/troubleshoot\n"
+        + "- EnvironmentCredential authentication unavailable. Environment variables are not fully configured. "
+        + "See the troubleshooting guide for more information. https://aka.ms/azsdk/net/identity/environmentcredential/troubleshoot\n"
+        + "- WorkloadIdentityCredential authentication unavailable. The workload options are not fully configured. "
+        + "See the troubleshooting guide for more information. https://aka.ms/azsdk/net/identity/workloadidentitycredential/troubleshoot\n"
+        + "- ManagedIdentityCredential authentication unavailable. No response received from the managed identity endpoint.\n"
+        + "- AzureCliCredential authentication failed: Please run 'az login' to set up account";
+
+    [Fact]
+    public async Task WithNothingToSignInWithItSaysWhatToDoAndWhatEachSourceSaid()
+    {
+        var provider = new AzureTokenProvider(
+            new Credential(_ => throw new CredentialUnavailableException(NothingAvailable)),
+            "https://energy.azure.com/.default", Tenant);
+
+        var exception = await Assert.ThrowsAsync<OsduException>(() =>
+            provider.GetTokenAsync(TestContext.Current.CancellationToken));
+
+        var lines = exception.Message.Split(Environment.NewLine);
+        Assert.Contains($"`az login --tenant {Tenant}`", lines[0]);
+        Assert.Equal(
+        [
+            "       AZURE_* variables: Environment variables are not fully configured.",
+            "       workload identity: The workload options are not fully configured.",
+            "       managed identity: No response received from the managed identity endpoint.",
+            "       Azure CLI: Please run 'az login' to set up account",
+        ], lines[1..]);
+        Assert.IsType<CredentialUnavailableException>(exception.InnerException);
+    }
+
+    [Fact]
+    public void ASingleSourcesReasonIsReadToo()
+    {
+        // AZURE_TOKEN_CREDENTIALS=AzureCliCredential leaves one source, and no dash before it.
+        Assert.Equal(["Azure CLI: Please run 'az login' to set up account"],
+            AzureTokenProvider.Reasons("AzureCliCredential authentication failed: Please run 'az login' to set up account"));
+    }
+
+    private static string Guidance(string? selection) =>
+        new AzureTokenProvider(new Credential(_ => default), "https://energy.azure.com/.default", Tenant,
+            selection: selection).NothingToSignInWith("").Split(Environment.NewLine)[0];
+
+    [Fact]
+    public void WithEverySourceInPlayAllAreSuggested()
+    {
+        Assert.Equal(
+            $"No Azure sign-in to use. Run `az login --tenant {Tenant}` to sign in as yourself; in a pipeline or on "
+            + "Azure, use a workload identity, a managed identity, or the AZURE_CLIENT_ID, AZURE_TENANT_ID and "
+            + "AZURE_CLIENT_SECRET variables.",
+            Guidance(null));
+    }
+
+    [Theory]
+    // `prod` leaves out the Azure CLI, so `az login` would change nothing.
+    [InlineData("prod", false, true)]
+    [InlineData("ManagedIdentityCredential", false, true)]
+    // The Azure CLI alone, so no pipeline identity would be tried.
+    [InlineData("dev", true, false)]
+    [InlineData("azureclicredential", true, false)]
+    public void ANarrowedSelectionSuggestsOnlyWhatItTries(string selection, bool azureCli, bool pipeline)
+    {
+        var guidance = Guidance(selection);
+
+        Assert.Equal(azureCli, guidance.Contains("az login", StringComparison.Ordinal));
+        Assert.Equal(pipeline, guidance.Contains("In a pipeline or on Azure", StringComparison.OrdinalIgnoreCase));
+        Assert.EndsWith($"AZURE_TOKEN_CREDENTIALS={selection} leaves out the other sources; unset it to try them too.", guidance);
+    }
+
+    [Fact]
+    public async Task ARefusedSignInIsOneLineFromItsCode()
+    {
+        // The likely failure for prod: an app registration that has not consented to the
+        // Azure CLI asking for tokens to it.
+        var provider = new AzureTokenProvider(
+            new Credential(_ => throw new AuthenticationFailedException(
+                "AzureCliCredential authentication failed: AADSTS65001: The user or administrator has not "
+                + "consented to use the application with ID '04b07795-8ddb-461a-bbee-02f9e1bf7b46'.\r\n"
+                + "Trace ID: 1111")),
+            "5a1178c2-5867-4a34-8fb8-216164e30b5f/.default");
+
+        var exception = await Assert.ThrowsAsync<OsduException>(() =>
+            provider.GetTokenAsync(TestContext.Current.CancellationToken));
+
+        Assert.Equal(
+            "Sign-in through Azure failed. AADSTS65001: The user or administrator has not consented to use "
+            + "the application with ID '04b07795-8ddb-461a-bbee-02f9e1bf7b46'. Trace ID: 1111",
+            exception.Message);
+    }
+
+    [Fact]
+    public async Task ARefusedSignInWithoutACodeGivesTheSourcesReason()
+    {
+        var provider = new AzureTokenProvider(
+            new Credential(_ => throw new AuthenticationFailedException(
+                "DefaultAzureCredential failed to retrieve a token from the included credentials.\n"
+                + "- AzureCliCredential authentication failed: Azure CLI authentication timed out.")),
+            "https://energy.azure.com/.default");
+
+        var exception = await Assert.ThrowsAsync<OsduException>(() =>
+            provider.GetTokenAsync(TestContext.Current.CancellationToken));
+
+        Assert.Equal("Sign-in through Azure failed. Azure CLI: Azure CLI authentication timed out.", exception.Message);
+    }
+
+    // ---- the account expected -------------------------------------------------------------
+
+    private static AzureTokenProvider Signing(object claims, AzureTokenProvider.ExpectedAccount? expected) =>
+        new(new Credential(_ => new AccessToken(Token(claims), Start.AddHours(1))),
+            "https://energy.azure.com/.default", clock: new Clock(Start), expected: expected);
+
+    private const string AzureCli = "04b07795-8ddb-461a-bbee-02f9e1bf7b46";
+
+    [Fact]
+    public async Task TheAccountExpectedSignsInWhateverItsCasing()
+    {
+        var provider = Signing(new { upn = "Name@Equinor.com", appid = AzureCli },
+            new("name@equinor.com", FromFlag: false));
+
+        Assert.NotEmpty(await provider.GetTokenAsync(TestContext.Current.CancellationToken));
+    }
+
+    [Fact]
+    public async Task AnotherPersonIsRefused()
+    {
+        // `az login` as an admin account for some other task, then a command meant for the
+        // normal one: it would have run as admin.
+        var provider = Signing(new { upn = "admin@equinor.com", appid = AzureCli },
+            new("name@equinor.com", FromFlag: false));
+
+        var exception = await Assert.ThrowsAsync<OsduException>(() =>
+            provider.GetTokenAsync(TestContext.Current.CancellationToken));
+
+        Assert.Equal(
+            "This profile is for name@equinor.com, but Azure signed in as admin@equinor.com, through the Azure CLI. "
+            + "Sign in as name@equinor.com with `az login`, or remove `user` from the profile.",
+            exception.Message);
+    }
+
+    [Fact]
+    public async Task AnApplicationIsRefusedWhenAPersonIsExpected()
+    {
+        var provider = Signing(new { appid = "1111", xms_mirid = "/subscriptions/x" },
+            new("name@equinor.com", FromFlag: true));
+
+        var exception = await Assert.ThrowsAsync<OsduException>(() =>
+            provider.GetTokenAsync(TestContext.Current.CancellationToken));
+
+        Assert.Equal(
+            "--user asks for name@equinor.com, but Azure signed in as the managed identity 1111. "
+            + "Sign in as name@equinor.com with `az login` if the Azure CLI is the one answering, or leave out --user.",
+            exception.Message);
+    }
+
+    [Fact]
+    public async Task WithNoAccountExpectedAnyoneSignsIn()
+    {
+        var provider = Signing(new { appid = "2222" }, expected: null);
+
+        Assert.NotEmpty(await provider.GetTokenAsync(TestContext.Current.CancellationToken));
+    }
+
+    [Fact]
+    public async Task WhoSignedInCanBeAskedWithoutTheCheck()
+    {
+        // For `account list`, the command for finding out who you are.
+        var provider = Signing(new { upn = "admin@equinor.com", appid = AzureCli },
+            new("name@equinor.com", FromFlag: false));
+
+        var who = await provider.IdentifyAsync(TestContext.Current.CancellationToken);
+
+        Assert.Equal("admin@equinor.com", who.Person);
+        Assert.False(provider.IsExpected(who));
+    }
+
+    // ---- who signed in --------------------------------------------------------------------
+
+    private static string Token(object claims)
+    {
+        static string Part(string json) =>
+            Convert.ToBase64String(Encoding.UTF8.GetBytes(json)).TrimEnd('=').Replace('+', '-').Replace('/', '_');
+        return $"{Part("""{"alg":"none"}""")}.{Part(JsonSerializer.Serialize(claims))}.";
+    }
+
+    [Fact]
+    public void APersonSignedInThroughTheAzureCliIsNamed()
+    {
+        var token = Token(new { upn = "steh@equinor.com", appid = "04b07795-8ddb-461a-bbee-02f9e1bf7b46" });
+
+        Assert.Equal("steh@equinor.com, through the Azure CLI", AzureTokenProvider.Describe(token));
+    }
+
+    [Fact]
+    public void AManagedIdentityIsNamedAsOne()
+    {
+        var token = Token(new { appid = "1111", xms_mirid = "/subscriptions/x/resourcegroups/y" });
+
+        Assert.Equal("the managed identity 1111", AzureTokenProvider.Describe(token));
+    }
+
+    [Fact]
+    public void OnlyATokenIssuedToTheAzureCliIsSaidToBeOne()
+    {
+        // Which decides whether `account list` suggests `az login`. An application's token
+        // says nothing about the source: a service principal signed in to the Azure CLI, as
+        // `azure/login` does in a pipeline, gets tokens naming the principal, not the CLI.
+        var person = Token(new { upn = "steh@equinor.com", appid = "04b07795-8ddb-461a-bbee-02f9e1bf7b46" });
+        var managed = Token(new { appid = "1111", xms_mirid = "/subscriptions/x" });
+        var application = Token(new { appid = "2222" });
+
+        Assert.True(AzureTokenProvider.Identify(person).IssuedToAzureCli);
+        Assert.False(AzureTokenProvider.Identify(managed).IssuedToAzureCli);
+        Assert.False(AzureTokenProvider.Identify(application).IssuedToAzureCli);
+    }
+
+    [Fact]
+    public void AnApplicationIsNamedByItsId()
+    {
+        Assert.Equal("the application 2222", AzureTokenProvider.Describe(Token(new { azp = "2222" })));
+    }
+
+    [Theory]
+    [InlineData("not a token")]
+    [InlineData("a.!!!.c")]
+    public void ATokenThatCannotBeReadSaysSo(string token)
+    {
+        Assert.Equal("(not readable from the token)", AzureTokenProvider.Describe(token));
+    }
+
+    // ---- config add, show and use ---------------------------------------------------------
+
+    [Fact]
+    public void ABrowserProfileCopiedToAzureLeavesItsClientIdBehindAndKeepsItsAccount()
+    {
+        WriteNativeProfile("dev", user: "someone@equinor.com");
+
+        var outcome = Add("az", Nothing with { AuthenticationMode = "azure" }, from: "dev",
+            ask: _ => throw new InvalidOperationException("everything needed was copied"));
+
+        var written = Written("az");
+        Assert.Equal("azure", written["AuthenticationMode"]!.GetValue<string>());
+        Assert.Equal("https://example.com/.default", written["Scopes"]!.GetValue<string>());
+        Assert.Null(written["ClientId"]);
+        // Kept, as the account the profile's commands are checked against.
+        Assert.Equal("someone@equinor.com", written["User"]!.GetValue<string>());
+        Assert.Null(written["ClientSecret"]);
+        Assert.Equal(["ClientId"], outcome.NotCarried);
+        Assert.Equal(["openid"], outcome.DroppedScopes);
+    }
+
+    [Fact]
+    public void UserCanBeGivenToANewAzureProfile()
+    {
+        WriteNativeProfile("dev");
+
+        Add("az", Nothing with { AuthenticationMode = "azure", User = "someone@equinor.com" }, from: "dev");
+
+        Assert.Equal("someone@equinor.com", Written("az")["User"]!.GetValue<string>());
+    }
+
+    [Fact]
+    public void ANewAzureProfileDoesNotAskForAClientId()
+    {
+        var asked = new List<string>();
+        var answers = new Queue<string>(["https://osdu.example.com", "p",
+            $"https://login.microsoftonline.com/{Tenant}", "https://energy.azure.com/.default"]);
+
+        Add("az", Nothing with { AuthenticationMode = "azure" },
+            ask: label => { asked.Add(label); return answers.Dequeue(); });
+
+        Assert.Equal(4, asked.Count);
+        Assert.DoesNotContain(asked, label => label.StartsWith("Client ID", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void AClientIdIsRefusedForAnAzureProfile()
+    {
+        WriteNativeProfile("dev");
+
+        var exception = Assert.Throws<OsduException>(() =>
+            Add("az", Nothing with { AuthenticationMode = "azure", ClientId = "app" }, from: "dev"));
+
+        Assert.Contains("--client-id does not apply", exception.Message);
+    }
+
+    [Fact]
+    public void ShowSaysWhatDoesNotApply()
+    {
+        WriteAzureProfile("dev");
+        var config = CliConfig.LoadWithSignIn("dev", out var signIn);
+
+        var rows = ConfigCommand.Rows(config, signIn).ToDictionary(row => row.Setting, row => row.Value);
+
+        Assert.Equal("azure", rows["authentication-mode"]);
+        Assert.StartsWith("(not used", rows["client-id"]);
+        Assert.Contains("account list", rows["user"]);
+        Assert.False(rows.ContainsKey("client-secret"));
+    }
+
+    [Fact]
+    public void ShowSaysTheProfilesUserIsChecked()
+    {
+        WriteAzureProfile("dev", "user = someone@equinor.com");
+        // Shown as what is checked, which OSDU_USER is not.
+        Environment.SetEnvironmentVariable("OSDU_USER", "other@equinor.com");
+        var config = CliConfig.LoadWithSignIn("dev", out var signIn);
+
+        var rows = ConfigCommand.Rows(config, signIn).ToDictionary(row => row.Setting, row => row.Value);
+
+        Assert.Equal("someone@equinor.com (checked: commands signed in as anyone else are refused)", rows["user"]);
+    }
+}

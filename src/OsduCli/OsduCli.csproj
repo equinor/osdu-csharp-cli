@@ -48,4 +48,12 @@
     <PackageReference Include="Equinor.OsduCsharpClient.Msal" Version="2.2.1"/>
   </ItemGroup>
 
+  <!-- For the `azure` authentication mode: `az login`, a managed or workload identity, or
+       AZURE_* variables, through DefaultAzureCredential. The client library offers MSAL
+       providers only. Its MSAL dependency resolves to the same Microsoft.Identity.Client the
+       client's MSAL package uses, and it adds about half a megabyte to a release archive. -->
+  <ItemGroup>
+    <PackageReference Include="Azure.Identity" Version="1.21.0"/>
+  </ItemGroup>
+
 </Project>
