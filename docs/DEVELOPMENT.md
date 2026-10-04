@@ -20,11 +20,32 @@ cli-manifest/*.yaml                                              what the CLI ex
 - **Specs.** Read from the client library's release, pinned in
   [`spec-source.yaml`](../spec-source.yaml) to the version the CLI builds against, so the
   coverage check sees the same operations the client has methods for. Fetched into a gitignored
-  `openapi_specs/`. See [Where the specs come from](../README.md#where-the-specs-come-from).
+  `openapi_specs/`. See [Where the specs come from](#where-the-specs-come-from).
 - **Manifests.** One per service. Every key is listed in [MANIFEST.md](MANIFEST.md), and the
   reasoning behind the rules is in [COMMAND-GRAMMAR.md](../COMMAND-GRAMMAR.md).
 - **Generated code.** Committed, so building needs no Python. CI regenerates it on every pull
   request and fails if the result differs from what is committed.
+
+Why it is built this way, and what the manifest decides that a spec cannot, is in
+[DESIGN.md](DESIGN.md).
+
+### Where the specs come from
+
+The generator needs the OpenAPI specs; the C# build does not, because the generated commands
+are committed. `tools/fetch_specs.py` downloads them into a gitignored `openapi_specs/` from
+the source declared in [`spec-source.yaml`](../spec-source.yaml), pinned to the client version
+`OsduCli.csproj` references.
+
+The pin is the point. The CLI calls that client version's generated methods, so the specs the
+coverage gate validates against have to be the specs that version was generated from —
+reading a newer tree lets the gate approve endpoints the pinned client cannot call. A test
+holds the two together, so bumping the client without the specs fails, and the generator
+refuses to run against a fetched tree stamped with a different ref than the one pinned —
+otherwise a pin bump would silently generate against whatever you fetched last.
+
+Resolution order is `OSDU_SPECS_DIR` → the fetched `openapi_specs/` → an `osdu-csharp-client`
+sibling checkout. The sibling still works and no longer needs to exist; it comes last because
+it is whatever branch happens to be checked out, which is the drift the pin removes.
 
 ### The client library
 
@@ -94,6 +115,29 @@ because no service has needed one.
 | `tests/generator/` | The generator: every rule it enforces, the C# it emits (against recorded goldens in `golden/`), coverage, the spec pin, and that the manifest reference matches the generator. | `python3 -m pytest` |
 | `tests/OsduCli.Tests/` | The CLI: configuration, help, output, completion, errors, and the real generated command tree. | `dotnet test` |
 | `tools/smoke_test.py` | Every manifest example, run against a live environment. Not in CI, since it needs a sign-in. | `python3 tools/smoke_test.py -c dev` |
+
+### Smoke-testing the examples
+
+Examples are untested documentation and rot silently — `data.Country:"Norway"` sat in
+`record search`'s documentation matching nothing, because that field exists on no OSDU kind. CI
+cannot catch it: it needs a live service and a token.
+
+```bash
+python3 tools/smoke_test.py            # every example, default profile
+python3 tools/smoke_test.py -c dev     # a named profile
+python3 tools/smoke_test.py record     # only `record …` commands
+```
+
+The examples live in the manifests beside the command they document, so the string shown in
+[the command reference](COMMANDS.md) and the string executed here are the same string. An
+example that cannot run anywhere — a record id is scoped to a data partition — carries a
+`skip:` reason and is reported as skipped rather than failed.
+
+An empty result counts as a failure: a command that renders nothing has "worked" and told the
+user nothing, which is exactly how the stale examples went unnoticed. Non-zero exit if
+anything fails, so it can gate a release.
+
+### The C# tests
 
 Two things to know about the C# tests:
 
