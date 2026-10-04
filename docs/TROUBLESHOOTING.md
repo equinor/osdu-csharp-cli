@@ -72,7 +72,9 @@ you instead of as the application, which is the likelier cause of the 401 itself
 
 A profile signing in through Azure (`azure`) found nothing to sign in with. The lines after the
 message say what each place it looked for an identity reported; for a person, the last one is
-the one that matters, and the fix is the `az login --tenant …` the message names. In a pipeline,
+the one that matters, and the fix is the `az login --tenant …` the message names. When
+`AZURE_TOKEN_CREDENTIALS` leaves some places out, only the ones it keeps are suggested, and the
+message says to unset it to try the rest. In a pipeline,
 check that the identity's variables reach the step running osducs.
 
 ## `error: sign-in failed. AADSTS…`

@@ -301,6 +301,36 @@ public class AzureSignInTests : ConfigTestDirectories
             AzureTokenProvider.Reasons("AzureCliCredential authentication failed: Please run 'az login' to set up account"));
     }
 
+    private static string Guidance(string? selection) =>
+        new AzureTokenProvider(new Credential(_ => default), "https://energy.azure.com/.default", Tenant,
+            selection: selection).NothingToSignInWith("").Split(Environment.NewLine)[0];
+
+    [Fact]
+    public void WithEverySourceInPlayAllAreSuggested()
+    {
+        Assert.Equal(
+            $"No Azure sign-in to use. Run `az login --tenant {Tenant}` to sign in as yourself; in a pipeline or on "
+            + "Azure, use a workload identity, a managed identity, or the AZURE_CLIENT_ID, AZURE_TENANT_ID and "
+            + "AZURE_CLIENT_SECRET variables.",
+            Guidance(null));
+    }
+
+    [Theory]
+    // `prod` leaves out the Azure CLI, so `az login` would change nothing.
+    [InlineData("prod", false, true)]
+    [InlineData("ManagedIdentityCredential", false, true)]
+    // The Azure CLI alone, so no pipeline identity would be tried.
+    [InlineData("dev", true, false)]
+    [InlineData("azureclicredential", true, false)]
+    public void ANarrowedSelectionSuggestsOnlyWhatItTries(string selection, bool azureCli, bool pipeline)
+    {
+        var guidance = Guidance(selection);
+
+        Assert.Equal(azureCli, guidance.Contains("az login", StringComparison.Ordinal));
+        Assert.Equal(pipeline, guidance.Contains("In a pipeline or on Azure", StringComparison.OrdinalIgnoreCase));
+        Assert.EndsWith($"AZURE_TOKEN_CREDENTIALS={selection} leaves out the other sources; unset it to try them too.", guidance);
+    }
+
     [Fact]
     public async Task ARefusedSignInIsOneLineFromItsCode()
     {

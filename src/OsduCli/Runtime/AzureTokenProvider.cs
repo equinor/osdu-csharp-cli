@@ -32,7 +32,7 @@ namespace Equinor.OsduCli.Runtime;
 /// </remarks>
 internal sealed partial class AzureTokenProvider(
     TokenCredential credential, string scope, string? tenant = null, TimeProvider? clock = null,
-    AzureTokenProvider.ExpectedAccount? expected = null)
+    AzureTokenProvider.ExpectedAccount? expected = null, string? selection = null)
     : ITokenProvider
 {
     /// <summary>The account a command expects to run as, and whether <c>--user</c> said so.</summary>
@@ -60,7 +60,8 @@ internal sealed partial class AzureTokenProvider(
 
     internal static AzureTokenProvider Create(OsduConfig config, ExpectedAccount? expected = null)
     {
-        CheckSelection(Environment.GetEnvironmentVariable(TokenCredentialsVariable));
+        var selection = Environment.GetEnvironmentVariable(TokenCredentialsVariable);
+        CheckSelection(selection);
         var tenant = TenantOf(config.Authority);
         return new(new DefaultAzureCredential(new DefaultAzureCredentialOptions
         {
@@ -71,7 +72,7 @@ internal sealed partial class AzureTokenProvider(
             ExcludeAzureDeveloperCliCredential = true,
             ExcludeBrokerCredential = true,
             ExcludeInteractiveBrowserCredential = true,
-        }), ScopeFor(config), tenant, expected: expected);
+        }), ScopeFor(config), tenant, expected: expected, selection: selection);
     }
 
     /// <remarks>
@@ -146,15 +147,60 @@ internal sealed partial class AzureTokenProvider(
         }
     }
 
+    /// <summary>The four places this mode looks for an identity, in the order it looks.</summary>
+    internal enum Source { Environment, WorkloadIdentity, ManagedIdentity, AzureCli }
+
+    /// <summary>The sources an <c>AZURE_TOKEN_CREDENTIALS</c> value leaves in play.</summary>
+    /// <remarks>
+    /// <c>dev</c> is the Azure CLI alone, since the other developer tools are excluded, and
+    /// <c>prod</c> the other three. Values outside these were refused by
+    /// <see cref="CheckSelection"/> before any were tried.
+    /// </remarks>
+    internal static IReadOnlyList<Source> SourcesFor(string? selection) =>
+        selection?.Trim().ToLowerInvariant() switch
+        {
+            null or "" => [Source.Environment, Source.WorkloadIdentity, Source.ManagedIdentity, Source.AzureCli],
+            "dev" or "azureclicredential" => [Source.AzureCli],
+            "prod" => [Source.Environment, Source.WorkloadIdentity, Source.ManagedIdentity],
+            "environmentcredential" => [Source.Environment],
+            "workloadidentitycredential" => [Source.WorkloadIdentity],
+            "managedidentitycredential" => [Source.ManagedIdentity],
+            _ => [],
+        };
+
     /// <summary>What to do when no source could sign in, with what each one said.</summary>
+    /// <remarks>
+    /// Only the sources still in play are suggested. Suggesting all four told someone who had
+    /// narrowed <c>AZURE_TOKEN_CREDENTIALS</c> to <c>prod</c> to run <c>az login</c>, which it
+    /// would then not try; so when it is narrowed, that is said too.
+    /// </remarks>
     internal string NothingToSignInWith(string message)
     {
-        var login = tenant is null ? "az login" : $"az login --tenant {tenant}";
-        var reasons = Reasons(message);
-        return $"No Azure sign-in to use. Run `{login}` to sign in as yourself; in a pipeline or on Azure, "
-               + "use its managed or workload identity, or set AZURE_CLIENT_ID, AZURE_TENANT_ID and "
-               + "AZURE_CLIENT_SECRET."
-               + string.Concat(reasons.Select(reason => Environment.NewLine + "       " + reason));
+        var sources = SourcesFor(selection);
+        var advice = new List<string>();
+        if (sources.Contains(Source.AzureCli))
+            advice.Add($"Run `{(tenant is null ? "az login" : $"az login --tenant {tenant}")}` to sign in as yourself");
+
+        var identities = new List<string>();
+        if (sources.Contains(Source.WorkloadIdentity))
+            identities.Add("a workload identity");
+        if (sources.Contains(Source.ManagedIdentity))
+            identities.Add("a managed identity");
+        if (sources.Contains(Source.Environment))
+            identities.Add("the AZURE_CLIENT_ID, AZURE_TENANT_ID and AZURE_CLIENT_SECRET variables");
+        if (identities.Count > 0)
+        {
+            var listed = identities.Count == 1
+                ? identities[0]
+                : string.Join(", ", identities[..^1]) + ", or " + identities[^1];
+            advice.Add(advice.Count == 0 ? $"In a pipeline or on Azure, use {listed}" : $"in a pipeline or on Azure, use {listed}");
+        }
+
+        var narrowed = sources.Count < 4
+            ? $" {TokenCredentialsVariable}={selection!.Trim()} leaves out the other sources; unset it to try them too."
+            : "";
+        return $"No Azure sign-in to use. {string.Join("; ", advice)}.{narrowed}"
+               + string.Concat(Reasons(message).Select(reason => Environment.NewLine + "       " + reason));
     }
 
     /// <summary>
