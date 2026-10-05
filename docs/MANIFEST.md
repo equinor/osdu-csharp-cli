@@ -6,7 +6,7 @@ is shown. `tools/generate_cli.py` joins a manifest with the service's OpenAPI sp
 C# under `src/OsduCli/Commands/Generated/`.
 
 This page lists every key, level by level. For why the format is the way it is, see
-[the README](../README.md#the-manifest-is-the-point); for the rules commands follow, see
+[DESIGN.md](DESIGN.md#the-manifest-is-the-point); for the rules commands follow, see
 [COMMAND-GRAMMAR.md](../COMMAND-GRAMMAR.md).
 
 Every level is checked. A key the generator does not know is an error that names the keys that
@@ -49,7 +49,7 @@ exclude:
 | `models` | no | The namespace under `Equinor.OsduCsharpClient` that holds the service's request models and enums. Defaults to `client`. Set it where the client library renamed the namespace, as `File` did to `FileNamespace` to avoid `System.IO.File`. |
 | `description` | no | Doc comment on the generated class. Not shown to users. |
 | `groups` | see text | Help text for each group a command sits under, keyed by its path: `record`, `record version`. Every group needs exactly one description, which may come from any manifest that puts commands under it, so a manifest adding commands to a group another manifest already describes does not repeat it. Two manifests describing the same group differently is an error, and so is describing a group no command sits under. |
-| `scope` | no | Path patterns (`fnmatch` style, such as `/ddms/v3/*`) limiting which operations the manifest must account for. Operations outside the scope are reported, not enforced; `generate_cli.py --strict-scope` fails on them. See [Scope](../README.md#scope-for-incremental-adoption). |
+| `scope` | no | Path patterns (`fnmatch` style, such as `/ddms/v3/*`) limiting which operations the manifest must account for. Operations outside the scope are reported, not enforced; `generate_cli.py --strict-scope` fails on them. See [Scope](DESIGN.md#scope-for-incremental-adoption). |
 | `section` | no | Heading under which this manifest's top-level nouns appear in `osducs --help`. Without it they are listed under "Core resources". See [`section`](../COMMAND-GRAMMAR.md#section). |
 | `commands` | no | The operations that become generated commands. See [Command entries](#command-entries). |
 | `handwritten` | no | Operations that deserve a command the manifest cannot express. See [`handwritten`](#handwritten). |
@@ -181,7 +181,7 @@ mapping:
 
 Examples are shown in [the command reference](COMMANDS.md), not in `--help`.
 `tools/smoke_test.py` runs every example that is not skipped against a live environment, and
-counts an empty result as a failure. See [Smoke-testing the examples](../README.md#smoke-testing-the-examples).
+counts an empty result as a failure. See [Smoke-testing the examples](DEVELOPMENT.md#smoke-testing-the-examples).
 
 ## `handwritten`
 
