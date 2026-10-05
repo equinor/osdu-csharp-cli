@@ -1,407 +1,146 @@
-# osdu-csharp-cli
+# osducs
 
-A C# twin of [osdu-cli](https://community.opengroup.org/osdu/platform/data-flow/data-loading/osdu-cli),
-built to answer one question: **can the CLI's command surface be generated from the OpenAPI
-specs instead of hand-written?**
+A command line for [OSDU](https://osduforum.org) data platforms. Search and read records, and
+manage schemas, legal tags, entitlements, workflows, units, CRS and Wellbore DDMS data, from a
+single self-contained binary for Windows, macOS and Linux.
 
-The answer, on this evidence, is yes for the bulk of it — with an editorial layer that has to
-stay hand-written, and which this repo makes explicit rather than implicit. The question is
-settled enough that the tool is now the point rather than the experiment: it is released, it
-is used against a live instance, and the generator runs in CI.
+```bash
+osducs record search --kind "osdu:wks:master-data--Well:*" --query 'data.FacilityName:GB*' -f id -f data.FacilityName
+osducs record aggregate --kind "osdu:wks:*:*" --by kind
+osducs legaltag list
+osducs group member add --group users.datalake.viewers@dev.dataservices.energy --member name@equinor.com --role MEMBER
+```
+
+## Why use it
+
+- **Nothing to set up if you already use the Python CLI.** osducs reads the
+  [`osducli`](https://community.opengroup.org/osdu/platform/data-flow/data-loading/osdu-cli)
+  profiles in `~/.osducli/` and follows the environment it has selected, without changing them.
+  The two run side by side, and moving a profile over is one command.
+- **The whole core OSDU surface.** 131 commands across 12 services — Storage, Search, Schema,
+  Legal, Entitlements, File, Dataset, CRS, Unit, Workflow and Wellbore DDMS — generated from the
+  services' own OpenAPI specs, so a new endpoint upstream is noticed rather than missed.
+- **Signs in the way your environment needs:** through a browser; as an application with a
+  client secret; or with `az login`, a managed identity or a pipeline identity. With more than
+  one account signed in, it lists them and waits to be told which, rather than guessing.
+- **Readable by default, scriptable when needed.** Tables for people, `-o json` for scripts,
+  and `-f` to pick the columns a search returns.
+- **Help that answers the question.** `--help` at every level. A refused request names the role
+  the endpoint needs, where its spec says. A mistyped command gets a suggestion, so
+  `osducs member add group` points to `osducs group member add`.
+- **One file, no runtime to install.** About 30 MB to download, with .NET inside, and tab completion for
+  bash, zsh, fish and PowerShell.
 
 ## Install
 
-Download the archive for your platform from the [latest release][releases]. No account is
-needed. Each is around 30 MB compressed, and nothing else has to be installed, since the .NET
-runtime is inside the binary.
-
-macOS (Apple silicon):
+Download from the [latest release][releases]; no account is needed.
 
 ```bash
+# macOS (Apple silicon); for Linux use osducs-linux-x64.tar.gz
 curl -LO https://github.com/equinor/osdu-csharp-cli/releases/latest/download/osducs-osx-arm64.tar.gz
 tar -xzf osducs-osx-arm64.tar.gz && chmod +x osducs
 ```
 
-Linux: the same, with `osducs-linux-x64.tar.gz`.
-
-Downloaded through a browser instead? macOS marks the file as quarantined, and since the binary
-is not yet signed and notarized, it will not run until the mark is cleared:
-
-```bash
-xattr -d com.apple.quarantine ./osducs
-```
-
-`curl` does not set that flag, so after the commands above `xattr` would only report
-`No such xattr`.
-
-### Windows
-
 ```powershell
+# Windows
 curl.exe -LO https://github.com/equinor/osdu-csharp-cli/releases/latest/download/osducs-win-x64.zip
 Expand-Archive osducs-win-x64.zip -DestinationPath .
-.\osducs --version           # note the .\ — see below
+.\osducs --version
 ```
 
-A browser download carries a `Zone.Identifier` stream — the Mark of the Web — which is what
-SmartScreen reacts to. Clearing it needs no administrator:
-
-```powershell
-Unblock-File .\osducs.exe    # or tick Unblock in the file's Properties dialog
-```
-
-Unblocking the `.zip` before extracting saves doing it per file.
-
-The leading `.\` is not optional. PowerShell does not run programs from the current directory,
-so a bare `osducs` reports `CommandNotFoundException` even though the file is right there. That
-is PowerShell's rule about the current directory, not anything about this binary or about it
-being unsigned.
-
-To use it as `osducs` from anywhere, put its directory on your user PATH — no administrator,
-and it applies to shells opened afterwards:
-
-```powershell
-$dir  = "C:\Appl\osducs-win-x64"
-$user = [Environment]::GetEnvironmentVariable("Path", "User")
-# Whole entries, not a substring match — "*$dir*" would also match ...\osducs-win-x64-old
-$have = @("$user" -split ';' | ForEach-Object { $_.TrimEnd('\') })
-if ($have -notcontains $dir.TrimEnd('\')) {
-    [Environment]::SetEnvironmentVariable("Path", "$user;$dir".Trim(';'), "User")
-}
-```
-
-On macOS and Linux the equivalent is somewhere already on `PATH`, such as
-`~/.local/bin/osducs`.
-
-### Checking a download against the release
-
-Every asset ships a `.sha256` beside it, at the same URL with `.sha256` added, holding two
-lines: the archive's hash and the hash of the binary inside it. The second is the one Windows
-tooling reports, and the one to compare after extracting:
-
-```powershell
-(Get-FileHash .\osducs.exe -Algorithm SHA256).Hash
-```
-
-```bash
-shasum -a 256 ./osducs        # macOS
-sha256sum ./osducs            # Linux
-```
-
-That catches a truncated download, a corrupted extract, or the wrong version — the file not
-matching the release entry. It is not proof of origin: the checksum is published beside the
-asset, so whoever could replace one could replace the other. Establishing origin needs a
-signature, and the binaries are not signed yet.
-
-The command is `osducs`, not `osdu`, so it sits alongside the Python
-[`osducli`](https://community.opengroup.org/osdu/platform/data-flow/data-loading/osdu-cli)
-rather than replacing it.
+The binaries are not signed yet, so a browser download needs unblocking first. That, putting
+osducs on your `PATH`, and checking a download against the release are in
+[docs/INSTALL.md](docs/INSTALL.md).
 
 [releases]: https://github.com/equinor/osdu-csharp-cli/releases/latest
 
-## Documentation
+## Get started
 
-| | |
-|---|---|
-| [docs/PEER-TEST.md](docs/PEER-TEST.md) | **hand this to a tester** — install, what to try, what not to report |
-| [docs/USAGE.md](docs/USAGE.md) | configuration, output, finding records — the everyday guide |
-| [docs/COMMANDS.md](docs/COMMANDS.md) | every command and flag, generated from the manifests |
-| [docs/TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md) | failure modes seen against a live instance, and which are not the CLI's fault |
-| [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md) | for maintainers: how the code fits together, upgrading the client, adding a service, releasing |
-| [docs/MANIFEST.md](docs/MANIFEST.md) | every key a manifest can use, for adding or changing commands |
-| [COMMAND-GRAMMAR.md](COMMAND-GRAMMAR.md) | why commands are named as they are, and the reasoning behind manifest features |
-
-## First run
-
-**If you already use the Python CLI, there is nothing to configure.** `osducs` reads the
-same profiles from `~/.osducli/`:
+**If you use the Python CLI, try it straight away:**
 
 ```bash
-osducs status -c dev
+osducs status
 ```
 
 ```
+https://<instance>.energy.azure.com  partition dev
 Service         Status  Version          Build
 --------------  ------  ---------------  ------------------------
 crs-catalog     ok      0.29.2-SNAPSHOT  2026-08-05T09:49:35.371Z
 crs-conversion  ok      0.29.2-SNAPSHOT  2026-08-05T09:49:28.770Z
 storage         ok      0.29.4-SNAPSHOT  2026-08-05T19:04:12.267Z
-wellbore-ddms   ok      0.29
 ...
 ```
 
-**Otherwise, create a profile.** Run in a terminal, this asks for each setting:
+**Otherwise, create a profile.** In a terminal this asks for each setting:
 
 ```bash
 osducs config add dev
 ```
 
-Or pass them, for a script:
-
-```bash
-osducs config add dev --server https://<instance>.energy.azure.com --partition dev \
-  --authority https://login.microsoftonline.com/<tenant-id> --client-id <app-id> \
-  --scopes "https://energy.azure.com/.default openid"
-```
-
-A second environment on the same tenant only needs what differs:
-
-```bash
-osducs config add test --from dev --server https://<test-instance>.energy.azure.com --partition test
-```
-
-If osducs has no other configuration yet — no profile it would read by default, no selection
-that still exists, and no `OSDU_*` variables — the profile you create is selected. Otherwise `config add` leaves
-the environment you are on alone, and `osducs config use <profile>` switches.
-Setting `OSDU_SERVER`, `OSDU_DATA_PARTITION_ID`, `OSDU_AUTHORITY`, `OSDU_CLIENT_ID` and
-`OSDU_SCOPES` works too, with no file at all. A profile can also sign in as an application
-with a client secret, as the Python CLI's `msal_non_interactive` does — see
-[docs/USAGE.md](docs/USAGE.md#signing-in-as-an-application) — or through `az login` or an
-identity Azure provides, as its `azure` mode does — see
-[docs/USAGE.md](docs/USAGE.md#signing-in-through-azure).
-
-**Moving from the Python CLI** is one command per profile:
+**To move a Python profile over**, so osducs keeps its own copy:
 
 ```bash
 osducs config add dev --from dev
 ```
 
-That writes `~/.osdu/dev.json`, which takes over from `~/.osducli/dev` wherever osducs would
-have read it. osducs reads the Python CLI's profiles but never writes to `~/.osducli/`, so the
-two tools stay independent — see [docs/USAGE.md](docs/USAGE.md#choosing-the-environment).
+[docs/USAGE.md](docs/USAGE.md) covers profiles and switching between environments, the
+sign-in options, output, and finding records. [docs/COMMANDS.md](docs/COMMANDS.md) lists every
+command and option.
 
-## Why
+## What it covers
 
-The Python CLI is 149 commands / ~11,900 lines. Of those, 83 are Wellbore DDMS and 10 wrap
-`wbdutil` — both later additions. **The core command set is the remaining 56**: storage,
-search, schema, entitlements, workflow, crs, legal, unit, file, plus `config`, `status`,
-`version`, `list` and `dataload`.
+| Noun | Service |
+| --- | --- |
+| `record` | Storage, Search |
+| `schema` | Schema |
+| `legaltag` | Legal |
+| `group`, `member` | Entitlements |
+| `file` | File |
+| `dataset` | Dataset |
+| `crs` | CRS Catalog, CRS Conversion |
+| `unit`, `measurement`, `unit-system` | Unit v3 |
+| `workflow` | Workflow |
+| `well`, `wellbore`, `welllog`, `trajectory`, `markerset`, `intervalset`, `logacquisition`, `ppfg`, `pressuretest` | Wellbore DDMS: every record type, and reading bulk data |
 
-Roughly 45 of those 56 are thin service CRUD that generates cleanly. The other 11 are
-genuinely hand-written — `dataload` alone is 4 commands and 1,870 lines of orchestration no
-generator should touch. (Wellbore DDMS shows the same split more starkly: 116 of its files
-are under 50 lines of near-identical boilerplate, machine output that happened to be
-produced by copy-paste.)
-
-This repo draws that line as a build-enforced boundary.
-
-## How it fits together
-
-```
-openapi_specs/<service>/openapi.{yaml,json}  what the service can do       (fetched, pinned)
-cli-manifest/<service>.yaml                  what the CLI should expose    (hand-written, reviewed)
-        │
-        ├── tools/generate_cli.py
-        ▼
-src/OsduCli/Commands/Generated/*.g.cs        System.CommandLine tree       (committed, never edited)
-src/OsduCli/Commands/Handwritten/            the Customize() partial hook  (hand-written)
-```
-
-Generated commands call [`Equinor.OsduCsharpClient`](https://github.com/equinor/osdu-csharp-client),
-which is itself Kiota-generated from the same specs. The CLI adds no HTTP code of its own.
-
-Since client 2.0.0 the core package is authentication-agnostic — it bundles no identity
-library and `OsduClient` takes an `ITokenProvider` rather than defaulting to one. The CLI
-therefore also references `Equinor.OsduCsharpClient.Msal` and selects
-`MsalInteractiveTokenProvider`, which is the right answer for a tool driven by a person at a
-terminal. Sign-in is cached, OS-encrypted, under `~/.osdu`. A profile set to sign in as an
-application gets `MsalClientCredentialsTokenProvider` instead, and one signing in through Azure
-a small provider over Azure.Identity's `DefaultAzureCredential`, which the client library does
-not offer.
-
-## The manifest is the point
-
-Three things cannot be derived from a spec, and all three live in the manifest:
-
-**Which operations deserve to be commands.** Storage has 20 operations; the CLI exposes 6.
-Every operation must appear in exactly one of `commands`, `handwritten` or `exclude` — and
-`exclude` requires a `reason`. `tools/generate_cli.py --check` fails otherwise, so a new
-upstream endpoint surfaces as a named build failure rather than silently not existing.
-
-Operations the spec marks `deprecated: true` are the one exception: they are excluded
-automatically, and mapping one to a command is an error. OSDU retires endpoints in bulk —
-all 28 Unit v2 operations at once — and that many exclusions all reading "deprecated" would
-bury the editorial ones.
-
-**Naming and hierarchy.** `osducs record version get` does not follow from
-`GET /records/{id}/{version}`. Commands are named for the resource, not the OSDU service
-that hosts it — the Storage manifest builds `osducs record`, not `osducs storage`. See
-[COMMAND-GRAMMAR.md](COMMAND-GRAMMAR.md).
-
-**What a human wants to see.** The Python CLI encodes this as JMESPath
-(`"results || {Id:id,Version:version,Kind:kind}"`). Here it is data:
-
-```yaml
-output:
-  root: results
-  columns: { Id: id, Version: version, Kind: kind }
-```
-
-Data rather than an expression language because a generator can emit and validate it, a
-reviewer can read it without knowing JMESPath, and it needs no expression evaluator at
-runtime — which keeps NativeAOT trivial.
-
-Every key a manifest can use is listed in [docs/MANIFEST.md](docs/MANIFEST.md).
-
-## What the generator derives, and what it refuses to guess
-
-Derived from the spec: the Kiota request-builder accessor chain, the HTTP method, C# option
-types (honouring `format: int32` vs `int64`, because Kiota does), whether the operation
-returns a body, and the request-body model from its `$ref`.
-
-It refuses to guess where Kiota's naming is not mechanical. `POST /records/{id}:delete`
-becomes a *method* (`Records.WithIdDelete(id)`), not an indexer, so the manifest states it:
-
-```yaml
-builder: Records.WithIdDelete({id})
-```
-
-A wrong guess would be a compile error, not a runtime one — but a clear manifest field beats
-a confusing compiler message.
-
-## Scope, for incremental adoption
-
-Wellbore DDMS has 84 operations. Triaging all 84 to add three commands is not useful, so a
-manifest may declare a `scope`:
-
-```yaml
-scope: ["/ddms/v3/wellbores*"]
-```
-
-Coverage is enforced inside the scope and reported outside it. Widening the scope one prefix
-at a time is how the rest of a service gets adopted.
-
-## Help
-
-`--help` (also `-h`, `-?`) works at every level of the tree, without configuration. Options
-are split into command options and **Common Options** — the global `--output`, `--config`,
-`--debug` and `--help` — so a command's own options are not buried among them, and every
-alias is listed rather than one form per option. Both match what the Python CLI does today.
-
-`Runtime/CliHelp.cs` renders this by hand: System.CommandLine 2.0.11 keeps `HelpBuilder`,
-`HelpContext` and `TwoColumnHelpRow` internal, and seals `HelpAction`, so the layout cannot
-be customised through the library. Positional arguments get their own section and the usage
-line brackets the optional ones, which the default formatter does not distinguish.
-
-Tab completion needs no code: System.CommandLine's `[suggest]` directive completes
-subcommands and options at every level, and `osducs status` adds value completion for its
-service argument. Shell registration scripts are not written yet. Two rules for any future
-value completion: never authenticate on TAB, and never block on the network.
-
-`--debug` prints the full exception instead of the one-line summary — for diagnosing an auth
-or transport failure rather than a user error.
-
-## Smoke-testing the examples
-
-Examples are untested documentation and rot silently — `data.Country:"Norway"` sat in
-`record search`'s documentation matching nothing, because that field exists on no OSDU kind. CI
-cannot catch it: it needs a live service and a token.
-
-```bash
-python3 tools/smoke_test.py            # every example, default profile
-python3 tools/smoke_test.py -c dev     # a named profile
-python3 tools/smoke_test.py record     # only `record …` commands
-```
-
-The examples live in the manifests beside the command they document, so the string shown in
-[the command reference](docs/COMMANDS.md) and the string executed here are the same string. An example that cannot run anywhere —
-a record id is scoped to a data partition — carries a `skip:` reason and is reported as
-skipped rather than failed.
-
-An empty result counts as a failure: a command that renders nothing has "worked" and told the
-user nothing, which is exactly how the stale examples went unnoticed. Non-zero exit if
-anything fails, so it can gate a release.
-
-## Running it
-
-```bash
-python3 tools/fetch_specs.py             # download the specs the generator reads
-python3 -m pytest                        # test the generator
-UPDATE_GOLDEN=1 python3 -m pytest        # re-record emission goldens after a deliberate change
-python3 tools/generate_cli.py           # generate
-python3 tools/generate_cli.py --check   # CI gate: validate, write nothing
-cd src/OsduCli && dotnet build
-```
-
-### Where the specs come from
-
-The generator needs the OpenAPI specs; the C# build does not, because the generated commands
-are committed. `tools/fetch_specs.py` downloads them into a gitignored `openapi_specs/` from
-the source declared in [`spec-source.yaml`](spec-source.yaml), pinned to the client version
-`OsduCli.csproj` references.
-
-The pin is the point. The CLI calls that client version's generated methods, so the specs the
-coverage gate validates against have to be the specs that version was generated from —
-reading a newer tree lets the gate approve endpoints the pinned client cannot call. A test
-holds the two together, so bumping the client without the specs fails, and the generator
-refuses to run against a fetched tree stamped with a different ref than the one pinned —
-otherwise a pin bump would silently generate against whatever you fetched last.
-
-Resolution order is `OSDU_SPECS_DIR` → the fetched `openapi_specs/` → an `osdu-csharp-client`
-sibling checkout. The sibling still works and no longer needs to exist; it comes last because
-it is whatever branch happens to be checked out, which is the drift the pin removes.
+Plus `status`, `config`, `account` and `completion`. Not ported from the Python CLI:
+`dataload` and the `wbdutil` commands.
 
 ## Status
 
-Working and released. It covers every core service the Python CLI covers, plus Wellbore
-DDMS's record types and the reads of their bulk data: **131 generated commands across 12
-services**, plus hand-written `status`, `account`, `config` and `completion`. Self-contained binaries for Linux, macOS and Windows are
-attached to each release, and every pull request builds the same three.
+Released and in use against Azure Data Manager for Energy instances. Reading is well
+exercised; most write commands have seen little use yet.
+[docs/TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md) lists the failures met so far, and which of
+them are not the CLI's.
 
-**Not yet cleared for managed-laptop distribution**, which is the original motivation and the
-remaining work:
+The binaries are unsigned: macOS quarantines a browser download, and Windows SmartScreen warns
+until the file is unblocked.
 
-- The binaries are **unsigned and un-notarized** — macOS quarantines them and Windows
-  SmartScreen warns. Whether WDAC blocks them outright on a managed laptop is unanswered.
-- The read surface is well exercised against a live instance; **most write commands have never
-  been run**.
+Found a problem, or something missing? [Open an issue](https://github.com/equinor/osdu-csharp-cli/issues).
+Testing it for the first time? [docs/PEER-TEST.md](docs/PEER-TEST.md) is a 20-minute round.
 
-Neither is a code problem, and neither is in the way of using it.
+## Documentation
 
-| Noun | Fed by |
-| --- | --- |
-| `record` | storage, search |
-| `schema` | schema |
-| `legaltag` | legal |
-| `group`, `member` | entitlements |
-| `file` | file |
-| `dataset` | dataset |
-| `crs` | crs_catalog, crs_conversion |
-| `unit`, `measurement`, `unit-system` | unit v3 |
-| `workflow` | workflow |
-| `well`, `wellbore`, `welllog`, `trajectory`, `markerset`, `intervalset`, `logacquisition`, `ppfg`, `pressuretest` | wellbore_ddms (55 of 84 operations — every record type, plus bulk reads) |
+| | |
+|---|---|
+| [docs/INSTALL.md](docs/INSTALL.md) | installing, unblocking, `PATH` and checking a download |
+| [docs/USAGE.md](docs/USAGE.md) | configuration, signing in, output, finding records — the everyday guide |
+| [docs/COMMANDS.md](docs/COMMANDS.md) | every command and option, generated from the manifests |
+| [docs/TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md) | failures seen against a live instance, and which are not the CLI's fault |
+| [docs/PEER-TEST.md](docs/PEER-TEST.md) | **hand this to a tester**: install, what to try, what not to report |
+| [docs/DESIGN.md](docs/DESIGN.md) | why commands are generated from the specs, and what the manifests decide |
+| [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md) | for maintainers: how the code fits together, upgrading the client, releasing |
+| [docs/MANIFEST.md](docs/MANIFEST.md) | every key a manifest can use, for adding or changing commands |
+| [COMMAND-GRAMMAR.md](COMMAND-GRAMMAR.md) | why commands are named as they are |
 
-Two nouns are assembled from more than one service (`record`, `crs`) and one service supplies
-several nouns (entitlements, unit). That mapping is the whole point of the resource-first
-grammar, and it is why the command tree lives in `CommandTree` rather than in any one
-manifest.
+## How it is built
 
-Unit **v2 is deprecated upstream and deliberately excluded**; only v3 is exposed. The
-generator refuses to bind a command to any operation the spec marks deprecated.
+Most of osducs is generated. Each OSDU service's OpenAPI spec says what it can do, and a
+hand-written manifest says which operations become commands, what they are called and what
+their output shows. A build check fails when a new upstream endpoint is neither mapped nor
+deliberately excluded. Commands call
+[`Equinor.OsduCsharpClient`](https://github.com/equinor/osdu-csharp-client), which is generated
+from the same specs. [docs/DESIGN.md](docs/DESIGN.md) explains the approach, and
+[CONTRIBUTING.md](CONTRIBUTING.md) how to change it.
 
-Every excluded operation carries a written reason, and the generator fails if an exclusion
-goes stale. The largest single category is the 12 GET/POST twins — endpoints exposed twice,
-once with query parameters and once with a body — where the GET is kept and the POST
-excluded; see `COMMAND-GRAMMAR.md` §3.1.
-
-Deliberately not covered: `wbdutil` (LAS/parquet — the only source of native dependencies in
-the Python CLI, and out of scope by decision), `dataload` (orchestration), and any real
-integration test — nothing here has been run against a live OSDU instance.
-
-One deliberate divergence from the Python CLI: its `storage get` accepts either `--kind` or
-`--id` and calls a different endpoint for each, which duplicates `storage list`. Here
-`record get` is id-only. See the comment in `cli-manifest/storage.yaml`.
-
-`osducs status` is the other divergence. The Python CLI gives every service its own `info`
-command, ten of which call one shared helper; here one command probes every configured
-service and reports them together, so an unreachable service shows as a row rather than
-aborting the run. It exits non-zero if any service fails to answer.
-
-## Shell completion
-
-```bash
-osducs completion bash > /usr/local/etc/bash_completion.d/osducs
-```
-
-`zsh`, `fish` and `powershell` are also supported; each script carries its own install line
-as a comment. Completion needs no configuration, no network and no token — Tab never
-authenticates.
+Security issues: see [SECURITY.md](SECURITY.md). Licensed under the [Apache License 2.0](LICENSE).
