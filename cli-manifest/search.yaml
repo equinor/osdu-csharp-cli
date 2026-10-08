@@ -66,6 +66,7 @@ commands:
           flag: --returned-fields
           short: -f
           type: string[]
+          comma-separated: true
           help: >
             Fields to project, e.g. id, data.FacilityName. Repeat the flag or comma-separate.
             These become the table columns, so asking for a field shows it. Server-side, so
@@ -74,9 +75,10 @@ commands:
           flag: --excluded-fields
           short: -x
           type: string[]
+          comma-separated: true
           help: >
-            Fields to omit, e.g. data.rawData — everything else is returned. The inverse of
-            --returned-fields and cannot be combined with it. Columns stay Id and Kind
+            Fields to omit, e.g. data.rawData — everything else is returned. Repeat the flag
+            or comma-separate. The inverse of --returned-fields and cannot be combined with it. Columns stay Id and Kind
             unless --returned-fields names others, since an exclusion says nothing about
             what to show.
         spatialFilter.field:

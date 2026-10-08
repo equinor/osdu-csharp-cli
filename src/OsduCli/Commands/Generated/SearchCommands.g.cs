@@ -75,11 +75,19 @@ public static partial class SearchCommands
         {
             Description = "Fields to project, e.g. id, data.FacilityName. Repeat the flag or comma-separate. These become the table columns, so asking for a field shows it. Server-side, so it also cuts what crosses the wire.",
             AllowMultipleArgumentsPerToken = true,
+            CustomParser = result => result.Tokens
+                .SelectMany(token => token.Value.Split(',',
+                    StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+                .ToArray(),
         };
         var excludedfieldsBodyOption = new Option<string[]>("--excluded-fields", "-x")
         {
-            Description = "Fields to omit, e.g. data.rawData — everything else is returned. The inverse of --returned-fields and cannot be combined with it. Columns stay Id and Kind unless --returned-fields names others, since an exclusion says nothing about what to show.",
+            Description = "Fields to omit, e.g. data.rawData — everything else is returned. Repeat the flag or comma-separate. The inverse of --returned-fields and cannot be combined with it. Columns stay Id and Kind unless --returned-fields names others, since an exclusion says nothing about what to show.",
             AllowMultipleArgumentsPerToken = true,
+            CustomParser = result => result.Tokens
+                .SelectMany(token => token.Value.Split(',',
+                    StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+                .ToArray(),
         };
         var spatialfilterFieldBodyOption = new Option<string>("--spatial-field")
         {
