@@ -113,6 +113,51 @@ class TestParts:
         assert field.is_collection
 
 
+class TestCommaSeparated:
+    """`comma-separated` lets a list option take `-f a,b`, which System.CommandLine does not."""
+
+    @staticmethod
+    def entry(field, spec_field=None):
+        return {"command": "record search", "op": {"method": "post", "path": "/query"},
+                "body": {"fields": {"returnedFields": {"flag": "-f", **field}}},
+                "output": "raw"}
+
+    def test_it_is_carried_onto_the_field(self):
+        # `record search -f data.Source,data.Equinor.WellboreName` was sent as one field with
+        # a comma in its name, though the help said values could be comma-separated.
+        field = build(self.entry({"type": "string[]", "comma-separated": True}),
+                      BODY_OPERATION).body.fields[0]
+        assert field.comma_separated
+
+    def test_it_is_off_unless_asked_for(self):
+        field = build(self.entry({"type": "string[]"}), BODY_OPERATION).body.fields[0]
+        assert not field.comma_separated
+
+    @pytest.mark.parametrize("type_", [None, "string", "double[]"])
+    def test_it_needs_a_list_of_strings(self, type_):
+        field = {"comma-separated": True} | ({"type": type_} if type_ else {})
+        with pytest.raises(ManifestError, match="needs `type: string\\[\\]`"):
+            build(self.entry(field), BODY_OPERATION)
+
+    def test_it_cannot_be_combined_with_parts(self):
+        with pytest.raises(ManifestError, match="`parts` already splits"):
+            build(self.entry({"type": "string[]", "comma-separated": True, "parts": ["a", "b"]}),
+                  BODY_OPERATION)
+
+    def test_it_cannot_be_combined_with_allowed_values(self):
+        # The enum's own parser would replace the splitting one, and the splitting would
+        # silently stop.
+        spec = {"components": {"schemas": {"QueryRequest": {"properties": {
+            "returnedFields": {"type": "array", "items": {"type": "string", "enum": ["a", "b"]}},
+        }}}}}
+        with pytest.raises(ManifestError, match="allowed values"):
+            build(self.entry({"type": "string[]", "comma-separated": True}), BODY_OPERATION, spec)
+
+    def test_it_is_true_or_false(self):
+        with pytest.raises(ManifestError, match="true or false"):
+            build(self.entry({"type": "string[]", "comma-separated": "yes"}), BODY_OPERATION)
+
+
 class TestParamValidation:
     def test_a_param_absent_from_the_spec_is_rejected(self):
         # Catches an upstream rename: the manifest names a parameter the operation no

@@ -895,7 +895,7 @@ Search records with a Lucene query.
 | `--sort-order` |  | Sort direction per --sort-by field. Defaults to ASC upstream when omitted. |
 | `--track-total-count` |  | Report the true match count. Without it the count is capped at 10000, which silently understates any large kind. |
 | `-f`, `--returned-fields` |  | Fields to project, e.g. id, data.FacilityName. Repeat the flag or comma-separate. These become the table columns, so asking for a field shows it. Server-side, so it also cuts what crosses the wire. |
-| `-x`, `--excluded-fields` |  | Fields to omit, e.g. data.rawData — everything else is returned. The inverse of --returned-fields and cannot be combined with it. Columns stay Id and Kind unless --returned-fields names others, since an exclusion says nothing about what to show. |
+| `-x`, `--excluded-fields` |  | Fields to omit, e.g. data.rawData — everything else is returned. Repeat the flag or comma-separate. The inverse of --returned-fields and cannot be combined with it. Columns stay Id and Kind unless --returned-fields names others, since an exclusion says nothing about what to show. |
 | `--spatial-field` |  | Geo-point field to filter on. Required with --bbox or --near; the OSDU convention is data.SpatialLocation.Wgs84Coordinates. |
 | `--bbox` |  | Bounding box as TOPLAT,TOPLON,BOTTOMLAT,BOTTOMLON — note top-left first, so the latitudes descend. Example: 49.1,7.7,48.8,8.0. |
 | `--near` |  | Centre point as LAT,LON, e.g. 48.935251,7.865344. Pair with --within. |

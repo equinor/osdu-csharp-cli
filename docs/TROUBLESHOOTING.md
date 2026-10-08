@@ -133,6 +133,14 @@ Record ids carry their data partition. An id copied from another environment, or
 documentation using `opendes`, will not resolve against `dev`. Take ids from
 `record search`.
 
+## `--excluded-fields` changes nothing
+
+On Equinor's ADME dev instance the Search service ignores `excludedFields`, although its spec
+declares it: with `-x data` the records still come back whole, and the same happens for a
+single field such as `-x data.Source`. osducs sends the list — `--debug` shows
+`"excludedFields":["data"]` in the request — so it is the service that does not apply it. Ask
+for what you want with `--returned-fields` instead.
+
 ## A search returns 0 and you expected results
 
 Three usual causes:

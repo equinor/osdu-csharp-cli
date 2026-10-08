@@ -130,6 +130,17 @@ CASES = {
          "output": {"root": "results", "columns": {"Id": "id"}}},
         operation(body={"$ref": "#/components/schemas/QueryRequest"}),
     ),
+    # A list option that splits each value on commas as well as accepting the flag repeated.
+    "comma_separated_list": (
+        {"command": "record search", "summary": "Search.",
+         "op": {"method": "post", "path": "/query"},
+         "body": {"fields": {
+             "kind": {"flag": "--kind", "required": True, "help": "Kind."},
+             "returnedFields": {"flag": "--returned-fields", "short": "-f", "type": "string[]",
+                                "comma-separated": True, "help": "Fields."}}},
+         "output": {"root": "results", "columns-from": "returnedFields", "columns": {"Id": "id"}}},
+        operation(body={"$ref": "#/components/schemas/QueryRequest"}),
+    ),
     "require_one_of": (
         {"command": "crs get", "summary": "Get a CRS.",
          "op": {"method": "get", "path": "/v3/coordinate-reference-system"},
