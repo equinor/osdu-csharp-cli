@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.11.1](https://github.com/equinor/osdu-csharp-cli/compare/v0.11.0...v0.11.1) (2026-10-08)
+
+
+### Bug Fixes
+
+* **output:** show search fields returned as keys with dots in them ([#54](https://github.com/equinor/osdu-csharp-cli/issues/54)) ([28c9226](https://github.com/equinor/osdu-csharp-cli/commit/28c92263e33af84a73a392f3d812455d19ea4478))
+
+
+### Dependencies
+
+* bump the github-actions group with 3 updates ([#52](https://github.com/equinor/osdu-csharp-cli/issues/52)) ([ed78bc5](https://github.com/equinor/osdu-csharp-cli/commit/ed78bc5c399b25f790ea697fe0144c00c37565e5))
+
 ## [0.11.0](https://github.com/equinor/osdu-csharp-cli/compare/v0.10.0...v0.11.0) (2026-10-04)
 
 
