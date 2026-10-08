@@ -1,6 +1,7 @@
 using System.Globalization;
 using System.Text;
 using System.Text.Json;
+using System.Text.Json.Nodes;
 
 namespace Equinor.OsduCli.Runtime;
 
@@ -123,33 +124,65 @@ public sealed class OutputWriter(OutputFormat format, TextWriter output, TextWri
         return builder.ToString().TrimEnd();
     }
 
+    /// <summary>Path meaning the array element itself rather than a property of it.</summary>
+    internal const string SelfPath = ".";
+
     /// <summary>
     /// Resolves a dotted path such as <c>acl.owners</c> against one element. Anything that
     /// is not a scalar at the end of the path is rendered as compact JSON, so a column
     /// pointing at an object or array still prints something useful.
     /// </summary>
-    /// <summary>Path meaning the array element itself rather than a property of it.</summary>
-    internal const string SelfPath = ".";
-
     private static string Resolve(JsonElement element, string path)
     {
-        var current = element;
-
         // Some endpoints return an array of scalars rather than objects — Storage's
         // kind-scoped query answers with a list of record ids as bare strings. Asking for a
         // property of a string resolved to nothing, so the command printed a header and one
         // blank row per record: data returned, nothing shown.
         if (path == SelfPath)
-            return Render(current);
+            return Render(element);
 
-        foreach (var segment in path.Split('.'))
+        return Find(element, path.Split('.'), 0) ?? string.Empty;
+    }
+
+    /// <summary>
+    /// The value <paramref name="segments"/> from <paramref name="start"/> on lead to,
+    /// rendered, or null when they lead nowhere.
+    /// </summary>
+    /// <remarks>
+    /// <para>A dot in a path is not always a level of nesting. Search returns fields added by
+    /// an index augmenter as single keys with dots in them — <c>"data": {"Equinor.FieldId":
+    /// …}</c> — so walking <c>data</c>, <c>Equinor</c>, <c>FieldId</c> one level at a time
+    /// found nothing, and <c>--returned-fields data.Equinor.FieldId</c> printed an empty
+    /// column over data the JSON output showed was there. Each level therefore tries the
+    /// next segment alone first, then joined with the ones after it.</para>
+    ///
+    /// <para>A path that stops at the shared prefix of several such keys, such as
+    /// <c>data.Equinor</c>, gathers them into one object, printed as a nested object would
+    /// be. The service returns all of them for that field, and showing none of them was the
+    /// same failure.</para>
+    /// </remarks>
+    private static string? Find(JsonElement current, string[] segments, int start)
+    {
+        if (start == segments.Length)
+            return Render(current);
+        if (current.ValueKind != JsonValueKind.Object)
+            return null;
+
+        for (var end = start + 1; end <= segments.Length; end++)
         {
-            if (current.ValueKind != JsonValueKind.Object ||
-                !current.TryGetProperty(segment, out current))
-                return string.Empty;
+            if (current.TryGetProperty(string.Join('.', segments[start..end]), out var next)
+                && Find(next, segments, end) is { } found)
+                return found;
         }
 
-        return Render(current);
+        var prefix = string.Join('.', segments[start..]) + ".";
+        var gathered = new JsonObject();
+        foreach (var property in current.EnumerateObject())
+        {
+            if (property.Name.StartsWith(prefix, StringComparison.Ordinal))
+                gathered[property.Name[prefix.Length..]] = JsonNode.Parse(property.Value.GetRawText());
+        }
+        return gathered.Count > 0 ? gathered.ToJsonString() : null;
     }
 
     private static string Render(JsonElement element) => element.ValueKind switch

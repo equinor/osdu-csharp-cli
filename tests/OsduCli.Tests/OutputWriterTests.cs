@@ -169,6 +169,64 @@ public class OutputWriterTests
         Assert.Equal("data.acl.owners", Assert.Single(spec.Columns).Path);
     }
 
+    /// <summary>What Search returns for fields an index augmenter adds: keys with dots in them.</summary>
+    private const string Augmented = """
+        {"results":[{"id":"a","data":{
+          "Equinor.FieldId":"dev:master-data--Field:05bf:",
+          "Equinor.WellboreName":"NO 34/4-M-1 H",
+          "Source":"Recall"}}]}
+        """;
+
+    [Fact]
+    public void AFieldReturnedAsAKeyWithDotsInItIsShown()
+    {
+        // `-f data.Equinor.FieldId` printed an empty column: walking data, Equinor, FieldId
+        // found no `Equinor` object, though `-o json` showed the value.
+        var output = Render(Augmented, OutputSpec.FromFields("results", ["id", "data.Equinor.FieldId", "data.Source"]));
+
+        Assert.Contains("dev:master-data--Field:05bf:", output);
+        Assert.Contains("Recall", output);
+    }
+
+    [Fact]
+    public void APrefixOfKeysWithDotsGathersThem()
+    {
+        // `-f data.Equinor` returns every Equinor.* field, and showed none of them.
+        var output = Render(Augmented, OutputSpec.FromFields("results", ["data.Equinor"]));
+
+        Assert.Contains("""{"FieldId":"dev:master-data--Field:05bf:","WellboreName":"NO 34/4-M-1 H"}""", output);
+    }
+
+    [Fact]
+    public void NestingIsPreferredToAKeyWithDotsInIt()
+    {
+        var output = Render("""{"data":{"a":{"b":"nested"},"a.b":"flat"}}""",
+            OutputSpec.Table(null, ("B", "data.a.b")));
+
+        Assert.Contains("nested", output);
+        Assert.DoesNotContain("flat", output);
+    }
+
+    [Fact]
+    public void AKeyWithDotsIsFoundBelowNesting()
+    {
+        // A dotted key one level down from a nested object, and at the top level.
+        var output = Render("""{"x":{"y":{"p.q":"deep"}},"r.s":"top"}""",
+            OutputSpec.Table(null, ("Deep", "x.y.p.q"), ("Top", "r.s")));
+
+        Assert.Contains("deep", output);
+        Assert.Contains("top", output);
+    }
+
+    [Fact]
+    public void ANullBehindAKeyWithDotsRendersEmpty()
+    {
+        var output = Render("""{"data":{"Equinor.FieldId":null}}""",
+            OutputSpec.FromFields(null, ["data.Equinor.FieldId"]));
+
+        Assert.DoesNotContain("null", output);
+    }
+
     [Fact]
     public void ANullProjectedValueRendersEmptyRatherThanTheWordNull()
     {
