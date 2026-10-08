@@ -300,7 +300,10 @@ dev:master-data--Well:86cade7a137a4a68b334145844d7eed0  FR SOULTZ (4616)
 ```
 
 `--returned-fields` is server-side, so it also cuts what crosses the wire. Column headers are
-the last dotted segment; values that are not scalars print as compact JSON.
+the last dotted segment; values that are not scalars print as compact JSON. Fields an index
+augmenter adds, such as `data.Equinor.FieldId`, come back as single keys with dots in them and
+are shown the same way; asking for their common prefix, `data.Equinor`, gathers them into one
+column.
 
 ## Finding things
 
