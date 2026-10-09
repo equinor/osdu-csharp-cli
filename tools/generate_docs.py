@@ -65,6 +65,13 @@ def options(command: dict) -> list[tuple[str, str, bool]]:
     if body.get("flag") and not body.get("fields"):
         found.append((flags(body), (body.get("help") or "").strip(),
                       bool(body.get("required", True))))
+    if paging := command.get("paging"):
+        # Generated from `paging:` rather than declared, so it is described the same way here
+        # as in --help, by the generator's own function.
+        from generate_cli import all_option_help
+        fields = body.get("fields") or {}
+        excluded = [fields[name]["flag"] for name in [paging["limit"], *(paging.get("not-with") or [])]]
+        found.append(("`--all`", all_option_help(paging["page-size"], paging["op"]["path"], excluded), False))
     return found
 
 

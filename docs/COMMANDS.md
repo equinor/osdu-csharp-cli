@@ -890,7 +890,7 @@ Search records with a Lucene query.
 |---|---|---|
 | `-k`, `--kind` | yes | Kind to search. Wildcards are allowed per segment, so "osdu:wks:master-data--Well:*" covers every schema version — pinning one silently misses records written against the others. |
 | `-q`, `--query` |  | Lucene query string, e.g. data.FacilityName:GB* for a prefix, or data.FacilityName:"GB 211/23-A8" for an exact phrase. Omit to match everything of this kind. |
-| `-l`, `--limit` |  | Maximum number of results. Defaults to 10 upstream, capped at 1000. |
+| `-l`, `--limit` |  | Maximum number of results. Defaults to 10. Above 1000, Search's per-request maximum, the results are fetched 1000 at a time through its cursor. |
 | `--offset` |  | Number of results to skip. Search refuses --offset plus --limit beyond 10000, so results past the first 10000 cannot be reached this way. |
 | `--sort-by` |  | Fields to sort by, e.g. id or data.FacilityName. Pair positionally with --sort-order. |
 | `--sort-order` |  | Sort direction per --sort-by field. Defaults to ASC upstream when omitted. |
@@ -901,6 +901,7 @@ Search records with a Lucene query.
 | `--bbox` |  | Bounding box as TOPLAT,TOPLON,BOTTOMLAT,BOTTOMLON — note top-left first, so the latitudes descend. Example: 49.1,7.7,48.8,8.0. |
 | `--near` |  | Centre point as LAT,LON, e.g. 48.935251,7.865344. Pair with --within. |
 | `--within` |  | Radius in metres around --near. |
+| `--all` |  | Return every match, fetched 1000 at a time through /query_with_cursor. Cannot be combined with --limit or --offset. |
 
 > `--returned-fields` and `--excluded-fields` cannot be combined.
 
@@ -908,6 +909,7 @@ Search records with a Lucene query.
 
 ```bash
 osducs record search --kind "osdu:wks:master-data--Well:*" --limit 5
+osducs record search --kind "osdu:wks:work-product-component--WellLog:*" --limit 2500 -f id
 osducs record search --kind "osdu:wks:master-data--Well:*" --limit 3 -x data.GeoContexts -x data.NameAliases
 osducs record search --kind "osdu:wks:master-data--Well:*" --spatial-field data.SpatialLocation.Wgs84Coordinates --bbox 49.1,7.7,48.8,8.0 --limit 3 -f id -f data.FacilityName
 osducs record search --kind "osdu:wks:master-data--Well:*" --spatial-field data.SpatialLocation.Wgs84Coordinates --near 48.935251,7.865344 --within 50000 --limit 3 -f id -f data.FacilityName

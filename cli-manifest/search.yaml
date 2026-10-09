@@ -42,7 +42,9 @@ commands:
           flag: --limit
           short: -l
           type: int
-          help: Maximum number of results. Defaults to 10 upstream, capped at 1000.
+          help: >
+            Maximum number of results. Defaults to 10. Above 1000, Search's per-request
+            maximum, the results are fetched 1000 at a time through its cursor.
         offset:
           flag: --offset
           type: int
@@ -114,8 +116,20 @@ commands:
     mutually-exclusive:
       - [returnedFields, excludedFields]
       - [spatialFilter.byBoundingBox, spatialFilter.byDistance.point]
+    # One request answers at most 1000 records, and --offset cannot reach past 10000. The
+    # cursor endpoint takes the same request plus a cursor, so the same options build it:
+    # a --limit above 1000, or --all, follows it to the end. --offset has no counterpart
+    # there. An interrupted or capped run releases the cursor it leaves open.
+    paging:
+      op: { method: post, path: /query_with_cursor }
+      release: { method: delete, path: "/query_with_cursor/{cursor}" }
+      limit: limit
+      page-size: 1000
+      cursor: cursor
+      not-with: [offset]
     examples:
       - --kind "osdu:wks:master-data--Well:*" --limit 5
+      - args: --kind "osdu:wks:work-product-component--WellLog:*" --limit 2500 -f id
       - --kind "osdu:wks:master-data--Well:*" --limit 3 -x data.GeoContexts -x data.NameAliases
       - args: --kind "osdu:wks:master-data--Well:*" --spatial-field data.SpatialLocation.Wgs84Coordinates --bbox 49.1,7.7,48.8,8.0 --limit 3 -f id -f data.FacilityName
         skip: >
@@ -184,15 +198,6 @@ commands:
         Count: count
 
 exclude:
-  - op: { method: post, path: /query_with_cursor }
-    reason: >
-      Cursor paging is the same query with a different result envelope, so it cannot share
-      a command with POST /query while one command means one operation. Exposing it as a
-      second command (`record search-cursor`) would put the paging mechanism in the command
-      name. Blocked on the generator growing a `variants:` mechanism — COMMAND-GRAMMAR.md
-      §3.1, the same gap that affects 24 operations across unit, crs and dataset.
-  - op: { method: delete, path: "/query_with_cursor/{cursor}" }
-    reason: Releases a cursor obtained from query_with_cursor, which is excluded.
   - op: { method: get, path: /readiness_check }
     reason: Infrastructure probe, covered by `osducs status`.
   - op: { method: get, path: /liveness_check }

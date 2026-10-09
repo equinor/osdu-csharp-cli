@@ -158,6 +158,80 @@ class TestCommaSeparated:
             build(self.entry({"type": "string[]", "comma-separated": "yes"}), BODY_OPERATION)
 
 
+class TestPaging:
+    """`paging:` sends the same request to a cursor endpoint when one page is not enough."""
+
+    CURSOR = {"requestBody": {"content": {"application/json": {"schema": {
+        "$ref": "#/components/schemas/CursorQueryRequest"}}}},
+        "responses": BODY_OPERATION["responses"]}
+    RELEASE = {"responses": BODY_OPERATION["responses"]}
+
+    @staticmethod
+    def entry(paging=None, fields=None, output=None):
+        spec_fields = {"kind": {"flag": "-k"}, "limit": {"flag": "--limit", "type": "int"},
+                       "offset": {"flag": "--offset", "type": "int"}}
+        paging_cfg = {"op": {"method": "post", "path": "/query_with_cursor"},
+                      "release": {"method": "delete", "path": "/query_with_cursor/{cursor}"},
+                      "limit": "limit", "page-size": 1000, "cursor": "cursor",
+                      "not-with": ["offset"]}
+        paging_cfg.update(paging or {})
+        return {"command": "record search", "op": {"method": "post", "path": "/query"},
+                "body": {"fields": fields or spec_fields},
+                "paging": {k: v for k, v in paging_cfg.items() if v is not None},
+                "output": output if output is not None else {"root": "results"}}
+
+    def build(self, entry, operations="default"):
+        ops = (self.CURSOR, self.RELEASE) if operations == "default" else operations
+        return build_command(entry, BODY_OPERATION, "here", "Models", SPEC, ops)
+
+    def test_it_is_carried_onto_the_command(self):
+        paging = self.build(self.entry()).paging
+        assert (paging.builder, paging.model, paging.release_builder) == (
+            "Query_with_cursor", "CursorQueryRequest", "Query_with_cursor[{cursor}]")
+        assert (paging.limit.name, paging.page_size, paging.cursor) == ("limit", 1000, "cursor")
+        assert [field.name for field in paging.not_with] == ["offset"]
+
+    def test_release_is_optional(self):
+        assert self.build(self.entry({"release": None}), (self.CURSOR, None)).paging.release_builder is None
+
+    def test_a_body_read_from_a_file_cannot_page(self):
+        # Each page resizes the request, which a file's body cannot be.
+        entry = self.entry()
+        entry["body"] = {"flag": "--file"}
+        with pytest.raises(ManifestError, match="body built from `fields:`"):
+            self.build(entry)
+
+    def test_the_results_need_a_root_to_join(self):
+        with pytest.raises(ManifestError, match="output.root"):
+            self.build(self.entry(output={}))
+
+    @pytest.mark.parametrize("limit", ["kind", "nonsense"])
+    def test_the_limit_must_be_a_number_field(self, limit):
+        with pytest.raises(ManifestError, match="must name an `int` body field"):
+            self.build(self.entry({"limit": limit}))
+
+    @pytest.mark.parametrize("size", [0, -5, "1000", True])
+    def test_the_page_size_is_a_positive_whole_number(self, size):
+        with pytest.raises(ManifestError, match="page-size"):
+            self.build(self.entry({"page-size": size}))
+
+    def test_not_with_names_fields_of_the_command(self):
+        with pytest.raises(ManifestError, match="not-with"):
+            self.build(self.entry({"not-with": ["sort"]}))
+
+    def test_release_is_a_delete_with_the_cursor_in_its_path(self):
+        with pytest.raises(ManifestError, match="release"):
+            self.build(self.entry({"release": {"method": "post", "path": "/query_with_cursor/{cursor}"}}))
+        with pytest.raises(ManifestError, match="release"):
+            self.build(self.entry({"release": {"method": "delete", "path": "/query_with_cursor"}}))
+
+    def test_unknown_paging_keys_are_refused(self):
+        entry = self.entry()
+        entry["paging"]["pages"] = 3
+        with pytest.raises(ManifestError, match="unknown paging key"):
+            self.build(entry)
+
+
 class TestParamValidation:
     def test_a_param_absent_from_the_spec_is_rejected(self):
         # Catches an upstream rename: the manifest names a parameter the operation no

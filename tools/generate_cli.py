@@ -571,6 +571,25 @@ class Body:
 
 
 @dataclass
+class Paging:
+    """A second endpoint a command pages through when one page of results is not enough.
+
+    Search answers at most 1000 records a request and cannot offset past 10000; its cursor
+    endpoint takes the same request plus a cursor and answers a page at a time. A command with
+    paging builds its request once and sends it to either: the ordinary endpoint for one page,
+    the cursor endpoint, followed to the end, for more.
+    """
+    path: str                 # the cursor endpoint, for messages
+    builder: str              # e.g. Query_with_cursor
+    model: str                # its request body model, e.g. CursorQueryRequest
+    release_builder: str | None  # e.g. Query_with_cursor[{cursor}]; releases a cursor left open
+    limit: "BodyField"        # the field whose value decides, and sets each page's size
+    page_size: int
+    cursor: str               # the request and response property carrying the cursor
+    not_with: list["BodyField"]  # fields the cursor endpoint does not take
+
+
+@dataclass
 class Command:
     path: list[str]       # e.g. ["storage", "version", "get"]
     summary: str
@@ -590,6 +609,7 @@ class Command:
     roles: str | None
     forbidden_hint: str | None
     message: str | None
+    paging: Paging | None = None
 
     @property
     def name(self) -> str:
@@ -649,6 +669,8 @@ class Coverage:
     total: int
     untriaged: list[tuple[str, str]]
     missing: list[tuple[str, str]]
+    # Endpoints a generated command pages through: claimed, but not commands of their own.
+    paged: int = 0
 
 
 # --------------------------------------------------------------------------------------
@@ -665,7 +687,7 @@ MANIFEST_KEYS = {
     "top": {"service", "spec", "client", "models", "description", "groups", "scope",
             "section", "commands", "handwritten", "exclude"},
     "command": {"command", "summary", "op", "builder", "params", "body", "output",
-                "examples", "require-one-of", "mutually-exclusive", "forbidden-hint"},
+                "examples", "require-one-of", "mutually-exclusive", "forbidden-hint", "paging"},
     "op": {"method", "path"},
     # No `type`: a parameter's C# type is derived from the spec. The key used to be accepted
     # here and never read, so 25 manifest entries stated a type that had no effect.
@@ -675,6 +697,7 @@ MANIFEST_KEYS = {
     "body field": {"flag", "short", "required", "help", "type", "parts", "comma-separated"},
     "output": {"root", "columns", "columns-from", "total-from", "cursor-from", "message"},
     "example": {"args", "skip"},
+    "paging": {"op", "release", "limit", "page-size", "cursor", "not-with"},
     "handwritten": {"command", "op", "reason"},
     "exclude": {"op", "reason"},
 }
@@ -718,6 +741,7 @@ def build_service(manifest_path: Path) -> Service:
     spec_label = spec_path.relative_to(SPECS_DIR).as_posix()
     commands: list[Command] = []
     claimed: set[tuple[str, str]] = set()
+    paged = 0
 
     def refuse_if_deprecated(key: tuple[str, str], where: str) -> None:
         if key in deprecated:
@@ -737,8 +761,37 @@ def build_service(manifest_path: Path) -> Service:
             )
         refuse_if_deprecated(key, where)
         claimed.add(key)
+
+        # The endpoints a command pages through are part of it, so they are accounted for
+        # here rather than excluded, and must exist like the command's own.
+        paging_operations = None
+        paging_cfg = entry.get("paging")
+        if paging_cfg is not None:
+            if not isinstance(paging_cfg, dict):
+                raise ManifestError(f"{where}: `paging:` must be a mapping")
+            check_keys("paging", paging_cfg, f"{where}: paging")
+            found = []
+            for part in ("op", "release"):
+                if part not in paging_cfg:
+                    found.append(None)
+                    continue
+                check_keys("op", paging_cfg[part], f"{where}: paging {part}")
+                paging_key = op_key({"op": paging_cfg[part]}, f"{where}: paging {part}")
+                if paging_key not in operations:
+                    raise ManifestError(
+                        f"{where}: paging {part} {paging_key[0].upper()} {paging_key[1]} is not in "
+                        f"{spec_label}")
+                refuse_if_deprecated(paging_key, f"{where}: paging {part}")
+                claimed.add(paging_key)
+                paged += 1
+                found.append(operations[paging_key])
+            if found[0] is None:
+                raise ManifestError(f"{where}: `paging:` needs `op:`, the endpoint to page through")
+            paging_operations = (found[0], found[1])
+
         commands.append(build_command(entry, operations[key], where,
-                                      manifest.get("models", manifest["client"]), spec))
+                                      manifest.get("models", manifest["client"]), spec,
+                                      paging_operations))
 
     for entry in manifest.get("handwritten") or []:
         where = f"{manifest_path.name}: handwritten {entry.get('command', '?')}"
@@ -804,7 +857,7 @@ def build_service(manifest_path: Path) -> Service:
                                         len(commands),
                                         len(manifest.get("handwritten") or []),
                                         len(manifest.get("exclude") or []),
-                                        deprecated)
+                                        deprecated, paged)
     return service
 
 
@@ -1023,7 +1076,7 @@ def fixed_body_values(body_cfg: dict, fields_cfg: dict, field_schemas: dict, spe
 
 
 def build_command(entry: dict, operation: dict, where: str, models_root: str,
-                  spec: dict) -> Command:
+                  spec: dict, paging_operations: tuple[dict, dict | None] | None = None) -> Command:
     check_keys("command", entry, where)
     check_keys("op", entry.get("op"), where)
     check_keys("output", entry.get("output"), where)
@@ -1249,6 +1302,10 @@ def build_command(entry: dict, operation: dict, where: str, models_root: str,
                 f"{where}: columns-from names {columns_from!r}, which is not one of this "
                 f"command's body fields: {sorted(body_field_names)}")
 
+    paging = None
+    if entry.get("paging") is not None:
+        paging = build_paging(entry["paging"], paging_operations, body, output, where)
+
     return Command(
         path=path,
         summary=entry.get("summary", ""),
@@ -1268,11 +1325,69 @@ def build_command(entry: dict, operation: dict, where: str, models_root: str,
         roles=documented_roles(operation),
         forbidden_hint=entry.get("forbidden-hint"),
         message=output.get("message"),
+        paging=paging,
+    )
+
+
+def build_paging(cfg: dict, operations: tuple[dict, dict | None] | None, body: "Body | None",
+                 output: dict, where: str) -> Paging:
+    """Checks a command's `paging:` and resolves what the emitted code needs.
+
+    Each rule refuses a manifest that would page wrongly rather than not at all: a request
+    built from a file cannot be resized page by page, a limit that is not a number cannot be
+    compared with the page size, and results with nowhere to join have no answer to give.
+    """
+    check_keys("paging", cfg, f"{where}: paging")
+    if not body or not body.from_fields:
+        raise ManifestError(f"{where}: `paging:` needs a body built from `fields:`, since each page "
+                            "resizes the request")
+    if not output.get("root"):
+        raise ManifestError(f"{where}: `paging:` needs `output.root`, the results the pages are joined from")
+    if operations is None:
+        raise ManifestError(f"{where}: `paging:` needs `op:`, the endpoint to page through")
+
+    fields = {field.name: field for field in body.fields}
+    limit_name = cfg.get("limit")
+    if limit_name not in fields or fields[limit_name].cs_type != "int":
+        raise ManifestError(f"{where}: paging `limit:` must name an `int` body field, not {limit_name!r}")
+    page_size = cfg.get("page-size")
+    if not isinstance(page_size, int) or isinstance(page_size, bool) or page_size < 1:
+        raise ManifestError(f"{where}: paging `page-size:` must be a positive whole number, not {page_size!r}")
+    cursor = cfg.get("cursor")
+    if not isinstance(cursor, str) or not cursor:
+        raise ManifestError(f"{where}: paging `cursor:` must name the cursor property")
+    not_with = cfg.get("not-with") or []
+    if not isinstance(not_with, list) or any(name not in fields for name in not_with):
+        raise ManifestError(f"{where}: paging `not-with:` must list body fields of this command, "
+                            f"not {not_with!r}")
+
+    op_cfg = cfg["op"]
+    model, collection = body_model(operations[0], where)
+    if collection:
+        raise ManifestError(f"{where}: paging `op:` must take one request object, not an array")
+
+    release_builder = None
+    if cfg.get("release") is not None:
+        release_path = cfg["release"]["path"]
+        if cfg["release"]["method"].lower() != "delete" or len(re.findall(r"\{\w+\}", release_path)) != 1:
+            raise ManifestError(f"{where}: paging `release:` must be a DELETE with the cursor as its "
+                                "one path parameter")
+        release_builder = derive_builder(release_path)
+
+    return Paging(
+        path=op_cfg["path"],
+        builder=derive_builder(op_cfg["path"]),
+        model=model,
+        release_builder=release_builder,
+        limit=fields[limit_name],
+        page_size=page_size,
+        cursor=cursor,
+        not_with=[fields[name] for name in not_with],
     )
 
 
 def compute_coverage(operations, claimed, scope, generated, handwritten, excluded,
-                     deprecated=frozenset()) -> Coverage:
+                     deprecated=frozenset(), paged=0) -> Coverage:
     def in_scope(path: str) -> bool:
         return not scope or any(fnmatch.fnmatch(path, pattern) for pattern in scope)
 
@@ -1288,6 +1403,7 @@ def compute_coverage(operations, claimed, scope, generated, handwritten, exclude
         total=len(live),
         untriaged=sorted(key for key in live if key not in scoped and key not in claimed),
         missing=sorted(scoped - claimed),
+        paged=paged,
     )
 
 
@@ -1454,6 +1570,12 @@ def emit_command(service: Service, command: Command) -> list[str]:
             lines += option_declaration(command.body.flag, command.body.short, "string",
                                         command.body.help, command.body.required,
                                         command.body.var)
+    if command.paging:
+        paging = command.paging
+        excluded = [paging.limit.flag] + [field.flag for field in paging.not_with]
+        lines += option_declaration("--all", None, "bool",
+                                    all_option_help(paging.page_size, paging.path, excluded),
+                                    False, "allOption")
 
     lines.append("")
     lines.append(f"        var command = new Command({csharp_string(command.name)}, "
@@ -1466,6 +1588,8 @@ def emit_command(service: Service, command: Command) -> list[str]:
                 lines.append(f"        command.Options.Add({bodyfield.option_var});")
         else:
             lines.append(f"        command.Options.Add({command.body.var});")
+    if command.paging:
+        lines.append("        command.Options.Add(allOption);")
 
     if command.require_one_of:
         by_name = {param.name: param for param in command.params}
@@ -1554,6 +1678,8 @@ def emit_command(service: Service, command: Command) -> list[str]:
                     lines.append(f"            if ({guard})")
                     lines.append(f"                {slot} = {assign};")
             lines.append("            var bodyJson = bodyNode.ToJsonString();")
+            if command.paging:
+                lines += paged_branch(service, command)
         else:
             read = (f"await CliContext.ReadBodyFileAsync("
                     f"parseResult.GetValue({command.body.var})!, cancellationToken)")
@@ -1631,6 +1757,67 @@ def emit_command(service: Service, command: Command) -> list[str]:
     lines.append("")
     lines.append("        return command;")
     lines.append("    }")
+    return lines
+
+
+def all_option_help(page_size: int, path: str, excluded_flags: list[str]) -> str:
+    """The help for the `--all` a command with `paging` gets, shared with the command reference."""
+    return (f"Return every match, fetched {page_size} at a time through {path}. "
+            f"Cannot be combined with {' or '.join(excluded_flags)}.")
+
+
+def paged_branch(service: Service, command: Command) -> list[str]:
+    """The early return a command with paging takes when one page is not enough.
+
+    Emitted after the request body is built, so both endpoints get the same request from the
+    same options; the ordinary path below it is unchanged.
+    """
+    paging = command.paging
+    limit = paging.limit
+    target = f"context.Client.{service.client}"
+    exception = "Equinor.OsduCsharpClient.Facade.OsduException"
+    lines = [
+        "",
+        "            var allValue = parseResult.GetValue(allOption);",
+        f"            if (allValue || {limit.var} > {paging.page_size})",
+        "            {",
+        f"                if (allValue && {limit.var} is not null)",
+        f"                    throw new {exception}({csharp_string(f'--all and {limit.flag} cannot be used together: --all is every match, {limit.flag} at most that many.')});",
+    ]
+    for field in paging.not_with:
+        guard = f"{field.var} is {{ Length: > 0 }}" if field.is_collection else f"{field.var} is not null"
+        lines.append(f"                if ({guard})")
+        lines.append(f"                    throw new {exception}({csharp_string(f'{field.flag} cannot be combined with --all or a {limit.flag} above {paging.page_size}: those page through {paging.path}, which starts at the first match.')});")
+
+    if paging.release_builder:
+        accessor = re.sub(r"\{\w+\}", "cursor", paging.release_builder)
+        release = f"(cursor, releaseCancellation) => {target}.{accessor}.DeleteAsync(cancellationToken: releaseCancellation)"
+    else:
+        release = "(_, _) => Task.CompletedTask"
+    total = csharp_string(command.total_from) if command.total_from else "null"
+
+    lines += [
+        "                var pagedJson = await CursorPaging.CollectAsync(",
+        f"                    bodyNode, allValue ? null : {limit.var}, {paging.page_size},",
+        f"                    {csharp_string(limit.name)}, {csharp_string(paging.cursor)}, {csharp_string(command.root)}, {total},",
+        "                    async (page, pageCancellation) => await OsduJson.ToJsonAsync(",
+        f"                        await {target}.{paging.builder}.PostAsync(",
+        f"                            await KiotaJsonSerializer.DeserializeAsync<{paging.model}>(",
+        f"                                page.ToJsonString(), {paging.model}.CreateFromDiscriminatorValue, pageCancellation),",
+        "                            cancellationToken: pageCancellation)),",
+        f"                    {release},",
+        "                    Console.IsErrorRedirected ? null : Console.Error,",
+        "                    cancellationToken);",
+    ]
+    if command.total_from:
+        lines.append(f"                context.Output.WriteTotal(pagedJson, {csharp_string(command.total_from)});")
+    lines += [
+        "                return context.Output.Write(",
+        "                    pagedJson,",
+        f"                    {output_expression(command)});",
+        "            }",
+        "",
+    ]
     return lines
 
 
@@ -1792,8 +1979,9 @@ def report(service: Service) -> list[str]:
     c = service.coverage
     scope_note = f", {c.total - c.in_scope} out of scope" if c.in_scope != c.total else ""
     deprecated_note = f", {c.deprecated} deprecated upstream" if c.deprecated else ""
+    paged_note = f" (+{c.paged} paged through)" if c.paged else ""
     return [
-        f"  {service.name}: {c.generated} generated, {c.handwritten} handwritten, "
+        f"  {service.name}: {c.generated} generated{paged_note}, {c.handwritten} handwritten, "
         f"{c.excluded} excluded of {c.in_scope} in scope{scope_note}{deprecated_note}"
     ]
 

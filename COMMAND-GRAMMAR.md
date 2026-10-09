@@ -203,6 +203,11 @@ to `osducs record search` would be tidier grammatically and wrong semantically. 
 one command with `--cursor` covers both — but that is again two endpoints behind one
 command (§3.2).
 
+> **Built:** `osducs record search` covers both without a `--cursor` option or a
+> `close-cursor` command. A `--limit` above 1000, or `--all`, sends the same request to
+> `/query_with_cursor` and follows the cursor to the end, releasing it when the command stops
+> early. The manifest's `paging:` key expresses it; see [MANIFEST.md](docs/MANIFEST.md#paging).
+
 ### file — File (6 ops)
 
 ```
@@ -336,7 +341,9 @@ osducs search --cursor                       POST /query        vs POST /query_w
 osducs workflow create --system              POST /v1/workflow  vs POST /v1/workflow/system
 ```
 
-The third is resolved by not exposing system workflows. The first two are not. Note that the CLI
+The third is resolved by not exposing system workflows. The second is resolved by `paging:`, a
+narrower mechanism than `variants:`: the CLI follows the cursor itself, so the user never
+chooses between the endpoints. The first is not resolved. Note that the CLI
 already rejected exactly this pattern once, deliberately: `storage get` is id-only because
 the Python CLI's `--kind`/`--id` dispatch "cannot be expressed as one operation".
 
