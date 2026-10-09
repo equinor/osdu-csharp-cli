@@ -342,11 +342,8 @@ public class ClientCredentialsTests : ConfigTestDirectories
     {
         Add("dev", Nothing with
         {
-            Server = "https://osdu.example.com",
-            DataPartitionId = "dev",
-            Authority = "https://login.microsoftonline.com/t",
-            ClientId = "c",
-            Scopes = "c/.default",
+            Server = "https://osdu.example.com", DataPartitionId = "dev",
+            Authority = "https://login.microsoftonline.com/t", ClientId = "c", Scopes = "c/.default",
         });
 
         Assert.Equal("msal_interactive", Written("dev")["AuthenticationMode"]!.GetValue<string>());
