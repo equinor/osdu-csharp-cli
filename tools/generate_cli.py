@@ -1351,8 +1351,11 @@ def build_paging(cfg: dict, operations: tuple[dict, dict | None] | None, body: "
     if limit_name not in fields or fields[limit_name].cs_type != "int":
         raise ManifestError(f"{where}: paging `limit:` must name an `int` body field, not {limit_name!r}")
     page_size = cfg.get("page-size")
-    if not isinstance(page_size, int) or isinstance(page_size, bool) or page_size < 1:
-        raise ManifestError(f"{where}: paging `page-size:` must be a positive whole number, not {page_size!r}")
+    # Emitted as a C# `int`, so the 32-bit range is the limit: a larger value generated code
+    # that did not compile.
+    if not isinstance(page_size, int) or isinstance(page_size, bool) or not 1 <= page_size <= 2**31 - 1:
+        raise ManifestError(f"{where}: paging `page-size:` must be a positive whole number that fits "
+                            f"a C# int, not {page_size!r}")
     cursor = cfg.get("cursor")
     if not isinstance(cursor, str) or not cursor:
         raise ManifestError(f"{where}: paging `cursor:` must name the cursor property")

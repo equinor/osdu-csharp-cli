@@ -188,6 +188,18 @@ public class CursorPagingTests
             progress.ToString());
     }
 
+    [Theory]
+    [InlineData(1000, null, "1,000")]
+    [InlineData(1000, 61042L, "1,000 of 61,042")]
+    // Search's cap, unless trackTotalCount was asked for: marked as one, as the summary is.
+    [InlineData(3000, 10000L, "3,000 of 10,000+")]
+    // Past the cap the figure says nothing, so it is left out rather than shown as 12,000 of 10,000.
+    [InlineData(12000, 10000L, "12,000")]
+    public void ProgressTrustsATotalOnlyAsFarAsItGoes(int fetched, long? total, string expected)
+    {
+        Assert.Equal(expected, CursorPaging.Progress(fetched, total));
+    }
+
     [Fact]
     public void RecordSearchHasAll()
     {

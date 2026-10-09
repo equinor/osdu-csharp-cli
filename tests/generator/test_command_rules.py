@@ -210,7 +210,8 @@ class TestPaging:
         with pytest.raises(ManifestError, match="must name an `int` body field"):
             self.build(self.entry({"limit": limit}))
 
-    @pytest.mark.parametrize("size", [0, -5, "1000", True])
+    # 2**31 is one past a C# int, and generated code that did not compile.
+    @pytest.mark.parametrize("size", [0, -5, "1000", True, 2**31])
     def test_the_page_size_is_a_positive_whole_number(self, size):
         with pytest.raises(ManifestError, match="page-size"):
             self.build(self.entry({"page-size": size}))

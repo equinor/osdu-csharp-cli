@@ -80,9 +80,7 @@ public static class CursorPaging
 
                 if (progress is not null)
                 {
-                    var fetched = results.Count.ToString("N0", CultureInfo.InvariantCulture);
-                    var of = total is { } all ? " of " + all.ToString("N0", CultureInfo.InvariantCulture) : "";
-                    progress.Write($"\rFetched {fetched}{of}");
+                    progress.Write($"\rFetched {Progress(results.Count, total)}");
                     reported = true;
                 }
 
@@ -107,6 +105,22 @@ public static class CursorPaging
         if (totalProperty is not null && total is not null)
             combined[totalProperty] = total;
         return combined.ToJsonString();
+    }
+
+    /// <summary>How far a run has got, against the total when the total can be trusted.</summary>
+    /// <remarks>
+    /// Exactly 10000 is Search's cap rather than a count unless trackTotalCount was asked
+    /// for, and is marked as one, as the summary line marks it. A total below what has been
+    /// fetched is no total at all, so it is left out rather than printed as
+    /// <c>12,000 of 10,000</c>.
+    /// </remarks>
+    internal static string Progress(int fetched, long? total)
+    {
+        var count = fetched.ToString("N0", CultureInfo.InvariantCulture);
+        if (total is not { } all || all < fetched)
+            return count;
+        var of = all.ToString("N0", CultureInfo.InvariantCulture);
+        return all == OutputWriter.SearchCountCap ? $"{count} of {of}+" : $"{count} of {of}";
     }
 
     private static async Task ReleaseQuietlyAsync(Func<string, CancellationToken, Task> release, string cursor)
