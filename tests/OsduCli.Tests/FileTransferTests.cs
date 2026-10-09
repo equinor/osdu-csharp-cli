@@ -272,17 +272,26 @@ public sealed class FileTransferTests : IDisposable
         Assert.Equal(Bytes, await File.ReadAllBytesAsync(destination, TestContext.Current.CancellationToken));
     }
 
-    /// <summary>Holds every response until <paramref name="expected"/> requests are in flight at once.</summary>
-    private sealed class Together(int expected) : HttpMessageHandler
+    /// <summary>
+    /// Answers the first of two requests once both are in flight, and the second only when
+    /// <see cref="Release"/> is called.
+    /// </summary>
+    private sealed class Together : HttpMessageHandler
     {
-        private readonly TaskCompletionSource _all = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        private readonly TaskCompletionSource _both = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        private readonly TaskCompletionSource _second = new(TaskCreationOptions.RunContinuationsAsynchronously);
         private int _arrived;
+
+        public void Release() => _second.SetResult();
 
         protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
         {
-            if (Interlocked.Increment(ref _arrived) == expected)
-                _all.SetResult();
-            await _all.Task.WaitAsync(cancellationToken);
+            var arrival = Interlocked.Increment(ref _arrived);
+            if (arrival == 2)
+                _both.SetResult();
+            await _both.Task.WaitAsync(cancellationToken);
+            if (arrival == 2)
+                await _second.Task.WaitAsync(cancellationToken);
             return new HttpResponseMessage(HttpStatusCode.OK) { Content = new ByteArrayContent(Bytes) };
         }
     }
@@ -291,13 +300,25 @@ public sealed class FileTransferTests : IDisposable
     public async Task TwoDownloadsToOnePathDoNotShareAPartialFile()
     {
         // Each opens its partial file before asking for the bytes, so both are open together:
-        // under one fixed name, the second could not open it.
+        // under one fixed name, the second could not open it. The second is answered only once
+        // the first has moved into place, since Windows refuses two replacements of one file
+        // at the same moment, which is not what this is about.
         var destination = Path.Combine(_directory.FullName, "log.las");
-        var http = new HttpClient(new Together(2));
+        var together = new Together();
+        var http = new HttpClient(together);
         var source = FileDownloadCommand.Describe(FileRecord());
+        Task<FileDownloadCommand.Saved> Download() => FileDownloadCommand.SaveAsync(
+            http, SignedUrl, destination, force: true, source, null, TestContext.Current.CancellationToken);
 
-        await Task.WhenAll(Enumerable.Range(0, 2).Select(_ => FileDownloadCommand.SaveAsync(
-            http, SignedUrl, destination, force: true, source, null, TestContext.Current.CancellationToken)));
+        var first = Download();
+        var second = Download();
+        // Under one name the second fails to open its file at once, and the first would wait
+        // for it forever.
+        if (second.IsCompleted)
+            await second;
+        await first;
+        together.Release();
+        await second;
 
         Assert.Equal(["log.las"], _directory.GetFiles().Select(file => file.Name));
     }
