@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.13.0](https://github.com/equinor/osdu-csharp-cli/compare/v0.12.1...v0.13.0) (2026-10-09)
+
+
+### Features
+
+* **search:** page past 1000 results with a larger --limit or --all ([#62](https://github.com/equinor/osdu-csharp-cli/issues/62)) ([55b12d5](https://github.com/equinor/osdu-csharp-cli/commit/55b12d56755266ebac74fd7b4c03481f110eadbd))
+
 ## [0.12.1](https://github.com/equinor/osdu-csharp-cli/compare/v0.12.0...v0.12.1) (2026-10-09)
 
 
