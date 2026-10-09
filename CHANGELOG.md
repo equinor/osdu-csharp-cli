@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.14.0](https://github.com/equinor/osdu-csharp-cli/compare/v0.13.0...v0.14.0) (2026-10-09)
+
+
+### Features
+
+* **file:** upload and download files through the File service's signed URLs ([#64](https://github.com/equinor/osdu-csharp-cli/issues/64)) ([4aded08](https://github.com/equinor/osdu-csharp-cli/commit/4aded08387818f8f077a625857ca8e461eb84195))
+
 ## [0.13.0](https://github.com/equinor/osdu-csharp-cli/compare/v0.12.1...v0.13.0) (2026-10-09)
 
 
