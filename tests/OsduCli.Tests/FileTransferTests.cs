@@ -555,6 +555,31 @@ public sealed class FileTransferTests : IDisposable
         Assert.Contains(expected, error.ToString());
     }
 
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task AnAnswerWithoutAnIdIsNotASuccess(bool empty)
+    {
+        var error = new StringWriter();
+
+        var exception = await Assert.ThrowsAsync<OsduException>(() => FileUploadCommand.CreateAsync(
+            () => Task.FromResult(empty ? new FileMetadataResponse { Id = " " } : null), "/osdu-user/2/def",
+            new OutputWriter(OutputFormat.Table, new StringWriter(), error)));
+
+        Assert.Equal("The File service accepted the metadata record but did not return its id.", exception.Message);
+        Assert.Contains("could not be confirmed", error.ToString());
+    }
+
+    [Fact]
+    public async Task TheNewRecordsIdIsReturned()
+    {
+        var id = await FileUploadCommand.CreateAsync(
+            () => Task.FromResult<FileMetadataResponse?>(new FileMetadataResponse { Id = "dev:dataset--File.Generic:2" }),
+            "/osdu-user/2/def", new OutputWriter(OutputFormat.Table, new StringWriter(), new StringWriter()));
+
+        Assert.Equal("dev:dataset--File.Generic:2", id);
+    }
+
     [Fact]
     public void TheUploadLocationIsReadFromTheResponse()
     {

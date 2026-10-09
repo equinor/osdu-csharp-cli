@@ -109,7 +109,7 @@ public static partial class FileUploadCommand
 
             return context.Output.Write(new JsonArray(new JsonObject
             {
-                ["id"] = created?.Id,
+                ["id"] = created,
                 ["name"] = (string?)record["data"]?["Name"],
                 ["size"] = local.Length,
                 ["md5"] = Convert.ToHexStringLower(md5),
@@ -324,21 +324,24 @@ public static partial class FileUploadCommand
     // ---- the service ------------------------------------------------------------------------
 
     /// <summary>
-    /// Creates the record through <paramref name="post"/>, saying first, when that fails, what
-    /// became of the bytes already uploaded.
+    /// Creates the record through <paramref name="post"/> and returns its id, saying first,
+    /// when that fails, what became of the bytes already uploaded.
     /// </summary>
     /// <remarks>
     /// Said before the error, so it is not mistaken for a failed upload to retry as it is. A
     /// 4xx refusal means no record was created. A 5xx can come after the record was written,
     /// and a lost connection or an interruption leaves it unknown too; saying "not created"
-    /// there invited a retry that could make a second one.
+    /// there invited a retry that could make a second one. So does an answer without an id:
+    /// it was reported as success with a blank id, which the command promises to print.
     /// </remarks>
-    internal static async Task<FileMetadataResponse?> CreateAsync(
+    internal static async Task<string> CreateAsync(
         Func<Task<FileMetadataResponse?>> post, string fileSource, OutputWriter output)
     {
         try
         {
-            return await post();
+            return (await post())?.Id is { } id && !string.IsNullOrWhiteSpace(id)
+                ? id
+                : throw new OsduException("The File service accepted the metadata record but did not return its id.");
         }
         catch (ApiException exception) when (exception.ResponseStatusCode is >= 400 and < 500)
         {
