@@ -1,5 +1,7 @@
 using System.CommandLine;
+using System.Globalization;
 using System.Security.Cryptography;
+using System.Text;
 using System.Text.Json.Nodes;
 using Equinor.OsduCli.Runtime;
 using Equinor.OsduCsharpClient.Facade;
@@ -129,6 +131,9 @@ public static class FileDownloadCommand
     /// <para>Windows also refuses a name ending in a dot or a space, and a device name such as
     /// <c>CON</c> or <c>nul.txt</c> whatever follows it, so the first are trimmed and the
     /// second get a leading <c>_</c>. A record naming one failed to download there.</para>
+    ///
+    /// <para>And a name is cut to <see cref="MaxNameBytes"/>, keeping its extension, as no file
+    /// system takes a longer one.</para>
     /// </remarks>
     internal static string SafeFileName(string? name, string id)
     {
@@ -142,7 +147,7 @@ public static class FileDownloadCommand
             if (cleaned.TrimStart('.').Length == 0)
                 return "";
             var stem = cleaned.Split('.')[0].TrimEnd(' ');
-            return ReservedNames.Contains(stem) ? "_" + cleaned : cleaned;
+            return Fit(ReservedNames.Contains(stem) ? "_" + cleaned : cleaned);
         }
 
         var safe = Clean(name);
@@ -150,6 +155,33 @@ public static class FileDownloadCommand
             return safe;
         var fromId = Clean(id.Split(':', StringSplitOptions.RemoveEmptyEntries).LastOrDefault());
         return fromId.Length > 0 ? fromId : "download";
+    }
+
+    /// <summary>The longest name Linux and macOS take, in UTF-8 bytes; within NTFS's 255 UTF-16 units too.</summary>
+    internal const int MaxNameBytes = 255;
+
+    /// <summary>
+    /// <paramref name="name"/> cut to <see cref="MaxNameBytes"/>, from the end of its stem so a
+    /// short extension survives, and never inside a character.
+    /// </summary>
+    private static string Fit(string name)
+    {
+        if (Encoding.UTF8.GetByteCount(name) <= MaxNameBytes)
+            return name;
+        var extension = Path.GetExtension(name);
+        if (Encoding.UTF8.GetByteCount(extension) > 16)
+            extension = "";
+        var room = MaxNameBytes - Encoding.UTF8.GetByteCount(extension);
+        var stem = new StringBuilder();
+        var elements = StringInfo.GetTextElementEnumerator(name[..^extension.Length]);
+        while (elements.MoveNext())
+        {
+            var element = elements.GetTextElement();
+            if (Encoding.UTF8.GetByteCount(stem + element) > room)
+                break;
+            stem.Append(element);
+        }
+        return stem.ToString().TrimEnd('.', ' ') + extension;
     }
 
     /// <summary>The device names Windows reserves, in any case and with any extension.</summary>
@@ -259,9 +291,17 @@ public static class FileDownloadCommand
             return "MD5 matches storage";
         }
 
-        return source.Checksum is null
-            ? "not checked: none recorded"
-            : $"not checked: {source.Algorithm ?? "unknown algorithm"} not supported";
+        if (source.Checksum is null)
+            return "not checked: none recorded";
+        // Told apart from an algorithm this cannot compute: an MD5 that is not 32 hex digits
+        // is a broken record, not an unsupported one.
+        return source.Algorithm?.Replace("-", "").ToUpperInvariant() switch
+        {
+            "MD5" => "not checked: the record's MD5 checksum is malformed",
+            "SHA256" => "not checked: the record's SHA-256 checksum is malformed",
+            null => "not checked: the record's checksum is neither MD5 nor SHA-256",
+            _ => $"not checked: {source.Algorithm} not supported",
+        };
     }
 
     private static bool IsHex(string text) => text.Length % 2 == 0 && text.All(char.IsAsciiHexDigit);

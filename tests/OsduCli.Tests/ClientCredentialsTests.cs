@@ -287,6 +287,31 @@ public class ClientCredentialsTests : ConfigTestDirectories
             error.ToString());
     }
 
+    [Fact]
+    public async Task AFileTheUserCannotReadOrWriteIsOneLine()
+    {
+        // A file to upload without read access, or a directory to download into without write
+        // access: Run handled this, RunAsync let it escape as a stack trace.
+        WriteApplicationProfile("test_admin");
+        var error = new StringWriter();
+        var original = Console.Error;
+        Console.SetError(error);
+        try
+        {
+            var code = await CliRunner.RunAsync(Parse("-c", "test_admin"),
+                (_, _) => throw new UnauthorizedAccessException("Access to the path '/data/log.las' is denied."),
+                TestContext.Current.CancellationToken);
+
+            Assert.Equal(1, code);
+        }
+        finally
+        {
+            Console.SetError(original);
+        }
+
+        Assert.Equal("error: Access to the path '/data/log.las' is denied." + Environment.NewLine, error.ToString());
+    }
+
     // ---- config add ---------------------------------------------------------------------
 
     [Fact]
@@ -317,8 +342,11 @@ public class ClientCredentialsTests : ConfigTestDirectories
     {
         Add("dev", Nothing with
         {
-            Server = "https://osdu.example.com", DataPartitionId = "dev",
-            Authority = "https://login.microsoftonline.com/t", ClientId = "c", Scopes = "c/.default",
+            Server = "https://osdu.example.com",
+            DataPartitionId = "dev",
+            Authority = "https://login.microsoftonline.com/t",
+            ClientId = "c",
+            Scopes = "c/.default",
         });
 
         Assert.Equal("msal_interactive", Written("dev")["AuthenticationMode"]!.GetValue<string>());

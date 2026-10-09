@@ -191,9 +191,26 @@ public sealed class FileTransferTests : IDisposable
     [InlineData("COM10", "COM10")]
     [InlineData("..", "1")]
     [InlineData("...", "1")]
+    [InlineData("ø", "ø")]
     [InlineData(null, "1")]
     public void ANameIsSafeToSaveUnder(string? name, string expected) =>
         Assert.Equal(expected, FileDownloadCommand.SafeFileName(name, "dev:dataset--File.Generic:1"));
+
+    [Theory]
+    // Bytes, not characters, are what Linux and macOS count: ø is two of them, and 👍🏽 eight.
+    [InlineData("a", ".las")]
+    [InlineData("ø", ".las")]
+    [InlineData("👍🏽", ".las")]
+    [InlineData("a", "")]
+    public void ALongNameIsCutKeepingItsExtension(string repeated, string extension)
+    {
+        var name = string.Concat(Enumerable.Repeat(repeated, 300)) + extension;
+
+        var safe = FileDownloadCommand.SafeFileName(name, "dev:x:1");
+
+        Assert.InRange(Encoding.UTF8.GetByteCount(safe), FileDownloadCommand.MaxNameBytes - 8, FileDownloadCommand.MaxNameBytes);
+        Assert.EndsWith(repeated + extension, safe);
+    }
 
     [Fact]
     public void TheDestinationIsThePathOrTheRecordsNameInIt()
@@ -346,6 +363,10 @@ public sealed class FileTransferTests : IDisposable
     [Theory]
     [InlineData(null, null, "not checked: none recorded")]
     [InlineData("1a2b3c4d", "CRC32C", "not checked: CRC32C not supported")]
+    // Broken records, not unsupported algorithms.
+    [InlineData("not hex at all", "MD5", "not checked: the record's MD5 checksum is malformed")]
+    [InlineData("1a2b3c4d", "SHA-256", "not checked: the record's SHA-256 checksum is malformed")]
+    [InlineData("1a2b3c4d", null, "not checked: the record's checksum is neither MD5 nor SHA-256")]
     public async Task WhatCannotBeCheckedIsSaidSo(string? checksum, string? algorithm, string expected)
     {
         var saved = await Save(new Storage(HttpStatusCode.OK, Bytes), FileRecord(checksum: checksum, algorithm: algorithm));
