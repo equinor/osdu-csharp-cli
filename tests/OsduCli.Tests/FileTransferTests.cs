@@ -371,6 +371,17 @@ public sealed class FileTransferTests : IDisposable
         Assert.Equal("MD5 matches storage", saved.Outcome);
     }
 
+    [Theory]
+    [InlineData("not hex at all", "MD5", "MD5 matches storage; the record's MD5 checksum is malformed")]
+    [InlineData("1a2b3c4d", "CRC32C", "MD5 matches storage; the record's CRC32C checksum is not supported")]
+    public async Task StoragesMd5DoesNotHideABrokenRecordChecksum(string checksum, string algorithm, string expected)
+    {
+        var saved = await Save(new Storage(HttpStatusCode.OK, Bytes, MD5.HashData(Bytes)),
+            FileRecord(checksum: checksum, algorithm: algorithm));
+
+        Assert.Equal(expected, saved.Outcome);
+    }
+
     [Fact]
     public async Task ABlobNotMatchingStoragesMd5IsNotSaved()
     {
@@ -383,7 +394,7 @@ public sealed class FileTransferTests : IDisposable
 
     [Theory]
     [InlineData(null, null, "not checked: none recorded")]
-    [InlineData("1a2b3c4d", "CRC32C", "not checked: CRC32C not supported")]
+    [InlineData("1a2b3c4d", "CRC32C", "not checked: the record's CRC32C checksum is not supported")]
     // Broken records, not unsupported algorithms.
     [InlineData("not hex at all", "MD5", "not checked: the record's MD5 checksum is malformed")]
     [InlineData("1a2b3c4d", "SHA-256", "not checked: the record's SHA-256 checksum is malformed")]

@@ -73,11 +73,19 @@ public static class FileDownloadCommand
                 ["size"] = checksum.Bytes,
                 ["checksum"] = checksum.Outcome,
             }).ToJsonString(), ResultSpec);
-        }, cancellationToken,
-            "service.file.viewers, users.datalake.viewers, users.datalake.editors, users.datalake.admins or users.datalake.ops"));
+        }, cancellationToken, forbiddenHint: AccessNeeded));
 
         return command;
     }
+
+    /// <summary>
+    /// What a refusal needs, for two services: the File roles alone told someone refused by
+    /// Storage's read of the record to ask for a role they may already hold.
+    /// </summary>
+    private const string AccessNeeded =
+        "file download needs a Storage role to read the record (service.storage.viewer, service.storage.creator "
+        + "or service.storage.admin) and a File role to download it (service.file.viewers, users.datalake.viewers, "
+        + "users.datalake.editors, users.datalake.admins or users.datalake.ops)";
 
     private static readonly OutputSpec ResultSpec = OutputSpec.Table(
         null, ("Id", "id"), ("Path", "path"), ("Size", "size"), ("Checksum", "checksum"));
@@ -282,6 +290,10 @@ public static class FileDownloadCommand
             return $"{expected.Label} matches the record";
         }
 
+        // Said whether or not storage's MD5 stands in for it: "MD5 matches storage" alone hid
+        // a record whose checksum is broken.
+        var unusable = Unusable(source);
+
         // Only reached hashing MD5: Expected returned null, so DownloadAsync was given the default.
         if (received.StorageMd5 is { Length: 16 } stored)
         {
@@ -291,21 +303,26 @@ public static class FileDownloadCommand
                     "The downloaded bytes do not match the MD5 storage holds for the file, so nothing was saved. "
                     + "Run the command again.");
             }
-            return "MD5 matches storage";
+            return unusable is null ? "MD5 matches storage" : $"MD5 matches storage; {unusable}";
         }
 
-        if (source.Checksum is null)
-            return "not checked: none recorded";
-        // Told apart from an algorithm this cannot compute: an MD5 that is not 32 hex digits
-        // is a broken record, not an unsupported one.
-        return source.Algorithm?.Replace("-", "").ToUpperInvariant() switch
-        {
-            "MD5" => "not checked: the record's MD5 checksum is malformed",
-            "SHA256" => "not checked: the record's SHA-256 checksum is malformed",
-            null => "not checked: the record's checksum is neither MD5 nor SHA-256",
-            _ => $"not checked: {source.Algorithm} not supported",
-        };
+        return $"not checked: {unusable ?? "none recorded"}";
     }
+
+    /// <summary>
+    /// Why the record's checksum could not be used, or null when it has none. An MD5 that is
+    /// not 32 hex digits is a broken record, told apart from an algorithm this cannot compute.
+    /// </summary>
+    private static string? Unusable(Source source) =>
+        source.Checksum is null
+            ? null
+            : source.Algorithm?.Replace("-", "").ToUpperInvariant() switch
+            {
+                "MD5" => "the record's MD5 checksum is malformed",
+                "SHA256" => "the record's SHA-256 checksum is malformed",
+                null => "the record's checksum is neither MD5 nor SHA-256",
+                _ => $"the record's {source.Algorithm} checksum is not supported",
+            };
 
     private static bool IsHex(string text) => text.Length % 2 == 0 && text.All(char.IsAsciiHexDigit);
 
