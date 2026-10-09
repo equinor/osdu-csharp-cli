@@ -1304,7 +1304,7 @@ def build_command(entry: dict, operation: dict, where: str, models_root: str,
 
     paging = None
     if entry.get("paging") is not None:
-        paging = build_paging(entry["paging"], paging_operations, body, output, where)
+        paging = build_paging(entry["paging"], paging_operations, body, output, where, spec)
 
     return Command(
         path=path,
@@ -1330,7 +1330,7 @@ def build_command(entry: dict, operation: dict, where: str, models_root: str,
 
 
 def build_paging(cfg: dict, operations: tuple[dict, dict | None] | None, body: "Body | None",
-                 output: dict, where: str) -> Paging:
+                 output: dict, where: str, spec: dict) -> Paging:
     """Checks a command's `paging:` and resolves what the emitted code needs.
 
     Each rule refuses a manifest that would page wrongly rather than not at all: a request
@@ -1382,6 +1382,26 @@ def build_paging(cfg: dict, operations: tuple[dict, dict | None] | None, body: "
     model, collection = body_model(operations[0], where)
     if collection:
         raise ManifestError(f"{where}: paging `op:` must take one request object, not an array")
+
+    # The cursor is paging's own state, written onto each page after the limit: a name shared
+    # with an option or a fixed value overwrote it, and `cursor: limit` replaced the page size
+    # with a string the request model then refused.
+    sent = {name.split(".")[0] for name in fields} | {name.split(".")[0] for name, _ in body.fixed}
+    if cursor in sent:
+        raise ManifestError(f"{where}: paging `cursor:` {cursor!r} is also a body field or fixed value "
+                            "of this command; the cursor must be a property of its own")
+    # And the cursor endpoint has to take what a page sends, or the page is a different
+    # request from the one the options described.
+    accepted = set(body_schema_properties(operations[0], spec))
+    if cursor not in accepted or limit_name not in accepted:
+        raise ManifestError(f"{where}: paging `op:` {op_cfg['path']} must take both {limit_name!r} and "
+                            f"{cursor!r}; it takes {sorted(accepted)}")
+    unaccepted = sorted(
+        ({name.split(".")[0] for name in fields if name not in not_with}
+         | {name.split(".")[0] for name, _ in body.fixed}) - accepted)
+    if unaccepted:
+        raise ManifestError(f"{where}: paging `op:` {op_cfg['path']} does not take {unaccepted}; list "
+                            "fields it cannot take in `not-with:`")
 
     release_builder = None
     if cfg.get("release") is not None:

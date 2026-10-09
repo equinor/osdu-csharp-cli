@@ -33,6 +33,8 @@ SPEC = {"components": {"schemas": {
         "order": {"type": "array", "items": {"type": "string", "enum": ["ASC", "DESC"]}}}},
     "SpatialFilter": {"properties": {"field": {"type": "string"}}},
     "Record": {"properties": {"kind": {"type": "string"}}},
+    "CursorQueryRequest": {"properties": {
+        "kind": {"type": "string"}, "limit": {"type": "integer"}, "cursor": {"type": "string"}}},
 }}}
 
 JSON_200 = {"200": {"content": {"application/json": {"schema": {"type": "object"}}}}}

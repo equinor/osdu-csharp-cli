@@ -22,11 +22,17 @@ BODY_OPERATION = {
     "responses": {"200": {"content": {"application/json": {"schema": {"type": "object"}}}}},
 }
 
-SPEC = {"components": {"schemas": {"QueryRequest": {"properties": {
-    "kind": {"type": "string"},
-    "returnedFields": {"type": "array", "items": {"type": "string"}},
-    "excludedFields": {"type": "array", "items": {"type": "string"}},
-}}}}}
+SPEC = {"components": {"schemas": {
+    "QueryRequest": {"properties": {
+        "kind": {"type": "string"},
+        "returnedFields": {"type": "array", "items": {"type": "string"}},
+        "excludedFields": {"type": "array", "items": {"type": "string"}},
+    }},
+    # What Search's cursor endpoint takes: the query's fields but `offset`, and a cursor.
+    "CursorQueryRequest": {"properties": {
+        "kind": {"type": "string"}, "limit": {"type": "integer"}, "cursor": {"type": "string"},
+    }},
+}}}
 
 
 def build(entry, operation=OPERATION, spec=None):
@@ -250,6 +256,21 @@ class TestPaging:
             self.build(self.entry({"limit": "page.limit", "not-with": None}, fields=fields))
         with pytest.raises(ManifestError, match="top-level cursor property"):
             self.build(self.entry({"cursor": "page.cursor"}))
+
+    def test_the_cursor_cannot_share_a_name_with_a_body_field(self):
+        # Written onto each page after the limit: `cursor: limit` replaced the page size.
+        with pytest.raises(ManifestError, match="is also a body field"):
+            self.build(self.entry({"cursor": "limit"}))
+
+    def test_the_cursor_endpoint_must_take_the_limit_and_the_cursor(self):
+        with pytest.raises(ManifestError, match="must take both"):
+            self.build(self.entry({"cursor": "nextPage"}))
+
+    def test_a_field_the_cursor_endpoint_does_not_take_must_be_listed_in_not_with(self):
+        # `offset` is not in the cursor endpoint's request; left out of not-with, a page
+        # would have been a different request from the one the options described.
+        with pytest.raises(ManifestError, match=r"does not take \['offset'\]"):
+            self.build(self.entry({"not-with": None}))
 
     def test_unknown_paging_keys_are_refused(self):
         entry = self.entry()

@@ -200,11 +200,13 @@ so they are not excluded as well.
 | `release` | no | A `DELETE` with the cursor as its one path parameter, called when the command stops before the cursor's end — at its limit, or on an error or an interruption. |
 | `limit` | yes | The top-level `int` body field setting the number of results. Above `page-size` the command pages, and each page asks for at most `page-size`. |
 | `page-size` | yes | The most one page may ask for: the service's own per-request maximum. |
-| `cursor` | yes | The top-level request and response property holding the cursor. |
+| `cursor` | yes | The top-level request and response property holding the cursor. It cannot share a name with a body field or a fixed value. |
 | `not-with` | no | Body fields the cursor endpoint does not take, such as `offset`, refused alongside paging. |
 
-Paging needs a body built from `fields` and an `output.root`. The added `--all` cannot be
-combined with the `limit` field's option.
+Paging needs a body built from `fields` and an `output.root`. The cursor endpoint's request
+must take the `limit` field, the `cursor`, and every other body field and fixed value; the
+generator refuses one that does not, unless the field is listed in `not-with`. The added `--all`
+cannot be combined with the `limit` field's option.
 
 ## `handwritten`
 
