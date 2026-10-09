@@ -40,12 +40,15 @@ commands:
             everything of this kind.
         limit:
           flag: --limit
+          short: -l
           type: int
           help: Maximum number of results. Defaults to 10 upstream, capped at 1000.
         offset:
           flag: --offset
           type: int
-          help: Number of results to skip. Use --cursor-based paging beyond 10000.
+          help: >
+            Number of results to skip. Search refuses --offset plus --limit beyond 10000, so
+            results past the first 10000 cannot be reached this way.
         sort.field:
           flag: --sort-by
           type: string[]

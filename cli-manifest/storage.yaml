@@ -33,7 +33,7 @@ commands:
     op: { method: get, path: /query/records }
     params:
       kind:   { flag: --kind,   short: -k, required: true, help: Kind of records to list. }
-      limit:  { flag: --limit,             help: Maximum number of records to return. }
+      limit:  { flag: --limit, short: -l,  help: Maximum number of records to return. }
       cursor: { flag: --cursor,            help: Cursor returned by a previous page. }
     examples:
       - args: --kind "osdu:wks:master-data--Well:1.2.0" --limit 5

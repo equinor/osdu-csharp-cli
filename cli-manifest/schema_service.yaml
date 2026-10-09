@@ -23,7 +23,7 @@ commands:
       status:     { flag: --status,     help: "Filter by lifecycle status: PUBLISHED, DEVELOPMENT or OBSOLETE." }
       scope:      { flag: --scope,      help: "Filter by scope: SHARED or INTERNAL." }
       latestVersion: { flag: --latest, help: Return only the newest version of each schema. }
-      limit:      { flag: --limit,      help: Maximum number of schemas to return. }
+      limit:      { flag: --limit, short: -l, help: Maximum number of schemas to return. }
       offset:     { flag: --offset,     help: Number of schemas to skip. }
     examples:
       - --limit 5

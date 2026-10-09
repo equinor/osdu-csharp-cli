@@ -62,7 +62,7 @@ public static partial class SchemaServiceCommands
         {
             Description = "Return only the newest version of each schema.",
         };
-        var limitOption = new Option<int?>("--limit")
+        var limitOption = new Option<int?>("--limit", "-l")
         {
             Description = "Maximum number of schemas to return.",
         };

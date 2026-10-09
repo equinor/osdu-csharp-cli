@@ -84,7 +84,7 @@ internal sealed partial class AzureTokenProvider(
     {
         var token = await FetchAsync(cancellationToken);
         if (expected is not null && !IsExpected(Identify(token)))
-            throw new OsduException(Mismatch(Identify(token)));
+            throw new SignInException(Mismatch(Identify(token)));
         return token;
     }
 
@@ -130,11 +130,11 @@ internal sealed partial class AzureTokenProvider(
         // Azure CLI's "Please run 'az login'", among the other sources' reasons.
         catch (CredentialUnavailableException exception)
         {
-            throw new OsduException(NothingToSignInWith(exception.Message), exception);
+            throw new SignInException(NothingToSignInWith(exception.Message), exception);
         }
         catch (AuthenticationFailedException exception)
         {
-            throw new OsduException(
+            throw new SignInException(
                 "Sign-in through Azure failed. "
                 + (exception.Message.Contains("AADSTS", StringComparison.Ordinal)
                     ? CliRunner.SignInCause(exception.Message)

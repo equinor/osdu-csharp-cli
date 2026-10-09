@@ -16,7 +16,11 @@ commands:
     summary: List LegalTags in the partition.
     op: { method: get, path: /legaltags }
     params:
-      valid: { flag: --valid, help: "Return only valid tags (true) or only invalid ones (false). Omit for all." }
+      # Not "omit for all": the spec defaults `valid` to true, so leaving it out returns the
+      # valid tags only, and no value returns both. Dev agreed (13 tags omitted, 13 with
+      # true, 0 with false) on 2026-10-09, though with no invalid tags there it cannot show
+      # the difference by itself.
+      valid: { flag: --valid, help: "Return valid tags (true, also when omitted) or invalid ones (false). Listing both takes two calls." }
     examples:
       - ""
     output:

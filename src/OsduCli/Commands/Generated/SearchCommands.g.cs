@@ -48,13 +48,13 @@ public static partial class SearchCommands
         {
             Description = "Lucene query string, e.g. data.FacilityName:GB* for a prefix, or data.FacilityName:\"GB 211/23-A8\" for an exact phrase. Omit to match everything of this kind.",
         };
-        var limitBodyOption = new Option<int?>("--limit")
+        var limitBodyOption = new Option<int?>("--limit", "-l")
         {
             Description = "Maximum number of results. Defaults to 10 upstream, capped at 1000.",
         };
         var offsetBodyOption = new Option<int?>("--offset")
         {
-            Description = "Number of results to skip. Use --cursor-based paging beyond 10000.",
+            Description = "Number of results to skip. Search refuses --offset plus --limit beyond 10000, so results past the first 10000 cannot be reached this way.",
         };
         var sortFieldBodyOption = new Option<string[]>("--sort-by")
         {

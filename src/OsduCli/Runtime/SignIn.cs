@@ -1,3 +1,5 @@
+using Equinor.OsduCsharpClient.Facade;
+
 namespace Equinor.OsduCli.Runtime;
 
 /// <summary>How a profile signs in.</summary>
@@ -99,6 +101,22 @@ internal static class AuthenticationModes
             ? (resource, all.Where(PersonScopes.Contains).ToList())
             : null;
     }
+}
+
+/// <summary>
+/// Signing in failed, or was refused before it was tried: which account to use is ambiguous,
+/// Azure has no sign-in to offer, or the account signed in is not the one expected.
+/// </summary>
+/// <remarks>
+/// A kind of its own so a command probing several services can tell it from a service's
+/// failure. <c>status</c> reported it as twelve failed services, each with the same reason,
+/// when nothing was wrong with any of them.
+/// </remarks>
+public sealed class SignInException : OsduException
+{
+    public SignInException(string message) : base(message) { }
+
+    public SignInException(string message, Exception inner) : base(message, inner) { }
 }
 
 /// <summary>A client secret, kept out of anything that prints it.</summary>

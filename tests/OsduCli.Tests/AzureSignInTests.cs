@@ -278,7 +278,7 @@ public class AzureSignInTests : ConfigTestDirectories
             new Credential(_ => throw new CredentialUnavailableException(NothingAvailable)),
             "https://energy.azure.com/.default", Tenant);
 
-        var exception = await Assert.ThrowsAsync<OsduException>(() =>
+        var exception = await Assert.ThrowsAsync<SignInException>(() =>
             provider.GetTokenAsync(TestContext.Current.CancellationToken));
 
         var lines = exception.Message.Split(Environment.NewLine);
@@ -343,7 +343,7 @@ public class AzureSignInTests : ConfigTestDirectories
                 + "Trace ID: 1111")),
             "5a1178c2-5867-4a34-8fb8-216164e30b5f/.default");
 
-        var exception = await Assert.ThrowsAsync<OsduException>(() =>
+        var exception = await Assert.ThrowsAsync<SignInException>(() =>
             provider.GetTokenAsync(TestContext.Current.CancellationToken));
 
         Assert.Equal(
@@ -361,7 +361,7 @@ public class AzureSignInTests : ConfigTestDirectories
                 + "- AzureCliCredential authentication failed: Azure CLI authentication timed out.")),
             "https://energy.azure.com/.default");
 
-        var exception = await Assert.ThrowsAsync<OsduException>(() =>
+        var exception = await Assert.ThrowsAsync<SignInException>(() =>
             provider.GetTokenAsync(TestContext.Current.CancellationToken));
 
         Assert.Equal("Sign-in through Azure failed. Azure CLI: Azure CLI authentication timed out.", exception.Message);
@@ -392,7 +392,7 @@ public class AzureSignInTests : ConfigTestDirectories
         var provider = Signing(new { upn = "admin@equinor.com", appid = AzureCli },
             new("name@equinor.com", FromFlag: false));
 
-        var exception = await Assert.ThrowsAsync<OsduException>(() =>
+        var exception = await Assert.ThrowsAsync<SignInException>(() =>
             provider.GetTokenAsync(TestContext.Current.CancellationToken));
 
         Assert.Equal(
@@ -407,7 +407,7 @@ public class AzureSignInTests : ConfigTestDirectories
         var provider = Signing(new { appid = "1111", xms_mirid = "/subscriptions/x" },
             new("name@equinor.com", FromFlag: true));
 
-        var exception = await Assert.ThrowsAsync<OsduException>(() =>
+        var exception = await Assert.ThrowsAsync<SignInException>(() =>
             provider.GetTokenAsync(TestContext.Current.CancellationToken));
 
         Assert.Equal(

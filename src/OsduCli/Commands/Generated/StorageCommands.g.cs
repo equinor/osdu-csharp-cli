@@ -46,7 +46,7 @@ public static partial class StorageCommands
             Description = "Kind of records to list.",
             Required = true,
         };
-        var limitOption = new Option<int?>("--limit")
+        var limitOption = new Option<int?>("--limit", "-l")
         {
             Description = "Maximum number of records to return.",
         };
