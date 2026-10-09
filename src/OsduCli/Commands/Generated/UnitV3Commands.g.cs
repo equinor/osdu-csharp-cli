@@ -59,7 +59,7 @@ public static partial class UnitV3Commands
         {
             Description = "Number of units to skip.",
         };
-        var limitOption = new Option<int?>("--limit")
+        var limitOption = new Option<int?>("--limit", "-l")
         {
             Description = "Maximum number of units to return.",
         };
@@ -135,7 +135,7 @@ public static partial class UnitV3Commands
         {
             Description = "Number of results to skip.",
         };
-        var limitOption = new Option<int?>("--limit")
+        var limitOption = new Option<int?>("--limit", "-l")
         {
             Description = "Maximum number of results to return.",
         };
@@ -316,7 +316,7 @@ public static partial class UnitV3Commands
         {
             Description = "Number of mappings to skip.",
         };
-        var limitOption = new Option<int?>("--limit")
+        var limitOption = new Option<int?>("--limit", "-l")
         {
             Description = "Maximum number of mappings to return.",
         };
@@ -468,7 +468,7 @@ public static partial class UnitV3Commands
         {
             Description = "Number of results to skip.",
         };
-        var limitOption = new Option<int?>("--limit")
+        var limitOption = new Option<int?>("--limit", "-l")
         {
             Description = "Maximum number of results to return.",
         };
@@ -517,7 +517,7 @@ public static partial class UnitV3Commands
         {
             Description = "Number of states to skip.",
         };
-        var limitOption = new Option<int?>("--limit")
+        var limitOption = new Option<int?>("--limit", "-l")
         {
             Description = "Maximum number of states to return.",
         };
@@ -575,7 +575,7 @@ public static partial class UnitV3Commands
         {
             Description = "Number of measurements to skip.",
         };
-        var limitOption = new Option<int?>("--limit")
+        var limitOption = new Option<int?>("--limit", "-l")
         {
             Description = "Maximum number of measurements to return.",
         };
@@ -643,7 +643,7 @@ public static partial class UnitV3Commands
         {
             Description = "Number of results to skip.",
         };
-        var limitOption = new Option<int?>("--limit")
+        var limitOption = new Option<int?>("--limit", "-l")
         {
             Description = "Maximum number of results to return.",
         };
@@ -692,7 +692,7 @@ public static partial class UnitV3Commands
         {
             Description = "Number of mappings to skip.",
         };
-        var limitOption = new Option<int?>("--limit")
+        var limitOption = new Option<int?>("--limit", "-l")
         {
             Description = "Maximum number of mappings to return.",
         };
@@ -729,7 +729,7 @@ public static partial class UnitV3Commands
         {
             Description = "Number of unit systems to skip.",
         };
-        var limitOption = new Option<int?>("--limit")
+        var limitOption = new Option<int?>("--limit", "-l")
         {
             Description = "Maximum number of unit systems to return.",
         };
@@ -771,7 +771,7 @@ public static partial class UnitV3Commands
         {
             Description = "Number of entries to skip.",
         };
-        var limitOption = new Option<int?>("--limit")
+        var limitOption = new Option<int?>("--limit", "-l")
         {
             Description = "Maximum number of entries to return.",
         };

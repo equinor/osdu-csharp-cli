@@ -424,7 +424,7 @@ List LegalTags in the partition.
 
 | Option | Required | Description |
 |---|---|---|
-| `--valid` |  | Return only valid tags (true) or only invalid ones (false). Omit for all. |
+| `--valid` |  | Return valid tags (true, also when omitted) or invalid ones (false). Listing both takes two calls. |
 
 ```bash
 osducs legaltag list 
@@ -583,7 +583,7 @@ List all measurements in the catalog.
 | Option | Required | Description |
 |---|---|---|
 | `--offset` |  | Number of measurements to skip. |
-| `--limit` |  | Maximum number of measurements to return. |
+| `-l`, `--limit` |  | Maximum number of measurements to return. |
 
 ### `osducs measurement maps`
 
@@ -594,7 +594,7 @@ List mappings between measurements in different namespaces.
 | Option | Required | Description |
 |---|---|---|
 | `--offset` |  | Number of mappings to skip. |
-| `--limit` |  | Maximum number of mappings to return. |
+| `-l`, `--limit` |  | Maximum number of mappings to return. |
 
 ### `osducs measurement search`
 
@@ -605,7 +605,7 @@ Search the measurement catalog.
 | Option | Required | Description |
 |---|---|---|
 | `--offset` |  | Number of results to skip. |
-| `--limit` |  | Maximum number of results to return. |
+| `-l`, `--limit` |  | Maximum number of results to return. |
 | `-q`, `--query` | yes | Search expression. |
 
 ## member
@@ -873,7 +873,7 @@ List records of a given kind.
 | Option | Required | Description |
 |---|---|---|
 | `-k`, `--kind` | yes | Kind of records to list. |
-| `--limit` |  | Maximum number of records to return. |
+| `-l`, `--limit` |  | Maximum number of records to return. |
 | `--cursor` |  | Cursor returned by a previous page. |
 
 ```bash
@@ -890,8 +890,8 @@ Search records with a Lucene query.
 |---|---|---|
 | `-k`, `--kind` | yes | Kind to search. Wildcards are allowed per segment, so "osdu:wks:master-data--Well:*" covers every schema version — pinning one silently misses records written against the others. |
 | `-q`, `--query` |  | Lucene query string, e.g. data.FacilityName:GB* for a prefix, or data.FacilityName:"GB 211/23-A8" for an exact phrase. Omit to match everything of this kind. |
-| `--limit` |  | Maximum number of results. Defaults to 10 upstream, capped at 1000. |
-| `--offset` |  | Number of results to skip. Use --cursor-based paging beyond 10000. |
+| `-l`, `--limit` |  | Maximum number of results. Defaults to 10 upstream, capped at 1000. |
+| `--offset` |  | Number of results to skip. Search refuses --offset plus --limit beyond 10000, so results past the first 10000 cannot be reached this way. |
 | `--sort-by` |  | Fields to sort by, e.g. id or data.FacilityName. Pair positionally with --sort-order. |
 | `--sort-order` |  | Sort direction per --sort-by field. Defaults to ASC upstream when omitted. |
 | `--track-total-count` |  | Report the true match count. Without it the count is capped at 10000, which silently understates any large kind. |
@@ -980,7 +980,7 @@ List schemas, optionally filtered by authority, source or entity type.
 | `--status` |  | Filter by lifecycle status: PUBLISHED, DEVELOPMENT or OBSOLETE. |
 | `--scope` |  | Filter by scope: SHARED or INTERNAL. |
 | `--latest` |  | Return only the newest version of each schema. |
-| `--limit` |  | Maximum number of schemas to return. |
+| `-l`, `--limit` |  | Maximum number of schemas to return. |
 | `--offset` |  | Number of schemas to skip. |
 
 ```bash
@@ -1141,7 +1141,7 @@ List the states a unit or measurement mapping can be in.
 | Option | Required | Description |
 |---|---|---|
 | `--offset` |  | Number of states to skip. |
-| `--limit` |  | Maximum number of states to return. |
+| `-l`, `--limit` |  | Maximum number of states to return. |
 
 ### `osducs unit catalog search`
 
@@ -1152,7 +1152,7 @@ Search across every kind of item in the catalog.
 | Option | Required | Description |
 |---|---|---|
 | `--offset` |  | Number of results to skip. |
-| `--limit` |  | Maximum number of results to return. |
+| `-l`, `--limit` |  | Maximum number of results to return. |
 | `-q`, `--query` | yes | Search expression. |
 
 ### `osducs unit conversion abcd`
@@ -1199,7 +1199,7 @@ List all units in the catalog.
 | Option | Required | Description |
 |---|---|---|
 | `--offset` |  | Number of units to skip. |
-| `--limit` |  | Maximum number of units to return. |
+| `-l`, `--limit` |  | Maximum number of units to return. |
 
 ```bash
 osducs unit list --limit 5
@@ -1214,7 +1214,7 @@ List mappings between units in different namespaces.
 | Option | Required | Description |
 |---|---|---|
 | `--offset` |  | Number of mappings to skip. |
-| `--limit` |  | Maximum number of mappings to return. |
+| `-l`, `--limit` |  | Maximum number of mappings to return. |
 
 ### `osducs unit preferred`
 
@@ -1235,7 +1235,7 @@ Search the unit catalog.
 | Option | Required | Description |
 |---|---|---|
 | `--offset` |  | Number of results to skip. |
-| `--limit` |  | Maximum number of results to return. |
+| `-l`, `--limit` |  | Maximum number of results to return. |
 | `-q`, `--query` | yes | Search expression. |
 
 ## unit-system
@@ -1250,7 +1250,7 @@ Get one unit system by name.
 |---|---|---|
 | `-n`, `--name` | yes | Unit system name. |
 | `--offset` |  | Number of entries to skip. |
-| `--limit` |  | Maximum number of entries to return. |
+| `-l`, `--limit` |  | Maximum number of entries to return. |
 
 ### `osducs unit-system list`
 
@@ -1261,7 +1261,7 @@ List the available unit systems.
 | Option | Required | Description |
 |---|---|---|
 | `--offset` |  | Number of unit systems to skip. |
-| `--limit` |  | Maximum number of unit systems to return. |
+| `-l`, `--limit` |  | Maximum number of unit systems to return. |
 
 ## well
 

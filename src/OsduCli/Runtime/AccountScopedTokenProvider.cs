@@ -39,7 +39,7 @@ internal sealed class AccountScopedTokenProvider(
             var cached = await cachedUsernames(cancellationToken);
             if (cached.Count > 1)
             {
-                throw new OsduException(
+                throw new SignInException(
                     "More than one account is signed in, so which one to use is ambiguous:"
                     + Environment.NewLine
                     + string.Join(Environment.NewLine, cached.Select(name => "  " + name))

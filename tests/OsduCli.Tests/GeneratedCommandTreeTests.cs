@@ -310,4 +310,18 @@ public class GeneratedCommandTreeTests
 
         Assert.Contains("cannot be used together", Assert.Single(result.Errors).Message);
     }
+
+    [Fact]
+    public void EveryLimitCanBeWrittenAsDashL()
+    {
+        // The Python CLI's `-l`, which people reach for. Half the commands had it and half did
+        // not, so whether it worked depended on the command.
+        var missing = AllNodes()
+            .SelectMany(node => node.Command.Options
+                .Where(option => option.Name == "--limit" && !option.Aliases.Contains("-l"))
+                .Select(_ => node.Path))
+            .ToList();
+
+        Assert.True(missing.Count == 0, "--limit without -l on: " + string.Join(", ", missing));
+    }
 }

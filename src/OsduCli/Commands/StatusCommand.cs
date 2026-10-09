@@ -4,6 +4,7 @@ using System.Text.Json;
 using System.Text.Json.Nodes;
 using Equinor.OsduCli.Runtime;
 using Equinor.OsduCsharpClient.Facade;
+using Microsoft.Identity.Client;
 using Microsoft.Kiota.Abstractions;
 
 namespace Equinor.OsduCli.Commands;
@@ -154,6 +155,8 @@ public static class StatusCommand
                 ("Status", "status"),
                 ("Version", "version"),
                 ("Build", "buildTime")));
+            foreach (var note in FailureNotes(rows))
+                context.Output.WriteNote(note);
 
             return failed ? 1 : 0;
         }, cancellationToken));
@@ -226,7 +229,7 @@ public static class StatusCommand
     /// catch is deliberately broad: the point of this command is to report whatever a
     /// service is doing, including refusing to talk to us.
     /// </summary>
-    private static async Task<JsonObject> ProbeAsync(
+    internal static async Task<JsonObject> ProbeAsync(
         string name,
         Func<CliContext, CancellationToken, Task<string?>> probe,
         CliContext context,
@@ -240,16 +243,60 @@ public static class StatusCommand
             row["status"] = "ok";
             MergePayload(row, json);
         }
-        catch (OperationCanceledException)
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            throw;
+        }
+        // Not a service's failure: every probe would fail the same way, and the command's one
+        // error says it once. See SignInException.
+        catch (Exception exception) when (exception is SignInException or MsalException)
         {
             throw;
         }
         catch (Exception exception)
         {
-            row["status"] = "unreachable";
-            row["error"] = exception.Message;
+            (var status, var error) = Failure(exception);
+            row["status"] = status;
+            row["error"] = error;
         }
 
         return row;
     }
+
+    /// <summary>What a failed probe says about the service, and why.</summary>
+    /// <remarks>
+    /// Every failure was "unreachable", including a service that answered — a 401 from one
+    /// service on prod looked like a network problem — and the reason was only in the JSON
+    /// output. A service that answers with a status code is reachable and says so; only a
+    /// connection that fails, or times out, is "unreachable". A timeout used to end the whole
+    /// command, since it surfaces as a cancellation.
+    /// </remarks>
+    internal static (string Status, string Error) Failure(Exception exception) => exception switch
+    {
+        ApiException { ResponseStatusCode: 401 or 403 } refused =>
+            ($"refused ({refused.ResponseStatusCode})", Reason(refused)),
+        ApiException { ResponseStatusCode: > 0 } failed =>
+            ($"error ({failed.ResponseStatusCode})", Reason(failed)),
+        HttpRequestException { StatusCode: { } code } answered => (int)code is 401 or 403
+            ? ($"refused ({(int)code})", answered.Message)
+            : ($"error ({(int)code})", answered.Message),
+        HttpRequestException connection => ("unreachable", connection.Message),
+        OperationCanceledException => ("unreachable", "No answer before the timeout."),
+        _ => ("failed", exception.Message),
+    };
+
+    private static string Reason(ApiException exception) =>
+        CliRunner.Describe(exception) is { Length: > 0 } reason
+            ? $"{exception.ResponseStatusCode} {reason}"
+            : $"{exception.ResponseStatusCode} from the service";
+
+    /// <summary>
+    /// One line per distinct reason, naming the services that gave it, so a table of
+    /// failures is not the end of the explanation.
+    /// </summary>
+    internal static IEnumerable<string> FailureNotes(JsonArray rows) =>
+        rows.OfType<JsonObject>()
+            .Where(row => row["status"]?.GetValue<string>() is { } status && status != "ok")
+            .GroupBy(row => row["error"]?.GetValue<string>() ?? "")
+            .Select(group => $"{string.Join(", ", group.Select(row => row["service"]!.GetValue<string>()))}: {group.Key}");
 }

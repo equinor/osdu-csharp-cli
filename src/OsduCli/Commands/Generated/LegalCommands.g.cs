@@ -44,7 +44,7 @@ public static partial class LegalCommands
     {
         var validOption = new Option<bool?>("--valid")
         {
-            Description = "Return only valid tags (true) or only invalid ones (false). Omit for all.",
+            Description = "Return valid tags (true, also when omitted) or invalid ones (false). Listing both takes two calls.",
         };
 
         var command = new Command("list", "List LegalTags in the partition.");
