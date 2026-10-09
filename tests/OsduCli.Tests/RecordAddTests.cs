@@ -233,6 +233,27 @@ public class RecordAddTests
     }
 
     [Fact]
+    public void DroppingAnEmptyDataFieldIsAChange()
+    {
+        // Counting empty as absent everywhere reported this as no change, though the write
+        // removes the field.
+        var current = Stored(Record(data: new JsonObject { ["Name"] = "x", ["Configurations"] = new JsonArray() }));
+        var proposed = Record(data: new JsonObject { ["Name"] = "x" });
+
+        Assert.Equal(["removes data.Configurations"], RecordAddCommand.Changes(current, proposed));
+        Assert.Equal(["adds data.Configurations"], RecordAddCommand.Changes(Stored(proposed), (JsonObject)current.DeepClone()));
+    }
+
+    [Fact]
+    public void ANullDataFieldIsADifferentValue()
+    {
+        var current = Stored(Record(data: new JsonObject { ["Name"] = "x", ["Note"] = null }));
+        var proposed = Record(data: new JsonObject { ["Name"] = "x", ["Note"] = "set" });
+
+        Assert.Equal(["changes data.Note"], RecordAddCommand.Changes(current, proposed));
+    }
+
+    [Fact]
     public void AnEmptyPartIsTheSameAsAMissingOne()
     {
         // Storage returns some parts filled in, such as an empty `tags`, that a file leaves out.

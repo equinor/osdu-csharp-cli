@@ -270,34 +270,43 @@ public static class RecordAddCommand
     /// each of <c>data</c>'s fields, and the record's other parts whole.
     /// </summary>
     /// <remarks>
-    /// Per field rather than a full diff, which for a large record would bury the one line
-    /// that matters: <c>removes data.Configurations</c> says another team's entries are about
-    /// to go. A field that is absent, null or empty counts as absent, since Storage returns
-    /// some parts filled in that a file may leave out.
+    /// <para>Per field rather than a full diff, which for a large record would bury the one
+    /// line that matters: <c>removes data.Configurations</c> says another team's entries are
+    /// about to go.</para>
+    ///
+    /// <para><c>data</c>'s fields are compared on presence and value alone, so dropping a field
+    /// is reported even when it held an empty list. Only the parts Storage fills in itself —
+    /// <c>tags</c>, <c>ancestry</c>, <c>meta</c> — count empty as absent, since a file may
+    /// leave out what Storage returns as <c>{}</c> or <c>[]</c>. Applying that everywhere
+    /// reported dropping <c>"Configurations": []</c> as no change.</para>
     /// </remarks>
     internal static IReadOnlyList<string> Changes(JsonObject current, JsonObject proposed)
     {
         var changes = new List<string>();
-        foreach (var part in new[] { "kind", "acl", "legal", "tags", "ancestry", "meta" })
-            Compare(part, Property(current, part), Property(proposed, part));
+        foreach (var part in new[] { "kind", "acl", "legal" })
+            Compare(part, current, proposed, part, emptyIsAbsent: false);
+        foreach (var part in new[] { "tags", "ancestry", "meta" })
+            Compare(part, current, proposed, part, emptyIsAbsent: true);
 
         var before = Property(current, "data") as JsonObject ?? [];
         var after = Property(proposed, "data") as JsonObject ?? [];
         foreach (var field in after.Select(pair => pair.Key).Concat(before.Select(pair => pair.Key)).Distinct())
-            Compare("data." + field, Property(before, field), Property(after, field));
+            Compare("data." + field, before, after, field, emptyIsAbsent: false);
 
         return changes;
 
-        void Compare(string field, JsonNode? was, JsonNode? will)
+        void Compare(string label, JsonObject was, JsonObject will, string field, bool emptyIsAbsent)
         {
-            if (IsEmpty(was) && IsEmpty(will))
+            var hadIt = was.TryGetPropertyValue(field, out var old) && !(emptyIsAbsent && IsEmpty(old));
+            var hasIt = will.TryGetPropertyValue(field, out var @new) && !(emptyIsAbsent && IsEmpty(@new));
+            if (!hadIt && !hasIt)
                 return;
-            if (IsEmpty(was))
-                changes.Add($"adds {field}");
-            else if (IsEmpty(will))
-                changes.Add($"removes {field}");
-            else if (!JsonNode.DeepEquals(was, will))
-                changes.Add($"changes {field}");
+            if (!hadIt)
+                changes.Add($"adds {label}");
+            else if (!hasIt)
+                changes.Add($"removes {label}");
+            else if (!JsonNode.DeepEquals(old, @new))
+                changes.Add($"changes {label}");
         }
     }
 
