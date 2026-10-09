@@ -231,10 +231,25 @@ class TestPaging:
         with pytest.raises(ManifestError, match="must be a POST"):
             self.build(self.entry({"op": {"method": "put", "path": "/query_with_cursor"}}))
 
-    def test_the_op_cannot_have_path_parameters(self):
+    # Any placeholder, not only one of word characters, as derive_builder treats them all.
+    @pytest.mark.parametrize("path", ["/items/{id}/cursor", "/items/{item.id}/cursor"])
+    def test_the_op_cannot_have_path_parameters(self, path):
         # Nothing would supply them, and the generated code would not compile.
         with pytest.raises(ManifestError, match="cannot have path parameters"):
-            self.build(self.entry({"op": {"method": "post", "path": "/items/{id}/cursor"}}))
+            self.build(self.entry({"op": {"method": "post", "path": path}}))
+
+    def test_a_release_placeholder_of_any_name_is_given_the_cursor(self):
+        paging = self.build(self.entry({"release": {"method": "delete", "path": "/query_with_cursor/{cursor.id}"}})).paging
+        assert paging.release_builder.count("{") == 1
+
+    def test_the_limit_and_cursor_are_top_level(self):
+        # Set on the request itself: a dotted name became a literal property beside the
+        # nested one it meant.
+        fields = {"kind": {"flag": "-k"}, "page.limit": {"flag": "--limit", "type": "int"}}
+        with pytest.raises(ManifestError, match="top-level body field"):
+            self.build(self.entry({"limit": "page.limit", "not-with": None}, fields=fields))
+        with pytest.raises(ManifestError, match="top-level cursor property"):
+            self.build(self.entry({"cursor": "page.cursor"}))
 
     def test_unknown_paging_keys_are_refused(self):
         entry = self.entry()

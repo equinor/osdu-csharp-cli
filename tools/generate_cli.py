@@ -1350,6 +1350,10 @@ def build_paging(cfg: dict, operations: tuple[dict, dict | None] | None, body: "
     limit_name = cfg.get("limit")
     if limit_name not in fields or fields[limit_name].cs_type != "int":
         raise ManifestError(f"{where}: paging `limit:` must name an `int` body field, not {limit_name!r}")
+    # Each page sets the limit and the cursor as properties of the request itself; a dotted
+    # name would add a property called `pagination.limit` beside the nested one it meant.
+    if "." in limit_name:
+        raise ManifestError(f"{where}: paging `limit:` must be a top-level body field, not {limit_name!r}")
     page_size = cfg.get("page-size")
     # Emitted as a C# `int`, so the 32-bit range is the limit: a larger value generated code
     # that did not compile.
@@ -1357,8 +1361,9 @@ def build_paging(cfg: dict, operations: tuple[dict, dict | None] | None, body: "
         raise ManifestError(f"{where}: paging `page-size:` must be a positive whole number that fits "
                             f"a C# int, not {page_size!r}")
     cursor = cfg.get("cursor")
-    if not isinstance(cursor, str) or not cursor:
-        raise ManifestError(f"{where}: paging `cursor:` must name the cursor property")
+    if not isinstance(cursor, str) or not cursor or "." in cursor:
+        raise ManifestError(f"{where}: paging `cursor:` must name the top-level cursor property, "
+                            f"not {cursor!r}")
     not_with = cfg.get("not-with") or []
     if not isinstance(not_with, list) or any(name not in fields for name in not_with):
         raise ManifestError(f"{where}: paging `not-with:` must list body fields of this command, "
@@ -1371,7 +1376,7 @@ def build_paging(cfg: dict, operations: tuple[dict, dict | None] | None, body: "
     if op_cfg["method"].lower() != "post":
         raise ManifestError(f"{where}: paging `op:` must be a POST, since each page sends the request "
                             f"as its body, not {op_cfg['method'].upper()}")
-    if re.search(r"\{\w+\}", op_cfg["path"]):
+    if re.search(r"\{[^{}]+\}", op_cfg["path"]):
         raise ManifestError(f"{where}: paging `op:` cannot have path parameters, since nothing would "
                             f"supply them: {op_cfg['path']}")
     model, collection = body_model(operations[0], where)
@@ -1381,7 +1386,7 @@ def build_paging(cfg: dict, operations: tuple[dict, dict | None] | None, body: "
     release_builder = None
     if cfg.get("release") is not None:
         release_path = cfg["release"]["path"]
-        if cfg["release"]["method"].lower() != "delete" or len(re.findall(r"\{\w+\}", release_path)) != 1:
+        if cfg["release"]["method"].lower() != "delete" or len(re.findall(r"\{[^{}]+\}", release_path)) != 1:
             raise ManifestError(f"{where}: paging `release:` must be a DELETE with the cursor as its "
                                 "one path parameter")
         release_builder = derive_builder(release_path)
@@ -1824,7 +1829,7 @@ def paged_branch(service: Service, command: Command) -> list[str]:
     ]
 
     if paging.release_builder:
-        accessor = re.sub(r"\{\w+\}", "cursor", paging.release_builder)
+        accessor = re.sub(r"\{[^{}]+\}", "cursor", paging.release_builder)
         release = f"(cursor, releaseCancellation) => {target}.{accessor}.DeleteAsync(cancellationToken: releaseCancellation)"
     else:
         release = "(_, _) => Task.CompletedTask"
