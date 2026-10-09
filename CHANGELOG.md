@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.12.0](https://github.com/equinor/osdu-csharp-cli/compare/v0.11.2...v0.12.0) (2026-10-09)
+
+
+### Features
+
+* **record:** add record add to create or update records of any kind ([#58](https://github.com/equinor/osdu-csharp-cli/issues/58)) ([05c2e4e](https://github.com/equinor/osdu-csharp-cli/commit/05c2e4e2534055968b07898b13bde7c31248512b))
+
 ## [0.11.2](https://github.com/equinor/osdu-csharp-cli/compare/v0.11.1...v0.11.2) (2026-10-08)
 
 
