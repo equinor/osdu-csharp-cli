@@ -69,6 +69,7 @@ Both packages come from GitHub Packages, which needs a token even though they ar
 | `Commands/AccountCommand.cs` | `osducs account list`: the accounts signed in on this machine. |
 | `Commands/ConfigCommand.cs` | `osducs config`: create, list, select and show profiles. |
 | `Commands/CompletionCommand.cs` | `osducs completion`: shell completion scripts, and the hidden command they call. |
+| `Commands/RecordAddCommand.cs` | `osducs record add`: creates or updates records of any kind, asking before it updates one that exists. |
 | `Runtime/CommandTree.cs` | Joins commands from several manifests under one noun, such as `crs`. |
 | `Runtime/CliRunner.cs` | Runs every command: builds the context, and turns failures into one-line errors and exit codes. |
 | `Runtime/CliContext.cs` | Per-command state: the loaded configuration, the signed-in `OsduClient` and the output writer. |
@@ -85,8 +86,10 @@ Both packages come from GitHub Packages, which needs a token even though they ar
 | `Runtime/CommandSuggestions.cs` | Explains a command that does not exist, and suggests the one meant: the same words in another order, or a typo away. |
 
 Behaviour a manifest cannot express can also go in a partial class that extends a generated
-service through its `Customize` hook, in `Commands/Handwritten/`. That folder does not exist yet,
-because no service has needed one.
+service through its `Customize` hook, in `Commands/Handwritten/`. Storage's is the first: it adds
+`record add` to the `record` noun the Storage manifest builds, and the command itself lives in
+`Commands/RecordAddCommand.cs`. The manifest lists the endpoint under `handwritten`, so the
+coverage check knows it is accounted for.
 
 ### What happens when a command runs
 

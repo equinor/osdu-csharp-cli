@@ -101,8 +101,8 @@ osducs record version purge --id ID --yes               DELETE /records/{id}/ver
 behind `--yes` (R6), and `delete`/`purge` now name the soft/hard distinction that
 `POST /records/{id}:delete` vs `DELETE /records/{id}` hides.
 
-**Built today:** `list`, `get`, `delete`, `version list`, `version get`. `add` is accounted
-for as hand-written but not yet implemented; `patch`, `purge` and `version purge` are still
+**Built today:** `list`, `get`, `headers`, `delete`, `version list`, `version get`, and the
+hand-written `add`, which asks before updating a record that exists (R6); `patch`, `purge` and `version purge` are still
 excluded in the manifest pending the `--yes` guard (R6), which the generator cannot yet
 express.
 
