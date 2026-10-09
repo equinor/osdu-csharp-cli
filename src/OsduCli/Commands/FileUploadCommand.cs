@@ -104,20 +104,8 @@ public static partial class FileUploadCommand
             }
 
             Complete(record, fileSource, local.Name, local.Length, md5);
-            FileMetadataResponse? created;
-            try
-            {
-                created = await PostAsync(context.Client.File.V2.Files.Metadata,
-                    context.Client.GetRequestAdapter("file"), record.ToJsonString(), token);
-            }
-            catch (ApiException)
-            {
-                // Said before the error, so it is not mistaken for a failed upload worth
-                // retrying as it is.
-                context.Output.WriteNote(
-                    "The file's bytes were uploaded, but its metadata record was not created, so nothing refers to them.");
-                throw;
-            }
+            var created = await CreateAsync(() => PostAsync(context.Client.File.V2.Files.Metadata,
+                context.Client.GetRequestAdapter("file"), record.ToJsonString(), token), fileSource, context.Output);
 
             return context.Output.Write(new JsonArray(new JsonObject
             {
@@ -201,29 +189,50 @@ public static partial class FileUploadCommand
     {
         var record = (JsonObject?)template?.DeepClone() ?? [];
         record["kind"] ??= DefaultKind;
-
-        var acl = CliContext.Child(record, "acl");
-        var legal = CliContext.Child(record, "legal");
-        Replace(legal, "legaltags", settings.LegalTags);
-        Replace(legal, "otherRelevantDataCountries", settings.Countries.Select(country => country.ToUpperInvariant()).ToList());
-        Replace(acl, "owners", settings.Owners);
-        Replace(acl, "viewers", settings.Viewers);
-
-        var data = CliContext.Child(record, "data");
-        if (settings.Name is { } name)
-            data["Name"] = name;
-        data["Name"] ??= fileName;
-        if (settings.Description is { } description)
-            data["Description"] = description;
-
         var problems = new List<string>();
+
+        // A part of the template that is not an object is reported with the rest, rather than
+        // escaping as a cast failure; what is inside it is not checked.
+        var acl = Part(record, "acl", "acl", problems);
+        var legal = Part(record, "legal", "legal", problems);
+        var data = Part(record, "data", "data", problems);
+        if (data is not null)
+            Part(data, "DatasetProperties", "data.DatasetProperties", problems);
+
+        if (legal is not null)
+        {
+            Replace(legal, "legaltags", settings.LegalTags);
+            Replace(legal, "otherRelevantDataCountries", settings.Countries.Select(country => country.ToUpperInvariant()).ToList());
+        }
+        if (acl is not null)
+        {
+            Replace(acl, "owners", settings.Owners);
+            Replace(acl, "viewers", settings.Viewers);
+        }
+        if (data is not null)
+        {
+            if (settings.Name is { } name)
+                data["Name"] = name;
+            data["Name"] ??= fileName;
+            if (settings.Description is { } description)
+                data["Description"] = description;
+            if (data["Name"] is not JsonValue value || !value.TryGetValue<string>(out _))
+                problems.Add("data.Name must be a string");
+        }
+
         if (record["kind"] is not JsonValue kind || !kind.TryGetValue<string>(out var kindText) || string.IsNullOrWhiteSpace(kindText))
             problems.Add("kind must be a string");
-        Require(legal, "legal", "legaltags", "--legal-tag", problems);
-        Require(legal, "legal", "otherRelevantDataCountries", "--country", problems,
-            country => CountryPattern().IsMatch(country) ? null : $"'{country}' is not a two-letter country code");
-        Require(acl, "acl", "owners", "--owner", problems, Group);
-        Require(acl, "acl", "viewers", "--viewer", problems, Group);
+        if (legal is not null)
+        {
+            Require(legal, "legal", "legaltags", "--legal-tag", problems);
+            Require(legal, "legal", "otherRelevantDataCountries", "--country", problems,
+                country => CountryPattern().IsMatch(country) ? null : $"'{country}' is not a two-letter country code");
+        }
+        if (acl is not null)
+        {
+            Require(acl, "acl", "owners", "--owner", problems, Group);
+            Require(acl, "acl", "viewers", "--viewer", problems, Group);
+        }
 
         if (problems.Count > 0)
         {
@@ -236,6 +245,23 @@ public static partial class FileUploadCommand
         static string? Group(string group) => GroupPattern().IsMatch(group)
             ? null
             : $"'{group}' is not a data group, which looks like data.<name>@<domain>";
+    }
+
+    /// <summary>The object under <paramref name="name"/>, created when absent, or null when it is something else.</summary>
+    private static JsonObject? Part(JsonObject parent, string name, string path, List<string> problems)
+    {
+        switch (parent[name])
+        {
+            case null:
+                var created = new JsonObject();
+                parent[name] = created;
+                return created;
+            case JsonObject part:
+                return part;
+            case var other:
+                problems.Add($"{path} must be an object, not {other.GetValueKind().ToString().ToLowerInvariant()}");
+                return null;
+        }
     }
 
     private static void Replace(JsonObject parent, string field, IReadOnlyList<string> values)
@@ -296,6 +322,38 @@ public static partial class FileUploadCommand
     }
 
     // ---- the service ------------------------------------------------------------------------
+
+    /// <summary>
+    /// Creates the record through <paramref name="post"/>, saying first, when that fails, what
+    /// became of the bytes already uploaded.
+    /// </summary>
+    /// <remarks>
+    /// Said before the error, so it is not mistaken for a failed upload to retry as it is. A
+    /// refusal means no record was created; a lost connection or an interruption leaves it
+    /// unknown, and saying "not created" there invited a retry that could make a second one.
+    /// </remarks>
+    internal static async Task<FileMetadataResponse?> CreateAsync(
+        Func<Task<FileMetadataResponse?>> post, string fileSource, OutputWriter output)
+    {
+        try
+        {
+            return await post();
+        }
+        catch (ApiException)
+        {
+            output.WriteNote(
+                $"The file's bytes were uploaded to {fileSource}, but the File service refused its metadata record, "
+                + "so nothing refers to them.");
+            throw;
+        }
+        catch (Exception exception) when (exception is not OutOfMemoryException)
+        {
+            output.WriteNote(
+                $"The file's bytes were uploaded to {fileSource}, but whether its metadata record was created "
+                + "could not be confirmed. Check for a record pointing there before uploading again.");
+            throw;
+        }
+    }
 
     /// <summary>The signed URL to write to, and the location the record refers to the file by.</summary>
     internal static (string SignedUrl, string FileSource) Location(LocationResponse? response)

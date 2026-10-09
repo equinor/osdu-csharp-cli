@@ -79,13 +79,13 @@ public sealed class FileTransferTests : IDisposable
     public async Task ARefusalSaysWhyWithoutTheSignature()
     {
         var storage = new Storage(HttpStatusCode.BadRequest,
-            Encoding.UTF8.GetBytes("<?xml version=\"1.0\"?><Error><Code>Md5Mismatch</Code><Message>no</Message></Error>"));
+            Encoding.UTF8.GetBytes("<?xml version=\"1.0\"?><Error><Code>InvalidBlobType</Code><Message>no</Message></Error>"));
 
         var exception = await Assert.ThrowsAsync<OsduException>(() => SignedUrlTransfer.UploadAsync(
             new HttpClient(storage), SignedUrl, new MemoryStream(Bytes), Bytes.Length, MD5.HashData(Bytes), null,
             TestContext.Current.CancellationToken));
 
-        Assert.Equal("Storage refused the upload: 400 Bad Request (Md5Mismatch).", exception.Message);
+        Assert.Equal("Storage refused the upload: 400 Bad Request (InvalidBlobType).", exception.Message);
     }
 
     [Fact]
@@ -181,7 +181,16 @@ public sealed class FileTransferTests : IDisposable
     [InlineData(@"..\..\evil.dll", ".._.._evil.dll")]
     [InlineData("C:report?.pdf", "C_report_.pdf")]
     [InlineData("no_6608!10-17_s~jan.las", "no_6608!10-17_s~jan.las")]
+    // Windows refuses a trailing dot or space, and a device name whatever its case or extension.
+    [InlineData("log.las. .", "log.las")]
+    [InlineData("CON", "_CON")]
+    [InlineData("nul.txt", "_nul.txt")]
+    [InlineData("Com1.tar.gz", "_Com1.tar.gz")]
+    [InlineData("LPT¹", "_LPT¹")]
+    [InlineData("CONSOLE.log", "CONSOLE.log")]
+    [InlineData("COM10", "COM10")]
     [InlineData("..", "1")]
+    [InlineData("...", "1")]
     [InlineData(null, "1")]
     public void ANameIsSafeToSaveUnder(string? name, string expected) =>
         Assert.Equal(expected, FileDownloadCommand.SafeFileName(name, "dev:dataset--File.Generic:1"));
@@ -426,6 +435,25 @@ public sealed class FileTransferTests : IDisposable
     }
 
     [Fact]
+    public void ATemplatePartOfTheWrongShapeIsReportedWithTheRest()
+    {
+        var template = FileUploadCommand.Template("""
+            {"acl":[],"legal":"dev-private","data":{"Name":5,"DatasetProperties":[]}}
+            """);
+
+        var exception = Assert.Throws<OsduException>(() => FileUploadCommand.Record(template, Everything, "log.las"));
+
+        Assert.Equal(
+            string.Join(Environment.NewLine,
+                "The file's record cannot be created; nothing was uploaded.",
+                "  acl must be an object, not array",
+                "  legal must be an object, not string",
+                "  data.DatasetProperties must be an object, not array",
+                "  data.Name must be a string"),
+            exception.Message);
+    }
+
+    [Fact]
     public void AFileTooLargeForOneRequestIsRefused()
     {
         FileUploadCommand.CheckSize("big.segy", SignedUrlTransfer.MaxUploadBytes);
@@ -445,6 +473,52 @@ public sealed class FileTransferTests : IDisposable
     }
 
     // ---- upload: the service -----------------------------------------------------------------
+
+    [Fact]
+    public async Task AFileThatChangesDuringTheUploadIsSaidToHaveChanged()
+    {
+        // Shorter than measured. HttpClient wraps the failure reading the body as its own,
+        // which read as storage being unreachable.
+        var exception = await Assert.ThrowsAsync<OsduException>(() => SignedUrlTransfer.UploadAsync(
+            new HttpClient(new Storage(HttpStatusCode.Created)), SignedUrl, new MemoryStream(Bytes[..10]), Bytes.Length,
+            MD5.HashData(Bytes), null, TestContext.Current.CancellationToken));
+
+        Assert.Equal($"The file changed while it was being uploaded: 10 of {Bytes.Length} bytes were read.", exception.Message);
+    }
+
+    [Fact]
+    public async Task AChecksumMismatchSuggestsAChangedFile()
+    {
+        var storage = new Storage(HttpStatusCode.BadRequest, Encoding.UTF8.GetBytes("<Error><Code>Md5Mismatch</Code></Error>"));
+
+        var exception = await Assert.ThrowsAsync<OsduException>(() => SignedUrlTransfer.UploadAsync(
+            new HttpClient(storage), SignedUrl, new MemoryStream(Bytes), Bytes.Length, MD5.HashData(Bytes), null,
+            TestContext.Current.CancellationToken));
+
+        Assert.Contains("it may have changed while it was being uploaded", exception.Message);
+    }
+
+    public static TheoryData<Exception, string> PostFailures => new()
+    {
+        { new ApiException("refused") { ResponseStatusCode = 400 }, "refused its metadata record, so nothing refers to them" },
+        // The record may have been created before the answer was lost.
+        { new HttpRequestException("Connection reset"), "could not be confirmed" },
+        { new OperationCanceledException(), "could not be confirmed" },
+    };
+
+    [Theory]
+    [MemberData(nameof(PostFailures))]
+    public async Task AFailureAfterTheUploadSaysWhatBecameOfTheBytes(Exception failure, string expected)
+    {
+        var error = new StringWriter();
+
+        var thrown = await Assert.ThrowsAnyAsync<Exception>(() => FileUploadCommand.CreateAsync(
+            () => throw failure, "/osdu-user/2/def", new OutputWriter(OutputFormat.Table, new StringWriter(), error)));
+
+        Assert.Same(failure, thrown);
+        Assert.Contains("uploaded to /osdu-user/2/def", error.ToString());
+        Assert.Contains(expected, error.ToString());
+    }
 
     [Fact]
     public void TheUploadLocationIsReadFromTheResponse()

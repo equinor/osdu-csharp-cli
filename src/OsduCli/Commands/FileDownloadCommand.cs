@@ -121,10 +121,14 @@ public static class FileDownloadCommand
     /// directory it is saved in.
     /// </summary>
     /// <remarks>
-    /// The name comes from a record anyone with write access could have set. Separators and
-    /// characters Windows refuses become <c>_</c>, so <c>../../.bashrc</c> is saved as
+    /// <para>The name comes from a record anyone with write access could have set. Separators
+    /// and characters Windows refuses become <c>_</c>, so <c>../../.bashrc</c> is saved as
     /// <c>.._.._.bashrc</c> where it was asked to go, and a name with nothing left falls back
-    /// to the id's last part.
+    /// to the id's last part.</para>
+    ///
+    /// <para>Windows also refuses a name ending in a dot or a space, and a device name such as
+    /// <c>CON</c> or <c>nul.txt</c> whatever follows it, so the first are trimmed and the
+    /// second get a leading <c>_</c>. A record naming one failed to download there.</para>
     /// </remarks>
     internal static string SafeFileName(string? name, string id)
     {
@@ -133,8 +137,12 @@ public static class FileDownloadCommand
             if (string.IsNullOrWhiteSpace(text))
                 return "";
             var invalid = Path.GetInvalidFileNameChars().Concat(['/', '\\', ':', '*', '?', '"', '<', '>', '|']).ToHashSet();
-            var cleaned = new string([.. text.Trim().Select(c => invalid.Contains(c) || char.IsControl(c) ? '_' : c)]);
-            return cleaned.Trim('.', ' ').Length == 0 ? "" : cleaned;
+            var cleaned = new string([.. text.Trim().Select(c => invalid.Contains(c) || char.IsControl(c) ? '_' : c)])
+                .TrimEnd('.', ' ');
+            if (cleaned.TrimStart('.').Length == 0)
+                return "";
+            var stem = cleaned.Split('.')[0].TrimEnd(' ');
+            return ReservedNames.Contains(stem) ? "_" + cleaned : cleaned;
         }
 
         var safe = Clean(name);
@@ -143,6 +151,13 @@ public static class FileDownloadCommand
         var fromId = Clean(id.Split(':', StringSplitOptions.RemoveEmptyEntries).LastOrDefault());
         return fromId.Length > 0 ? fromId : "download";
     }
+
+    /// <summary>The device names Windows reserves, in any case and with any extension.</summary>
+    private static readonly HashSet<string> ReservedNames = new(
+        ["CON", "PRN", "AUX", "NUL",
+         .. Enumerable.Range(1, 9).Select(n => $"COM{n}"), "COM¹", "COM²", "COM³",
+         .. Enumerable.Range(1, 9).Select(n => $"LPT{n}"), "LPT¹", "LPT²", "LPT³"],
+        StringComparer.OrdinalIgnoreCase);
 
     // ---- saving and checking ----------------------------------------------------------------
 

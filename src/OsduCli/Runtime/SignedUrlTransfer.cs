@@ -114,6 +114,14 @@ internal static partial class SignedUrlTransfer
         }
         catch (HttpRequestException exception)
         {
+            // HttpClient wraps a failure reading the request body as one of its own, which
+            // reported a file that changed during the upload as storage being unreachable.
+            for (var inner = exception.InnerException; inner is not null; inner = inner.InnerException)
+            {
+                if (inner is FileChangedException changed)
+                    throw new OsduException(changed.Message);
+            }
+
             // The host is enough to tell a proxy or firewall problem; the rest of the URL is
             // the signature.
             throw new OsduException(
@@ -135,6 +143,11 @@ internal static partial class SignedUrlTransfer
                 + (detail is null ? "." : $" ({detail}).")
                 + (response.StatusCode == HttpStatusCode.Forbidden
                     ? " The signed URL may have expired; run the command again for a new one."
+                    : "")
+                // The checksum is taken before the upload, so this is a file changed in between
+                // as often as bytes damaged on the way.
+                + (detail == "Md5Mismatch"
+                    ? " The bytes that arrived differ from the file's checksum: it may have changed while it was being uploaded."
                     : ""));
         }
     }
@@ -205,6 +218,9 @@ internal static partial class SignedUrlTransfer
         }
     }
 
+    /// <summary>The file being uploaded is no longer the one measured and hashed.</summary>
+    private sealed class FileChangedException(string message) : IOException(message);
+
     /// <summary>A file's bytes as a request body, reporting how far the upload has got.</summary>
     private sealed class MeteredContent(Stream source, long length, Meter meter) : HttpContent
     {
@@ -232,7 +248,7 @@ internal static partial class SignedUrlTransfer
             // A file that shrank while it was read would otherwise leave the request short of
             // its declared length, which surfaces as an obscure transport error.
             if (sent != length)
-                throw new IOException($"The file changed while it was being uploaded: {sent} of {length} bytes were read.");
+                throw new FileChangedException($"The file changed while it was being uploaded: {sent} of {length} bytes were read.");
         }
 
         protected override Task SerializeToStreamAsync(Stream stream, TransportContext? context) =>
