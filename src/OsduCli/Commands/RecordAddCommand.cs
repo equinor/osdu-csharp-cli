@@ -106,7 +106,9 @@ public static class RecordAddCommand
     /// <remarks>
     /// Checked here so a mistake costs nothing, and so the report names the record and the
     /// field rather than leaving the service's 400 to be decoded. Every problem is listed, so
-    /// a file is fixed in one pass rather than one error per attempt.
+    /// a file is fixed in one pass rather than one error per attempt: one line per record with
+    /// all of its problems, which keeps even a file wrong throughout to a line a record. A cap
+    /// on the lines listed made that promise false for any file with more than ten.
     /// </remarks>
     internal static IReadOnlyList<JsonObject> Read(string json, string partition)
     {
@@ -138,35 +140,37 @@ public static class RecordAddCommand
             records.Add(record);
 
             var name = $"record {index + 1}";
+            var wrong = new List<string>();
             if (Text(record, "id") is { } id)
             {
                 name = $"record {index + 1} ({id})";
                 // Storage refuses an id from another partition, as "does not belong to account".
                 if (!id.StartsWith(partition + ":", StringComparison.Ordinal))
-                    problems.Add($"{name}: the id must start with '{partition}:', the data partition it is written to");
+                    wrong.Add($"the id must start with '{partition}:', the data partition it is written to");
                 if (!seen.Add(id))
-                    problems.Add($"{name}: the id appears more than once in the file");
+                    wrong.Add("the id appears more than once in the file");
             }
 
             if (Text(record, "kind") is null)
-                problems.Add($"{name}: kind is missing");
+                wrong.Add("kind is missing");
             if (Property(record, "data") is not JsonObject)
-                problems.Add($"{name}: data is missing, or not an object");
+                wrong.Add("data is missing, or not an object");
             foreach (var path in new[] { "acl.owners", "acl.viewers", "legal.legaltags", "legal.otherRelevantDataCountries" })
             {
                 var segments = path.Split('.');
                 if (Property(Property(record, segments[0]), segments[1]) is not JsonArray { Count: > 0 })
-                    problems.Add($"{name}: {path} is missing or empty");
+                    wrong.Add($"{path} is missing or empty");
             }
+
+            if (wrong.Count > 0)
+                problems.Add($"{name}: {string.Join("; ", wrong)}");
         }
 
         if (problems.Count > 0)
         {
-            const int shown = 10;
             throw new OsduException(
                 $"The file cannot be written; nothing was sent.{Environment.NewLine}"
-                + string.Join(Environment.NewLine, problems.Take(shown).Select(problem => "  " + problem))
-                + (problems.Count > shown ? $"{Environment.NewLine}  …and {problems.Count - shown} more" : ""));
+                + string.Join(Environment.NewLine, problems.Select(problem => "  " + problem)));
         }
 
         return records;
@@ -325,15 +329,22 @@ public static class RecordAddCommand
     /// otherwise when the person at the terminal agrees. With nobody to ask, refused, since
     /// guessing yes is the accident this exists to prevent.
     /// </summary>
+    /// <remarks>
+    /// What each update replaces and changes is said whichever way it goes. <c>--yes</c> skips
+    /// the question, not the information: it returned before saying anything, so a pipeline
+    /// writing over a shared record left no trace of whose version it replaced.
+    /// </remarks>
     internal static bool Confirm(
         IReadOnlyList<PlannedRecord> plan, bool yes, Func<string, string?>? ask, OutputWriter output)
     {
         var updates = plan.Where(entry => entry.IsUpdate).ToList();
-        if (updates.Count == 0 || yes)
+        if (updates.Count == 0)
             return true;
 
         foreach (var update in updates)
             output.WriteNote(Describe(update));
+        if (yes)
+            return true;
 
         var count = updates.Count == 1 ? "1 record already exists" : $"{updates.Count} records already exist";
         if (ask is null)

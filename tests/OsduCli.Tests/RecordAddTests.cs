@@ -78,9 +78,10 @@ public class RecordAddTests
         var message = Assert.Throws<OsduException>(() => RecordAddCommand.Read(json, Partition)).Message;
 
         Assert.Contains("nothing was sent", message);
-        Assert.Contains("record 2 (dev:a:1): kind is missing", message);
-        Assert.Contains("record 2 (dev:a:1): data is missing, or not an object", message);
-        Assert.Contains("record 2 (dev:a:1): acl.viewers is missing or empty", message);
+        // One line per record, with all of its problems.
+        Assert.Contains(
+            "record 2 (dev:a:1): kind is missing; data is missing, or not an object; acl.viewers is missing or empty",
+            message);
         Assert.DoesNotContain("record 1", message);
     }
 
@@ -103,11 +104,15 @@ public class RecordAddTests
     }
 
     [Fact]
-    public void ManyProblemsAreCountedPastTheFirstTen()
+    public void EveryRecordWithAProblemIsListedHoweverMany()
     {
+        // A cap of ten lines named only the first ten records of a twelve-record file.
         var json = new JsonArray([.. Enumerable.Range(0, 12).Select(i => (JsonNode)Record($"dev:a:{i}", kind: null))]).ToJsonString();
 
-        Assert.Contains("…and 2 more", Assert.Throws<OsduException>(() => RecordAddCommand.Read(json, Partition)).Message);
+        var message = Assert.Throws<OsduException>(() => RecordAddCommand.Read(json, Partition)).Message;
+
+        Assert.Equal(13, message.Split(Environment.NewLine).Length);
+        Assert.Contains("record 12 (dev:a:11): kind is missing", message);
     }
 
     [Fact]
@@ -249,10 +254,15 @@ public class RecordAddTests
     }
 
     [Fact]
-    public void YesGoesAheadWithoutAsking()
+    public void YesGoesAheadWithoutAskingButStillSaysWhatItReplaces()
     {
+        // Skipping the question is not skipping the information: a pipeline updating a shared
+        // record should leave a trace of whose version it replaced.
+        var (writer, error) = Writer();
+
         Assert.True(RecordAddCommand.Confirm(OneUpdate(), yes: true,
-            _ => throw new InvalidOperationException("--yes was given"), Writer().Writer));
+            _ => throw new InvalidOperationException("--yes was given"), writer));
+        Assert.Contains("replaces version 1700000000000000", error.ToString());
     }
 
     [Fact]

@@ -394,8 +394,9 @@ dev:reference-data--Thing:1: replaces version 1777891344832578, last changed by 
 ```
 
 A `removes data.…` in that list is the one to stop at: it usually means the file was copied before
-someone else's change. `--yes` skips the question; without a terminal to ask, the command refuses
-rather than guess. `--dry-run` stops before writing, whatever is in the file.
+someone else's change. `--yes` skips the question but still prints those lines, so a pipeline's
+log shows whose version it replaced; without a terminal to ask, the command refuses rather than
+guess. `--dry-run` stops before writing, whatever is in the file.
 
 The file is checked first, and every problem is listed with its record: a missing `kind`, `acl`,
 `legal` or `data`, an id from another data partition, or an id twice. Storage takes at most 500
