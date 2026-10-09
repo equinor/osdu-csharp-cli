@@ -21,6 +21,9 @@ public sealed class OutputWriter(OutputFormat format, TextWriter output, TextWri
 
     private readonly TextWriter _error = error ?? Console.Error;
 
+    /// <summary>The format results are written in, for a command whose result differs by it.</summary>
+    public OutputFormat Format => format;
+
     /// <summary>Search reports at most this many matches without trackTotalCount.</summary>
     private const long SearchCountCap = 10_000;
 

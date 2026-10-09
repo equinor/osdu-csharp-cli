@@ -144,11 +144,12 @@ commands:
         CreateTime: createTime
 
 handwritten:
-  - command: storage add
+  - command: record add
     op: { method: put, path: /records }
     reason: >
-      Globs a local path, chunks the records into batches, issues one call per batch and
-      aggregates the failures. Orchestration around the endpoint, not a single request.
+      Fetches the records the file names before writing, says which exist and what would
+      change in each, and asks before updating them; --dry-run stops there. Orchestration
+      around the endpoint, not a single request. Commands/RecordAddCommand.cs.
 
   - command: status
     op: { method: get, path: /info }

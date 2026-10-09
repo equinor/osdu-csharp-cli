@@ -365,6 +365,46 @@ osducs record headers --id "…" -a kind -a acl      # headers only, no data pay
 Record ids are scoped to a data partition, so an id from one environment is meaningless in
 another. Take them from `record search`.
 
+## Writing records
+
+`record add` creates or updates records of any kind from a JSON file holding one record or an
+array of them. The typed nouns, such as `wellbore add`, write their own kinds; this is the way to
+write anything else, reference data included.
+
+```bash
+osducs record add --file thing.json --dry-run    # what would be created and updated, and what would change
+osducs record add --file thing.json
+```
+
+```
+Id                           Version           Result
+---------------------------  ----------------  -------
+dev:reference-data--Thing:1  1777891344832579  updated
+```
+
+Writing to an id that already exists adds a new version over whatever is there. Earlier versions
+stay readable with `record version get`, but on a record several teams edit, the last version is
+the one everyone sees. So before writing, `record add` fetches every record the file names, and for
+each that exists says which version it replaces, who changed it last and when, and what would
+change:
+
+```
+dev:reference-data--Thing:1: replaces version 1777891344832578, last changed by someone@equinor.com on 2026-05-04; changes data.Configurations, adds data.Description
+1 record already exists. Update it? [y/N]
+```
+
+A `removes data.…` in that list is the one to stop at: it usually means the file was copied before
+someone else's change. `--yes` skips the question; without a terminal to ask, the command refuses
+rather than guess. `--dry-run` stops before writing, whatever is in the file.
+
+The file is checked first, and every problem is listed with its record: a missing `kind`, `acl`,
+`legal` or `data`, an id from another data partition, or an id twice. Storage takes at most 500
+records in one request, so a longer file is refused; split it. The file is sent as it is, not
+rewritten.
+
+`--skip-unchanged` leaves a record alone when it is identical to its latest version, so running
+the same file again does not stack up identical versions; those are reported as `unchanged`.
+
 ## Shell completion
 
 ```bash
