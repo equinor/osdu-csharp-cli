@@ -155,7 +155,8 @@ Three usual causes:
 ## The count says exactly 10,000
 
 That is the cap, not the answer. `osducs` prints it as `10,000+ …`; add
-`--track-total-count` for the true figure.
+`--track-total-count` for the true figure. To get the records themselves past the first 1000,
+use a larger `--limit` or `--all`; see [USAGE.md](USAGE.md#more-than-1000-results).
 
 ## macOS refuses to run the binary
 

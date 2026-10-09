@@ -22,11 +22,17 @@ BODY_OPERATION = {
     "responses": {"200": {"content": {"application/json": {"schema": {"type": "object"}}}}},
 }
 
-SPEC = {"components": {"schemas": {"QueryRequest": {"properties": {
-    "kind": {"type": "string"},
-    "returnedFields": {"type": "array", "items": {"type": "string"}},
-    "excludedFields": {"type": "array", "items": {"type": "string"}},
-}}}}}
+SPEC = {"components": {"schemas": {
+    "QueryRequest": {"properties": {
+        "kind": {"type": "string"},
+        "returnedFields": {"type": "array", "items": {"type": "string"}},
+        "excludedFields": {"type": "array", "items": {"type": "string"}},
+    }},
+    # What Search's cursor endpoint takes: the query's fields but `offset`, and a cursor.
+    "CursorQueryRequest": {"properties": {
+        "kind": {"type": "string"}, "limit": {"type": "integer"}, "cursor": {"type": "string"},
+    }},
+}}}
 
 
 def build(entry, operation=OPERATION, spec=None):
@@ -156,6 +162,143 @@ class TestCommaSeparated:
     def test_it_is_true_or_false(self):
         with pytest.raises(ManifestError, match="true or false"):
             build(self.entry({"type": "string[]", "comma-separated": "yes"}), BODY_OPERATION)
+
+
+class TestPaging:
+    """`paging:` sends the same request to a cursor endpoint when one page is not enough."""
+
+    CURSOR = {"requestBody": {"content": {"application/json": {"schema": {
+        "$ref": "#/components/schemas/CursorQueryRequest"}}}},
+        "responses": BODY_OPERATION["responses"]}
+    RELEASE = {"responses": BODY_OPERATION["responses"]}
+
+    @staticmethod
+    def entry(paging=None, fields=None, output=None):
+        spec_fields = {"kind": {"flag": "-k"}, "limit": {"flag": "--limit", "type": "int"},
+                       "offset": {"flag": "--offset", "type": "int"}}
+        paging_cfg = {"op": {"method": "post", "path": "/query_with_cursor"},
+                      "release": {"method": "delete", "path": "/query_with_cursor/{cursor}"},
+                      "limit": "limit", "page-size": 1000, "cursor": "cursor",
+                      "not-with": ["offset"]}
+        paging_cfg.update(paging or {})
+        return {"command": "record search", "op": {"method": "post", "path": "/query"},
+                "body": {"fields": fields or spec_fields},
+                "paging": {k: v for k, v in paging_cfg.items() if v is not None},
+                "output": output if output is not None else {"root": "results"}}
+
+    def build(self, entry, operations="default"):
+        ops = (self.CURSOR, self.RELEASE) if operations == "default" else operations
+        return build_command(entry, BODY_OPERATION, "here", "Models", SPEC, ops)
+
+    def test_it_is_carried_onto_the_command(self):
+        paging = self.build(self.entry()).paging
+        assert (paging.builder, paging.model, paging.release_builder) == (
+            "Query_with_cursor", "CursorQueryRequest", "Query_with_cursor[{cursor}]")
+        assert (paging.limit.name, paging.page_size, paging.cursor) == ("limit", 1000, "cursor")
+        assert [field.name for field in paging.not_with] == ["offset"]
+
+    def test_release_is_optional(self):
+        assert self.build(self.entry({"release": None}), (self.CURSOR, None)).paging.release_builder is None
+
+    def test_a_body_read_from_a_file_cannot_page(self):
+        # Each page resizes the request, which a file's body cannot be.
+        entry = self.entry()
+        entry["body"] = {"flag": "--file"}
+        with pytest.raises(ManifestError, match="body built from `fields:`"):
+            self.build(entry)
+
+    def test_the_results_need_a_root_to_join(self):
+        with pytest.raises(ManifestError, match="output.root"):
+            self.build(self.entry(output={}))
+
+    @pytest.mark.parametrize("limit", ["kind", "nonsense"])
+    def test_the_limit_must_be_a_number_field(self, limit):
+        with pytest.raises(ManifestError, match="must name an `int` body field"):
+            self.build(self.entry({"limit": limit}))
+
+    # 2**31 is one past a C# int, and generated code that did not compile.
+    @pytest.mark.parametrize("size", [0, -5, "1000", True, 2**31])
+    def test_the_page_size_is_a_positive_whole_number(self, size):
+        with pytest.raises(ManifestError, match="page-size"):
+            self.build(self.entry({"page-size": size}))
+
+    def test_not_with_names_fields_of_the_command(self):
+        with pytest.raises(ManifestError, match="not-with"):
+            self.build(self.entry({"not-with": ["sort"]}))
+
+    def test_release_is_a_delete_with_the_cursor_in_its_path(self):
+        with pytest.raises(ManifestError, match="release"):
+            self.build(self.entry({"release": {"method": "post", "path": "/query_with_cursor/{cursor}"}}))
+        with pytest.raises(ManifestError, match="release"):
+            self.build(self.entry({"release": {"method": "delete", "path": "/query_with_cursor"}}))
+
+    def test_the_op_must_be_a_post(self):
+        # The emitted code calls PostAsync whatever the manifest said.
+        with pytest.raises(ManifestError, match="must be a POST"):
+            self.build(self.entry({"op": {"method": "put", "path": "/query_with_cursor"}}))
+
+    # Any placeholder, not only one of word characters, as derive_builder treats them all.
+    @pytest.mark.parametrize("path", ["/items/{id}/cursor", "/items/{item.id}/cursor"])
+    def test_the_op_cannot_have_path_parameters(self, path):
+        # Nothing would supply them, and the generated code would not compile.
+        with pytest.raises(ManifestError, match="cannot have path parameters"):
+            self.build(self.entry({"op": {"method": "post", "path": path}}))
+
+    def test_a_release_placeholder_of_any_name_is_given_the_cursor(self):
+        paging = self.build(self.entry({"release": {"method": "delete", "path": "/query_with_cursor/{cursor.id}"}})).paging
+        assert paging.release_builder.count("{") == 1
+
+    def test_the_limit_and_cursor_are_top_level(self):
+        # Set on the request itself: a dotted name became a literal property beside the
+        # nested one it meant.
+        fields = {"kind": {"flag": "-k"}, "page.limit": {"flag": "--limit", "type": "int"}}
+        with pytest.raises(ManifestError, match="top-level body field"):
+            self.build(self.entry({"limit": "page.limit", "not-with": None}, fields=fields))
+        with pytest.raises(ManifestError, match="top-level cursor property"):
+            self.build(self.entry({"cursor": "page.cursor"}))
+
+    def test_the_cursor_cannot_share_a_name_with_a_body_field(self):
+        # Written onto each page after the limit: `cursor: limit` replaced the page size.
+        with pytest.raises(ManifestError, match="is also a body field"):
+            self.build(self.entry({"cursor": "limit"}))
+
+    def test_the_cursor_endpoint_must_take_the_limit_and_the_cursor(self):
+        with pytest.raises(ManifestError, match="must take both"):
+            self.build(self.entry({"cursor": "nextPage"}))
+
+    def test_a_field_the_cursor_endpoint_does_not_take_must_be_listed_in_not_with(self):
+        # `offset` is not in the cursor endpoint's request; left out of not-with, a page
+        # would have been a different request from the one the options described.
+        with pytest.raises(ManifestError, match=r"does not take \['offset'\]"):
+            self.build(self.entry({"not-with": None}))
+
+    # One option spread across several paths by `parts` lands on those paths, not its name.
+    SPREAD = {"kind": {"flag": "-k"}, "limit": {"flag": "--limit", "type": "int"},
+              "offset": {"flag": "--offset", "type": "int"}}
+
+    def spread(self, *paths):
+        return {**self.SPREAD, "area": {"flag": "--area", "type": "double[]", "parts": list(paths)}}
+
+    def test_parts_landing_on_the_cursor_are_refused(self):
+        with pytest.raises(ManifestError, match="is also a body field"):
+            self.build(self.entry(fields=self.spread("cursor.x", "cursor.y")))
+
+    def test_parts_the_cursor_endpoint_does_not_take_must_be_listed_in_not_with(self):
+        with pytest.raises(ManifestError, match=r"does not take \['box'\]"):
+            self.build(self.entry(fields=self.spread("box.x", "box.y")))
+        # Listed by the option's own name, wherever its parts land.
+        self.build(self.entry({"not-with": ["offset", "area"]}, fields=self.spread("box.x", "box.y")))
+
+    def test_the_limit_cannot_be_spread_by_parts(self):
+        fields = {**self.SPREAD, "limit": {"flag": "--limit", "type": "int", "parts": ["page.limit"]}}
+        with pytest.raises(ManifestError, match="must be a top-level body field"):
+            self.build(self.entry(fields=fields))
+
+    def test_unknown_paging_keys_are_refused(self):
+        entry = self.entry()
+        entry["paging"]["pages"] = 3
+        with pytest.raises(ManifestError, match="unknown paging key"):
+            self.build(entry)
 
 
 class TestParamValidation:

@@ -29,6 +29,7 @@ SECTIONS = {
     "body field": "### Body `fields`",
     "output": "### `output`",
     "example": "### `examples`",
+    "paging": "### `paging`",
     "handwritten": "## `handwritten`",
     "exclude": "## `exclude`",
 }
@@ -112,6 +113,70 @@ def test_a_scope_list_is_accepted(tmp_path, monkeypatch):
     service = build_service(manifest_with_scope(tmp_path, monkeypatch, ["/ddms/v3/*"]))
 
     assert service.coverage.in_scope == 1
+
+
+PAGED_SPEC = """
+openapi: 3.0.1
+info: { title: t, version: "1" }
+paths:
+  /query:
+    post:
+      requestBody: { content: { application/json: { schema: { $ref: "#/components/schemas/Q" } } } }
+      responses: { "200": { description: ok, content: { application/json: { schema: { type: object } } } } }
+  /query_with_cursor:
+    post:
+      requestBody: { content: { application/json: { schema: { $ref: "#/components/schemas/C" } } } }
+      responses: { "200": { description: ok, content: { application/json: { schema: { type: object } } } } }
+  /query_with_cursor/{cursor}:
+    delete:
+      parameters: [ { name: cursor, in: path, required: true, schema: { type: string } } ]
+      responses: { "200": { description: ok } }
+components:
+  schemas:
+    Q: { properties: { kind: { type: string }, limit: { type: integer } } }
+    C: { properties: { kind: { type: string }, limit: { type: integer }, cursor: { type: string } } }
+"""
+
+
+def paged_manifest(tmp_path, monkeypatch, paging) -> Path:
+    (tmp_path / "specs" / "tiny").mkdir(parents=True)
+    (tmp_path / "specs" / "tiny" / "openapi.yaml").write_text(PAGED_SPEC, encoding="utf-8")
+    monkeypatch.setattr(generate_cli, "SPECS_DIR", tmp_path / "specs")
+    command = {"command": "record search", "summary": "Search.",
+               "op": {"method": "post", "path": "/query"},
+               "body": {"fields": {"kind": {"flag": "--kind"},
+                                   "limit": {"flag": "--limit", "type": "int"}}},
+               "output": {"root": "results", "columns": {"Id": "id"}}}
+    if paging:
+        command["paging"] = paging
+    path = tmp_path / "tiny.yaml"
+    path.write_text(yaml.safe_dump({"service": "tiny", "spec": "tiny", "client": "Tiny",
+                                    "commands": [command]}), encoding="utf-8")
+    return path
+
+
+def test_the_endpoints_a_command_pages_through_are_accounted_for(tmp_path, monkeypatch):
+    service = build_service(paged_manifest(tmp_path, monkeypatch, {
+        "op": {"method": "post", "path": "/query_with_cursor"},
+        "release": {"method": "delete", "path": "/query_with_cursor/{cursor}"},
+        "limit": "limit", "page-size": 1000, "cursor": "cursor"}))
+
+    assert service.coverage.missing == []
+    assert service.coverage.paged == 2
+
+
+def test_without_paging_the_cursor_endpoints_are_missing(tmp_path, monkeypatch):
+    service = build_service(paged_manifest(tmp_path, monkeypatch, None))
+
+    assert service.coverage.missing == [("delete", "/query_with_cursor/{cursor}"),
+                                        ("post", "/query_with_cursor")]
+
+
+def test_a_paging_endpoint_the_spec_lacks_is_refused(tmp_path, monkeypatch):
+    with pytest.raises(ManifestError, match="paging op POST /nowhere is not in"):
+        build_service(paged_manifest(tmp_path, monkeypatch, {
+            "op": {"method": "post", "path": "/nowhere"},
+            "limit": "limit", "page-size": 1000, "cursor": "cursor"}))
 
 
 def test_a_scope_written_as_a_string_is_refused(tmp_path, monkeypatch):

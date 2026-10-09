@@ -25,7 +25,7 @@ public sealed class OutputWriter(OutputFormat format, TextWriter output, TextWri
     public OutputFormat Format => format;
 
     /// <summary>Search reports at most this many matches without trackTotalCount.</summary>
-    private const long SearchCountCap = 10_000;
+    internal const long SearchCountCap = 10_000;
 
     /// <summary>
     /// Writes <paramref name="json"/> and returns the process exit code (always 0 — a failed

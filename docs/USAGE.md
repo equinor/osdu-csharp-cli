@@ -330,6 +330,25 @@ osducs record search --kind "osdu:wks:master-data--Well:*" --limit 1 --track-tot
 Wildcards work per segment, and `…--Well:*` is better than pinning a version: a kind usually
 has records against several schema versions, and pinning one silently misses the rest.
 
+### More than 1000 results
+
+Search answers at most 1000 records a request, and `--offset` cannot reach past the first
+10,000. Ask for more and osducs pages through Search's cursor for you:
+
+```bash
+# the first 25,000
+osducs record search --kind "osdu:wks:work-product-component--WellLog:*" --limit 25000 -f id
+
+# every match
+osducs record search --kind "osdu:wks:work-product-component--WellLog:*" --all -f id -o json > welllogs.json
+```
+
+Pages of 1000 are fetched one after another, with progress on stderr when it is a terminal
+(`Fetched 12,000 of 61,042`), and joined into one table or one JSON array. All 61,042
+WellLogs on dev took about 12 seconds with `-f id`. Name the fields you need: without `-f`,
+every record arrives whole. `--offset` cannot be combined with this, since the cursor starts
+at the first match, and `--all` cannot be combined with `--limit`.
+
 ### Counting
 
 `record aggregate` answers "how many of each", which `search` cannot:

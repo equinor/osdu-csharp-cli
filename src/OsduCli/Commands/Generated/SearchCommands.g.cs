@@ -50,7 +50,7 @@ public static partial class SearchCommands
         };
         var limitBodyOption = new Option<int?>("--limit", "-l")
         {
-            Description = "Maximum number of results. Defaults to 10 upstream, capped at 1000.",
+            Description = "Maximum number of results. Defaults to 10. Above 1000, Search's per-request maximum, the results are fetched 1000 at a time through its cursor.",
         };
         var offsetBodyOption = new Option<int?>("--offset")
         {
@@ -145,6 +145,10 @@ public static partial class SearchCommands
         {
             Description = "Radius in metres around --near.",
         };
+        var allOption = new Option<bool>("--all")
+        {
+            Description = "Return every match, fetched 1000 at a time through /query_with_cursor. Cannot be combined with --limit or --offset.",
+        };
 
         var command = new Command("search", "Search records with a Lucene query.");
         command.Options.Add(kindBodyOption);
@@ -160,6 +164,7 @@ public static partial class SearchCommands
         command.Options.Add(spatialfilterByBoundingBoxBodyOption);
         command.Options.Add(spatialfilterByDistancePointBodyOption);
         command.Options.Add(spatialfilterByDistanceDistanceBodyOption);
+        command.Options.Add(allOption);
 
         // Contradictory options, rejected before the service has to
         // decide which one it believes.
@@ -175,6 +180,16 @@ public static partial class SearchCommands
         {
             if (result.GetResult(spatialfilterByBoundingBoxBodyOption) is not null && result.GetResult(spatialfilterByDistancePointBodyOption) is not null)
                 result.AddError("--bbox and --near cannot be used together.");
+        });
+
+        // Options paging cannot combine, rejected before configuration is read.
+        command.Validators.Add(result =>
+        {
+            var all = result.GetValue(allOption);
+            if (all && result.GetResult(limitBodyOption) is not null)
+                result.AddError("--all and --limit cannot be used together: --all is every match, --limit at most that many.");
+            if ((all || result.GetValue(limitBodyOption) > 1000) && result.GetResult(offsetBodyOption) is not null)
+                result.AddError("--offset cannot be combined with --all or a --limit above 1000: those page through /query_with_cursor, which starts at the first match.");
         });
 
         command.SetAction((parseResult, cancellationToken) =>
@@ -228,6 +243,29 @@ public static partial class SearchCommands
             if (spatialfilterByDistanceDistanceValue is not null)
                 CliContext.Child(CliContext.Child(bodyNode, "spatialFilter"), "byDistance")["distance"] = JsonValue.Create(spatialfilterByDistanceDistanceValue);
             var bodyJson = bodyNode.ToJsonString();
+
+            var allValue = parseResult.GetValue(allOption);
+            if (allValue || limitValue > 1000)
+            {
+                var pagedJson = await CursorPaging.CollectAsync(
+                    bodyNode, allValue ? null : limitValue, 1000,
+                    "limit", "cursor", "results", "totalCount",
+                    async (page, pageCancellation) => await OsduJson.ToJsonAsync(
+                        await context.Client.Search.Query_with_cursor.PostAsync(
+                            await KiotaJsonSerializer.DeserializeAsync<CursorQueryRequest>(
+                                page.ToJsonString(), CursorQueryRequest.CreateFromDiscriminatorValue, pageCancellation),
+                            cancellationToken: pageCancellation)),
+                    (cursor, releaseCancellation) => context.Client.Search.Query_with_cursor[cursor].DeleteAsync(cancellationToken: releaseCancellation),
+                    Console.IsErrorRedirected ? null : Console.Error,
+                    cancellationToken);
+                context.Output.WriteTotal(pagedJson, "totalCount");
+                return context.Output.Write(
+                    pagedJson,
+                    returnedfieldsValue is { Length: > 0 }
+                    ? OutputSpec.FromFields("results", returnedfieldsValue)
+                    : OutputSpec.Table("results", ("Id", "id"), ("Kind", "kind")));
+            }
+
             var body = await KiotaJsonSerializer.DeserializeAsync<QueryRequest>(
                 bodyJson, QueryRequest.CreateFromDiscriminatorValue, cancellationToken);
 

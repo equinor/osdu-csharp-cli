@@ -78,6 +78,7 @@ Each item under `commands:`.
 | `require-one-of` | no | Two or more param names of which at least one must be given, checked before anything is sent. See [`require-one-of`](../COMMAND-GRAMMAR.md#require-one-of). |
 | `mutually-exclusive` | no | Params or body fields that cannot be combined: one group as `[a, b]`, or several as `[[a, b], [c, d]]`. See [`mutually-exclusive`](../COMMAND-GRAMMAR.md#mutually-exclusive). |
 | `forbidden-hint` | no | An extra line printed under a 403, for example pointing to a command most users can run instead. The roles the operation needs are added without this key: the generator reads them from the spec's "Allowed roles" or "Required roles" text. |
+| `paging` | no | A cursor endpoint to send the same request to when one page of results is not enough. Adds `--all`. See [`paging`](#paging). |
 
 ### `op`
 
@@ -183,6 +184,30 @@ mapping:
 Examples are shown in [the command reference](COMMANDS.md), not in `--help`.
 `tools/smoke_test.py` runs every example that is not skipped against a live environment, and
 counts an empty result as a failure. See [Smoke-testing the examples](DEVELOPMENT.md#smoke-testing-the-examples).
+
+### `paging`
+
+For an endpoint that answers one page at a time, beside a cursor endpoint that takes the same
+request plus a cursor — Search's `POST /query` and `POST /query_with_cursor`. The command's
+options build the request once. A `limit` above `page-size`, or `--all`, sends it to the cursor
+endpoint instead, page after page, and joins the results under `output.root`; anything else
+goes to the command's own endpoint as before. The endpoints named here count as accounted for,
+so they are not excluded as well.
+
+| Key | Required | What it does |
+|---|---|---|
+| `op` | yes | The cursor endpoint, as `{ method, path }`: a `POST` without path parameters, whose request body is one object, not an array. |
+| `release` | no | A `DELETE` with the cursor as its one path parameter, called when the command stops before the cursor's end — at its limit, or on an error or an interruption. |
+| `limit` | yes | The top-level `int` body field, without `parts`, setting the number of results. Above `page-size` the command pages, and each page asks for at most `page-size`. |
+| `page-size` | yes | The most one page may ask for: the service's own per-request maximum. |
+| `cursor` | yes | The top-level request and response property holding the cursor. It cannot be a property a body field or fixed value writes to, including the paths a field's `parts` spread across. |
+| `not-with` | no | Body fields the cursor endpoint does not take, such as `offset`, refused alongside paging. |
+
+Paging needs a body built from `fields` and an `output.root`. The cursor endpoint's request
+must take the `limit` field, the `cursor`, and every property the other body fields and fixed
+values write to; the generator refuses one that does not, unless the field is listed in
+`not-with` by its own name. The added `--all` cannot be combined with the `limit` field's
+option.
 
 ## `handwritten`
 

@@ -24,6 +24,7 @@ SPEC = {"components": {"schemas": {
     "QueryRequest": {"properties": {
         "kind": {"type": "string"},
         "limit": {"type": "integer", "format": "int32"},
+        "offset": {"type": "integer", "format": "int32"},
         "returnedFields": {"type": "array", "items": {"type": "string"}},
         "sort": {"$ref": "#/components/schemas/SortQuery"},
         "spatialFilter": {"$ref": "#/components/schemas/SpatialFilter"},
@@ -32,6 +33,8 @@ SPEC = {"components": {"schemas": {
         "order": {"type": "array", "items": {"type": "string", "enum": ["ASC", "DESC"]}}}},
     "SpatialFilter": {"properties": {"field": {"type": "string"}}},
     "Record": {"properties": {"kind": {"type": "string"}}},
+    "CursorQueryRequest": {"properties": {
+        "kind": {"type": "string"}, "limit": {"type": "integer"}, "cursor": {"type": "string"}}},
 }}}
 
 JSON_200 = {"200": {"content": {"application/json": {"schema": {"type": "object"}}}}}
@@ -141,6 +144,23 @@ CASES = {
          "output": {"root": "results", "columns-from": "returnedFields", "columns": {"Id": "id"}}},
         operation(body={"$ref": "#/components/schemas/QueryRequest"}),
     ),
+    # A command that pages through a cursor endpoint past one page: an early branch after the
+    # body is built, sending the same request there, and the ordinary call below unchanged.
+    "paged_search": (
+        {"command": "record search", "summary": "Search.",
+         "op": {"method": "post", "path": "/query"},
+         "body": {"fields": {
+             "kind": {"flag": "--kind", "required": True, "help": "Kind."},
+             "limit": {"flag": "--limit", "short": "-l", "type": "int", "help": "Limit."},
+             "offset": {"flag": "--offset", "type": "int", "help": "Offset."}}},
+         "paging": {"op": {"method": "post", "path": "/query_with_cursor"},
+                    "release": {"method": "delete", "path": "/query_with_cursor/{cursor}"},
+                    "limit": "limit", "page-size": 1000, "cursor": "cursor",
+                    "not-with": ["offset"]},
+         "output": {"root": "results", "total-from": "totalCount", "columns": {"Id": "id"}}},
+        operation(body={"$ref": "#/components/schemas/QueryRequest"}),
+        (operation(body={"$ref": "#/components/schemas/CursorQueryRequest"}), operation()),
+    ),
     "require_one_of": (
         {"command": "crs get", "summary": "Get a CRS.",
          "op": {"method": "get", "path": "/v3/coordinate-reference-system"},
@@ -154,17 +174,17 @@ CASES = {
 }
 
 
-def emit(entry, op):
+def emit(entry, op, paging_operations=None):
     service = Service(name="test", client="Storage", models="Storage", description="Test.",
                       spec_file="test.yaml", commands=[], groups={})
-    command = build_command(entry, op, "test", "Storage", SPEC)
+    command = build_command(entry, op, "test", "Storage", SPEC, paging_operations)
     return "\n".join(emit_command(service, command)) + "\n"
 
 
 @pytest.mark.parametrize("name", sorted(CASES))
 def test_emission_matches_the_recorded_output(name):
-    entry, op = CASES[name]
-    produced = emit(entry, op)
+    entry, op, *paging_operations = CASES[name]
+    produced = emit(entry, op, *paging_operations)
     golden = GOLDEN / f"{name}.cs"
 
     if os.environ.get("UPDATE_GOLDEN"):
