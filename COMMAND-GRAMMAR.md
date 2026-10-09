@@ -228,7 +228,8 @@ actual byte transfer is a second request the CLI must make. That is orchestratio
 > endpoint needs an editor role that a viewer who may download lacks, and checks the bytes
 > against its checksum. `file upload` also creates the metadata record (`POST
 > /v2/files/metadata`), with access and legal settings from options or a `--metadata`
-> template. The metadata commands kept their generated names, `file get`, `add` and `delete`.
+> template. The metadata commands are `file get`, `file add` and `file delete`, as generated,
+> rather than the `file metadata …` planned above.
 
 ### dataset — Dataset (9 ops)
 

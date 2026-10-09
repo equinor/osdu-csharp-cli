@@ -445,7 +445,7 @@ dev:dataset--File.Generic:259d…  /home/me/logs/no_6608!10-17_s~jan_lfptest.las
 The bytes are checked against the checksum in the file's record, MD5 or SHA-256, or against the
 MD5 storage keeps when the record has none. A file that does not match is not saved, and a
 download that fails or is interrupted leaves nothing behind under the name. An existing file is
-only replaced with `--force`. The name comes from the record, with anything that could lead
+only replaced with `--force`, and a `--path` directory that does not exist yet is created. The name comes from the record, with anything that could lead
 outside the directory replaced.
 
 ```bash

@@ -32,7 +32,8 @@ public static class FileDownloadCommand
         var path = new Option<string?>("--path", "-p")
         {
             Description = "Where to save the file: a file name, or a directory to save it in under the name its "
-                          + "record gives. Defaults to that name in the current directory.",
+                          + "record gives; a directory that does not exist yet is created. Defaults to that name in "
+                          + "the current directory.",
         };
         var force = new Option<bool>("--force")
         {
@@ -153,12 +154,21 @@ public static class FileDownloadCommand
     /// once its checksum matches, so a failed or interrupted download never leaves a partial
     /// or wrong file under the name asked for.
     /// </summary>
+    /// <remarks>
+    /// The directory is created first: <c>--path logs/</c> names one that may not exist yet,
+    /// and opening the file in it failed with an unexplained exception. The partial file's
+    /// name is unique to the run, and in the same directory so the move into place is a
+    /// rename: a fixed name made a second download to the same path fail to open it.
+    /// </remarks>
     internal static async Task<Saved> SaveAsync(
         HttpClient http, string url, string destination, bool force, Source source,
         TextWriter? progress, CancellationToken cancellationToken)
     {
         var expected = Expected(source);
-        var partial = destination + ".osducs-download";
+        var directory = Path.GetDirectoryName(destination)!;
+        Directory.CreateDirectory(directory);
+        var partial = Path.Combine(directory,
+            $".{Path.GetFileName(destination)}.{Convert.ToHexStringLower(RandomNumberGenerator.GetBytes(4))}.osducs-download");
         var moved = false;
         try
         {

@@ -236,6 +236,47 @@ public sealed class FileTransferTests : IDisposable
     }
 
     [Fact]
+    public async Task ADirectoryThatDoesNotExistYetIsCreated()
+    {
+        var destination = FileDownloadCommand.Destination(
+            Path.Combine(_directory.FullName, "logs", "2026") + Path.DirectorySeparatorChar, "log.las", "dev:x:1");
+
+        await Save(new Storage(HttpStatusCode.OK, Bytes), FileRecord(), destination);
+
+        Assert.Equal(Bytes, await File.ReadAllBytesAsync(destination, TestContext.Current.CancellationToken));
+    }
+
+    /// <summary>Holds every response until <paramref name="expected"/> requests are in flight at once.</summary>
+    private sealed class Together(int expected) : HttpMessageHandler
+    {
+        private readonly TaskCompletionSource _all = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        private int _arrived;
+
+        protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
+        {
+            if (Interlocked.Increment(ref _arrived) == expected)
+                _all.SetResult();
+            await _all.Task.WaitAsync(cancellationToken);
+            return new HttpResponseMessage(HttpStatusCode.OK) { Content = new ByteArrayContent(Bytes) };
+        }
+    }
+
+    [Fact]
+    public async Task TwoDownloadsToOnePathDoNotShareAPartialFile()
+    {
+        // Each opens its partial file before asking for the bytes, so both are open together:
+        // under one fixed name, the second could not open it.
+        var destination = Path.Combine(_directory.FullName, "log.las");
+        var http = new HttpClient(new Together(2));
+        var source = FileDownloadCommand.Describe(FileRecord());
+
+        await Task.WhenAll(Enumerable.Range(0, 2).Select(_ => FileDownloadCommand.SaveAsync(
+            http, SignedUrl, destination, force: true, source, null, TestContext.Current.CancellationToken)));
+
+        Assert.Equal(["log.las"], _directory.GetFiles().Select(file => file.Name));
+    }
+
+    [Fact]
     public async Task AnExistingFileIsReplacedOnlyWhenForced()
     {
         var destination = Path.Combine(_directory.FullName, "log.las");
