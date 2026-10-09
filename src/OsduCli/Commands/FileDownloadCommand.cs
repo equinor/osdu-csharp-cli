@@ -217,11 +217,14 @@ public static class FileDownloadCommand
         var directory = Path.GetDirectoryName(destination)!;
         Directory.CreateDirectory(directory);
         var partial = Path.Combine(directory, $".osducs-{Convert.ToHexStringLower(RandomNumberGenerator.GetBytes(4))}.part");
+        // Created, never reused: a file already there under the name is someone else's, and
+        // is neither truncated nor, below, deleted.
+        var file = new FileStream(partial, FileMode.CreateNew, FileAccess.Write, FileShare.None);
         var moved = false;
         try
         {
             SignedUrlTransfer.Received received;
-            await using (var file = new FileStream(partial, FileMode.Create, FileAccess.Write, FileShare.None))
+            await using (file)
             {
                 received = await SignedUrlTransfer.DownloadAsync(
                     http, url, file, expected?.Algorithm ?? HashAlgorithmName.MD5, progress, cancellationToken);

@@ -231,10 +231,19 @@ internal static partial class SignedUrlTransfer
             long sent = 0;
             try
             {
-                int read;
-                while (sent < length && (read = await source.ReadAsync(
-                           buffer.AsMemory(0, (int)Math.Min(buffer.Length, length - sent)), cancellationToken)) > 0)
+                while (true)
                 {
+                    // One byte more than is left, so a file that grew after it was measured and
+                    // hashed is noticed before its last bytes go: stopping at the length sent a
+                    // prefix whose checksum matched, and the record described a truncated file.
+                    var remaining = length - sent;
+                    var read = await source.ReadAsync(
+                        buffer.AsMemory(0, (int)Math.Min(buffer.Length, remaining + 1)), cancellationToken);
+                    if (read == 0)
+                        break;
+                    if (read > remaining)
+                        throw new FileChangedException(
+                            $"The file changed while it was being uploaded: it is now longer than the {length} bytes measured.");
                     await stream.WriteAsync(buffer.AsMemory(0, read), cancellationToken);
                     sent += read;
                     meter.Report(sent);

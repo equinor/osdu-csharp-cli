@@ -441,6 +441,17 @@ public sealed class FileTransferTests : IDisposable
     }
 
     [Fact]
+    public void AnEmptyLegalTagIsRefusedBeforeAnythingIsSent()
+    {
+        var template = FileUploadCommand.Template("""{"legal":{"legaltags":["", " "]}}""");
+
+        var exception = Assert.Throws<OsduException>(() => FileUploadCommand.Record(template,
+            Everything with { LegalTags = [] }, "log.las"));
+
+        Assert.Contains("legal.legaltags cannot hold an empty value", exception.Message);
+    }
+
+    [Fact]
     public void GroupsAndCountriesAreCheckedBeforeAnythingIsSent()
     {
         var exception = Assert.Throws<OsduException>(() => FileUploadCommand.Record(null,
@@ -518,6 +529,20 @@ public sealed class FileTransferTests : IDisposable
             MD5.HashData(Bytes), null, TestContext.Current.CancellationToken));
 
         Assert.Equal($"The file changed while it was being uploaded: 10 of {Bytes.Length} bytes were read.", exception.Message);
+    }
+
+    [Fact]
+    public async Task AFileThatGrowsDuringTheUploadIsStoppedBeforeItsLastBytes()
+    {
+        // Longer than measured. Stopping at the length sent a prefix that matched its checksum.
+        var storage = new Storage(HttpStatusCode.Created);
+
+        var exception = await Assert.ThrowsAsync<OsduException>(() => SignedUrlTransfer.UploadAsync(
+            new HttpClient(storage), SignedUrl, new MemoryStream(Bytes), Bytes.Length - 5,
+            MD5.HashData(Bytes[..^5]), null, TestContext.Current.CancellationToken));
+
+        Assert.Equal($"The file changed while it was being uploaded: it is now longer than the {Bytes.Length - 5} bytes measured.",
+            exception.Message);
     }
 
     [Fact]

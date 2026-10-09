@@ -284,6 +284,10 @@ public static partial class FileUploadCommand
             var text = value is JsonValue json && json.TryGetValue<string>(out var s) ? s : null;
             if (text is null)
                 problems.Add($"{path} must hold strings");
+            // Legal tags have no pattern to catch it, so a template's [""] passed and the bytes
+            // were uploaded before the service refused the record.
+            else if (string.IsNullOrWhiteSpace(text))
+                problems.Add($"{path} cannot hold an empty value");
             else if (check?.Invoke(text) is { } problem)
                 problems.Add($"{path}: {problem}");
         }
