@@ -329,8 +329,9 @@ public static partial class FileUploadCommand
     /// </summary>
     /// <remarks>
     /// Said before the error, so it is not mistaken for a failed upload to retry as it is. A
-    /// refusal means no record was created; a lost connection or an interruption leaves it
-    /// unknown, and saying "not created" there invited a retry that could make a second one.
+    /// 4xx refusal means no record was created. A 5xx can come after the record was written,
+    /// and a lost connection or an interruption leaves it unknown too; saying "not created"
+    /// there invited a retry that could make a second one.
     /// </remarks>
     internal static async Task<FileMetadataResponse?> CreateAsync(
         Func<Task<FileMetadataResponse?>> post, string fileSource, OutputWriter output)
@@ -339,7 +340,7 @@ public static partial class FileUploadCommand
         {
             return await post();
         }
-        catch (ApiException)
+        catch (ApiException exception) when (exception.ResponseStatusCode is >= 400 and < 500)
         {
             output.WriteNote(
                 $"The file's bytes were uploaded to {fileSource}, but the File service refused its metadata record, "

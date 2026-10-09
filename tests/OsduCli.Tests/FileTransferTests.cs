@@ -286,6 +286,19 @@ public sealed class FileTransferTests : IDisposable
     }
 
     [Fact]
+    public async Task ANameNearTheLengthLimitCanBeDownloaded()
+    {
+        // Windows' limit on the whole path depends on a system setting; the component limit
+        // tested here is what a partial name built on the destination's broke.
+        Assert.SkipWhen(OperatingSystem.IsWindows(), "the full path, not the name, is what Windows limits by default");
+        var destination = Path.Combine(_directory.FullName, new string('a', 246) + ".las");
+
+        await Save(new Storage(HttpStatusCode.OK, Bytes), FileRecord(), destination);
+
+        Assert.Equal(Bytes, await File.ReadAllBytesAsync(destination, TestContext.Current.CancellationToken));
+    }
+
+    [Fact]
     public async Task AnExistingFileIsReplacedOnlyWhenForced()
     {
         var destination = Path.Combine(_directory.FullName, "log.las");
@@ -502,6 +515,7 @@ public sealed class FileTransferTests : IDisposable
     {
         { new ApiException("refused") { ResponseStatusCode = 400 }, "refused its metadata record, so nothing refers to them" },
         // The record may have been created before the answer was lost.
+        { new ApiException("failed") { ResponseStatusCode = 500 }, "could not be confirmed" },
         { new HttpRequestException("Connection reset"), "could not be confirmed" },
         { new OperationCanceledException(), "could not be confirmed" },
     };

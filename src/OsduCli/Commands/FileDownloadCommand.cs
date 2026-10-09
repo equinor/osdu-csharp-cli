@@ -173,7 +173,9 @@ public static class FileDownloadCommand
     /// The directory is created first: <c>--path logs/</c> names one that may not exist yet,
     /// and opening the file in it failed with an unexplained exception. The partial file's
     /// name is unique to the run, and in the same directory so the move into place is a
-    /// rename: a fixed name made a second download to the same path fail to open it.
+    /// rename: a fixed name made a second download to the same path fail to open it. It is
+    /// short and owes nothing to the destination's, which built on, pushed a valid name near
+    /// the 255-byte limit past it.
     /// </remarks>
     internal static async Task<Saved> SaveAsync(
         HttpClient http, string url, string destination, bool force, Source source,
@@ -182,8 +184,7 @@ public static class FileDownloadCommand
         var expected = Expected(source);
         var directory = Path.GetDirectoryName(destination)!;
         Directory.CreateDirectory(directory);
-        var partial = Path.Combine(directory,
-            $".{Path.GetFileName(destination)}.{Convert.ToHexStringLower(RandomNumberGenerator.GetBytes(4))}.osducs-download");
+        var partial = Path.Combine(directory, $".osducs-{Convert.ToHexStringLower(RandomNumberGenerator.GetBytes(4))}.part");
         var moved = false;
         try
         {
