@@ -198,15 +198,16 @@ so they are not excluded as well.
 |---|---|---|
 | `op` | yes | The cursor endpoint, as `{ method, path }`: a `POST` without path parameters, whose request body is one object, not an array. |
 | `release` | no | A `DELETE` with the cursor as its one path parameter, called when the command stops before the cursor's end — at its limit, or on an error or an interruption. |
-| `limit` | yes | The top-level `int` body field setting the number of results. Above `page-size` the command pages, and each page asks for at most `page-size`. |
+| `limit` | yes | The top-level `int` body field, without `parts`, setting the number of results. Above `page-size` the command pages, and each page asks for at most `page-size`. |
 | `page-size` | yes | The most one page may ask for: the service's own per-request maximum. |
-| `cursor` | yes | The top-level request and response property holding the cursor. It cannot share a name with a body field or a fixed value. |
+| `cursor` | yes | The top-level request and response property holding the cursor. It cannot be a property a body field or fixed value writes to, including the paths a field's `parts` spread across. |
 | `not-with` | no | Body fields the cursor endpoint does not take, such as `offset`, refused alongside paging. |
 
 Paging needs a body built from `fields` and an `output.root`. The cursor endpoint's request
-must take the `limit` field, the `cursor`, and every other body field and fixed value; the
-generator refuses one that does not, unless the field is listed in `not-with`. The added `--all`
-cannot be combined with the `limit` field's option.
+must take the `limit` field, the `cursor`, and every property the other body fields and fixed
+values write to; the generator refuses one that does not, unless the field is listed in
+`not-with` by its own name. The added `--all` cannot be combined with the `limit` field's
+option.
 
 ## `handwritten`
 

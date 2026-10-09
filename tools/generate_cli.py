@@ -1351,8 +1351,9 @@ def build_paging(cfg: dict, operations: tuple[dict, dict | None] | None, body: "
     if limit_name not in fields or fields[limit_name].cs_type != "int":
         raise ManifestError(f"{where}: paging `limit:` must name an `int` body field, not {limit_name!r}")
     # Each page sets the limit and the cursor as properties of the request itself; a dotted
-    # name would add a property called `pagination.limit` beside the nested one it meant.
-    if "." in limit_name:
+    # name would add a property called `pagination.limit` beside the nested one it meant,
+    # and `parts` would have written the option somewhere else.
+    if "." in limit_name or fields[limit_name].parts:
         raise ManifestError(f"{where}: paging `limit:` must be a top-level body field, not {limit_name!r}")
     page_size = cfg.get("page-size")
     # Emitted as a C# `int`, so the 32-bit range is the limit: a larger value generated code
@@ -1386,7 +1387,13 @@ def build_paging(cfg: dict, operations: tuple[dict, dict | None] | None, body: "
     # The cursor is paging's own state, written onto each page after the limit: a name shared
     # with an option or a fixed value overwrote it, and `cursor: limit` replaced the page size
     # with a string the request model then refused.
-    sent = {name.split(".")[0] for name in fields} | {name.split(".")[0] for name, _ in body.fixed}
+    # Where each option lands at the top of the request: its own name, or each path its `parts`
+    # spread across, so `parts: [cursor.x, ...]` is caught as well.
+    def lands(field: BodyField) -> set[str]:
+        return {path.split(".")[0] for path in (field.parts or [field.name])}
+
+    fixed_lands = {name.split(".")[0] for name, _ in body.fixed}
+    sent = set().union(*(lands(field) for field in fields.values())) | fixed_lands
     if cursor in sent:
         raise ManifestError(f"{where}: paging `cursor:` {cursor!r} is also a body field or fixed value "
                             "of this command; the cursor must be a property of its own")
@@ -1396,9 +1403,10 @@ def build_paging(cfg: dict, operations: tuple[dict, dict | None] | None, body: "
     if cursor not in accepted or limit_name not in accepted:
         raise ManifestError(f"{where}: paging `op:` {op_cfg['path']} must take both {limit_name!r} and "
                             f"{cursor!r}; it takes {sorted(accepted)}")
+    # `not-with:` names options, so a field is left out by its own name wherever it lands.
     unaccepted = sorted(
-        ({name.split(".")[0] for name in fields if name not in not_with}
-         | {name.split(".")[0] for name, _ in body.fixed}) - accepted)
+        (set().union(*(lands(field) for name, field in fields.items() if name not in not_with))
+         | fixed_lands) - accepted)
     if unaccepted:
         raise ManifestError(f"{where}: paging `op:` {op_cfg['path']} does not take {unaccepted}; list "
                             "fields it cannot take in `not-with:`")

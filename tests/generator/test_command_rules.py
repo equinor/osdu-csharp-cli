@@ -272,6 +272,28 @@ class TestPaging:
         with pytest.raises(ManifestError, match=r"does not take \['offset'\]"):
             self.build(self.entry({"not-with": None}))
 
+    # One option spread across several paths by `parts` lands on those paths, not its name.
+    SPREAD = {"kind": {"flag": "-k"}, "limit": {"flag": "--limit", "type": "int"},
+              "offset": {"flag": "--offset", "type": "int"}}
+
+    def spread(self, *paths):
+        return {**self.SPREAD, "area": {"flag": "--area", "type": "double[]", "parts": list(paths)}}
+
+    def test_parts_landing_on_the_cursor_are_refused(self):
+        with pytest.raises(ManifestError, match="is also a body field"):
+            self.build(self.entry(fields=self.spread("cursor.x", "cursor.y")))
+
+    def test_parts_the_cursor_endpoint_does_not_take_must_be_listed_in_not_with(self):
+        with pytest.raises(ManifestError, match=r"does not take \['box'\]"):
+            self.build(self.entry(fields=self.spread("box.x", "box.y")))
+        # Listed by the option's own name, wherever its parts land.
+        self.build(self.entry({"not-with": ["offset", "area"]}, fields=self.spread("box.x", "box.y")))
+
+    def test_the_limit_cannot_be_spread_by_parts(self):
+        fields = {**self.SPREAD, "limit": {"flag": "--limit", "type": "int", "parts": ["page.limit"]}}
+        with pytest.raises(ManifestError, match="must be a top-level body field"):
+            self.build(self.entry(fields=fields))
+
     def test_unknown_paging_keys_are_refused(self):
         entry = self.entry()
         entry["paging"]["pages"] = 3
