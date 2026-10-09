@@ -9,9 +9,10 @@ Commands are named for the **resource**, not the service that hosts it, so verbs
 the thing they act on: searching records is `osducs record search`. See
 [COMMAND-GRAMMAR.md](../COMMAND-GRAMMAR.md) for why.
 
-Hand-written commands — `osducs status`, `osducs record add`, `osducs completion` — are not
-listed here, since no manifest describes their options; `record add` is in
-[USAGE.md](USAGE.md#writing-records). Run `osducs --help` for the full tree.
+Hand-written commands — `osducs status`, `osducs record add`, `osducs file upload`,
+`osducs file download`, `osducs completion` — are not listed here, since no manifest describes
+their options; `record add` is in [USAGE.md](USAGE.md#writing-records), and the file commands in
+[USAGE.md](USAGE.md#files). Run `osducs --help` for the full tree.
 
 
 | Noun | Commands |

@@ -70,6 +70,7 @@ Both packages come from GitHub Packages, which needs a token even though they ar
 | `Commands/ConfigCommand.cs` | `osducs config`: create, list, select and show profiles. |
 | `Commands/CompletionCommand.cs` | `osducs completion`: shell completion scripts, and the hidden command they call. |
 | `Commands/RecordAddCommand.cs` | `osducs record add`: creates or updates records of any kind, asking before it updates one that exists. |
+| `Commands/FileUploadCommand.cs`, `FileDownloadCommand.cs` | `osducs file upload` and `file download`: a file's bytes through the File service's signed URLs, checked against its checksum. |
 | `Runtime/CommandTree.cs` | Joins commands from several manifests under one noun, such as `crs`. |
 | `Runtime/CliRunner.cs` | Runs every command: builds the context, and turns failures into one-line errors and exit codes. |
 | `Runtime/CliContext.cs` | Per-command state: the loaded configuration, the signed-in `OsduClient` and the output writer. |
@@ -78,6 +79,8 @@ Both packages come from GitHub Packages, which needs a token even though they ar
 | `Runtime/SignIn.cs` | How a profile signs in: through a browser, as an application with a client secret, or through Azure. |
 | `Runtime/AzureTokenProvider.cs` | Signs in through `az login`, a managed or workload identity, or `AZURE_*` variables, for the `azure` mode. |
 | `Runtime/AccountScopedTokenProvider.cs` | Refuses to guess when more than one account is signed in and none was chosen. |
+| `Runtime/SignedUrlTransfer.cs` | Sends and fetches bytes at a signed storage URL, without the OSDU token. |
+| `Runtime/CursorPaging.cs` | Follows a cursor endpoint page by page, for a manifest's `paging`. |
 | `Runtime/TextBodyParseNodeFactory.cs` | Reads an HTML or plain-text error page, so it becomes a one-line error rather than a crash. |
 | `Runtime/OutputWriter.cs`, `OutputSpec.cs`, `OsduJson.cs` | Turn a response into a table or JSON. |
 | `Runtime/CliHelp.cs` | Renders `--help`; the library's own help cannot be customised. |
@@ -89,7 +92,8 @@ Behaviour a manifest cannot express can also go in a partial class that extends 
 service through its `Customize` hook, in `Commands/Handwritten/`. Storage's is the first: it adds
 `record add` to the `record` noun the Storage manifest builds, and the command itself lives in
 `Commands/RecordAddCommand.cs`. The manifest lists the endpoint under `handwritten`, so the
-coverage check knows it is accounted for.
+coverage check knows it is accounted for. File's adds `file upload` and `file download`; the
+endpoints they call already have generated commands, so its manifest needs no entry.
 
 ### What happens when a command runs
 

@@ -426,6 +426,57 @@ rewritten.
 `--skip-unchanged` leaves a record alone when it is identical to its latest version, so running
 the same file again does not stack up identical versions; those are reported as `unchanged`.
 
+## Files
+
+`file download` saves a file's bytes, and `file upload` uploads a file and creates the record that
+describes it.
+
+```bash
+osducs file download --id "dev:dataset--File.Generic:259d…"               # under the name its record gives
+osducs file download --id "dev:dataset--File.Generic:259d…" --path logs/  # in another directory
+```
+
+```
+Id                               Path                                           Size     Checksum
+-------------------------------  ---------------------------------------------  -------  ----------------------
+dev:dataset--File.Generic:259d…  /home/me/logs/no_6608!10-17_s~jan_lfptest.las  4903168  MD5 matches the record
+```
+
+The bytes are checked against the checksum in the file's record, MD5 or SHA-256, or against the
+MD5 storage keeps when the record has none. A file that does not match is not saved, and a
+download that fails or is interrupted leaves nothing behind under the name. An existing file is
+only replaced with `--force`. The name comes from the record, with anything that could lead
+outside the directory replaced.
+
+```bash
+osducs file upload --file log.las \
+  --legal-tag dev-equinor-private-default --country NO \
+  --owner data.default.owners@dev.dataservices.energy \
+  --viewer data.default.viewers@dev.dataservices.energy
+```
+
+```
+Id                               Name     Size     MD5
+-------------------------------  -------  -------  --------------------------------
+dev:dataset--File.Generic:23b9…  log.las  3000000  c86b4f7299db976566059ddc7c1bac53
+```
+
+This creates an `osdu:wks:dataset--File.Generic:1.0.0` record, filling in the file's location,
+name, size and MD5 checksum; storage refuses the bytes if they arrive different from those sent.
+`--name` and `--description` set the record's `data.Name` and `data.Description`.
+
+Access and legal settings have no default, since group domains differ between environments.
+They come from the options, from a record template given with `--metadata`, or from both, with the
+options winning. A template copied from one of a team's existing records, without its `id`, is
+the quickest way to match what it already uses, and can set any other part of the record,
+including the kind. The record is checked before anything is sent, and every problem is listed
+at once; `--dry-run` shows the record without uploading anything.
+
+One upload takes at most 5.24 GB, Azure's limit for a single request; a larger file is refused.
+Neither command sends the OSDU token to storage, since the signed URL authorises itself, and
+neither prints that URL. `file upload-url` and `file download-url` still hand it out for other
+tools.
+
 ## Shell completion
 
 ```bash
