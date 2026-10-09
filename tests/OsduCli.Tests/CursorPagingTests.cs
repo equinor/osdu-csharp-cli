@@ -200,16 +200,42 @@ public class CursorPagingTests
         Assert.Equal(expected, CursorPaging.Progress(fetched, total));
     }
 
-    [Fact]
-    public void RecordSearchHasAll()
+    private static RootCommand Root()
     {
         var root = new RootCommand("osducs");
         GlobalOptions.AddTo(root);
         foreach (var command in GeneratedCommands.All())
             root.Subcommands.Add(command);
+        return root;
+    }
 
-        var search = root.Subcommands.Single(c => c.Name == "record").Subcommands.Single(c => c.Name == "search");
+    [Fact]
+    public void RecordSearchHasAll()
+    {
+        var search = Root().Subcommands.Single(c => c.Name == "record").Subcommands.Single(c => c.Name == "search");
 
         Assert.Contains(search.Options, option => option.Name == "--all");
+    }
+
+    [Theory]
+    [InlineData("--all --limit 5", "--all and --limit cannot be used together")]
+    [InlineData("--all --offset 5", "--offset cannot be combined with --all")]
+    [InlineData("--limit 2000 --offset 5", "--offset cannot be combined with --all")]
+    public void ConflictsAreRefusedWhileParsing(string options, string expected)
+    {
+        // At parse time, before any profile is read: inside the command, a broken profile was
+        // reported instead of the options.
+        var result = Root().Parse($"record search --kind k {options}");
+
+        Assert.Contains(result.Errors, error => error.Message.StartsWith(expected, StringComparison.Ordinal));
+    }
+
+    [Theory]
+    [InlineData("--limit 500 --offset 5")]
+    [InlineData("--limit 2000")]
+    [InlineData("--all")]
+    public void WhatPagingCanCombineParses(string options)
+    {
+        Assert.Empty(Root().Parse($"record search --kind k {options}").Errors);
     }
 }

@@ -226,6 +226,16 @@ class TestPaging:
         with pytest.raises(ManifestError, match="release"):
             self.build(self.entry({"release": {"method": "delete", "path": "/query_with_cursor"}}))
 
+    def test_the_op_must_be_a_post(self):
+        # The emitted code calls PostAsync whatever the manifest said.
+        with pytest.raises(ManifestError, match="must be a POST"):
+            self.build(self.entry({"op": {"method": "put", "path": "/query_with_cursor"}}))
+
+    def test_the_op_cannot_have_path_parameters(self):
+        # Nothing would supply them, and the generated code would not compile.
+        with pytest.raises(ManifestError, match="cannot have path parameters"):
+            self.build(self.entry({"op": {"method": "post", "path": "/items/{id}/cursor"}}))
+
     def test_unknown_paging_keys_are_refused(self):
         entry = self.entry()
         entry["paging"]["pages"] = 3

@@ -1365,6 +1365,15 @@ def build_paging(cfg: dict, operations: tuple[dict, dict | None] | None, body: "
                             f"not {not_with!r}")
 
     op_cfg = cfg["op"]
+    # The emitted code calls PostAsync on the builder the path derives, with nothing to fill
+    # a path parameter from: another method called the wrong client method, and a parameter
+    # left an undeclared placeholder in the generated code.
+    if op_cfg["method"].lower() != "post":
+        raise ManifestError(f"{where}: paging `op:` must be a POST, since each page sends the request "
+                            f"as its body, not {op_cfg['method'].upper()}")
+    if re.search(r"\{\w+\}", op_cfg["path"]):
+        raise ManifestError(f"{where}: paging `op:` cannot have path parameters, since nothing would "
+                            f"supply them: {op_cfg['path']}")
     model, collection = body_model(operations[0], where)
     if collection:
         raise ManifestError(f"{where}: paging `op:` must take one request object, not an array")
@@ -1624,6 +1633,9 @@ def emit_command(service: Service, command: Command) -> list[str]:
         lines.append(f"                result.AddError({csharp_string(flags + ' cannot be used together.')});")
         lines.append("        });")
 
+    if command.paging:
+        lines += paging_validator(command)
+
     lines.append("")
     lines.append("        command.SetAction((parseResult, cancellationToken) =>")
     lines.append("            CliRunner.RunAsync(parseResult, async (context, cancellationToken) =>")
@@ -1769,6 +1781,32 @@ def all_option_help(page_size: int, path: str, excluded_flags: list[str]) -> str
             f"Cannot be combined with {' or '.join(excluded_flags)}.")
 
 
+def paging_validator(command: Command) -> list[str]:
+    """Rejects the options paging cannot combine, at parse time.
+
+    Before the action runs, and so before any configuration is read or anyone signs in: as an
+    exception inside the action, `--all --limit 5` with a broken profile reported the profile
+    rather than the options.
+    """
+    paging = command.paging
+    limit = paging.limit
+    lines = [
+        "",
+        "        // Options paging cannot combine, rejected before configuration is read.",
+        "        command.Validators.Add(result =>",
+        "        {",
+        "            var all = result.GetValue(allOption);",
+        f"            if (all && result.GetResult({limit.option_var}) is not null)",
+        f"                result.AddError({csharp_string(f'--all and {limit.flag} cannot be used together: --all is every match, {limit.flag} at most that many.')});",
+    ]
+    for field in paging.not_with:
+        lines.append(f"            if ((all || result.GetValue({limit.option_var}) > {paging.page_size}) "
+                     f"&& result.GetResult({field.option_var}) is not null)")
+        lines.append(f"                result.AddError({csharp_string(f'{field.flag} cannot be combined with --all or a {limit.flag} above {paging.page_size}: those page through {paging.path}, which starts at the first match.')});")
+    lines.append("        });")
+    return lines
+
+
 def paged_branch(service: Service, command: Command) -> list[str]:
     """The early return a command with paging takes when one page is not enough.
 
@@ -1778,19 +1816,12 @@ def paged_branch(service: Service, command: Command) -> list[str]:
     paging = command.paging
     limit = paging.limit
     target = f"context.Client.{service.client}"
-    exception = "Equinor.OsduCsharpClient.Facade.OsduException"
     lines = [
         "",
         "            var allValue = parseResult.GetValue(allOption);",
         f"            if (allValue || {limit.var} > {paging.page_size})",
         "            {",
-        f"                if (allValue && {limit.var} is not null)",
-        f"                    throw new {exception}({csharp_string(f'--all and {limit.flag} cannot be used together: --all is every match, {limit.flag} at most that many.')});",
     ]
-    for field in paging.not_with:
-        guard = f"{field.var} is {{ Length: > 0 }}" if field.is_collection else f"{field.var} is not null"
-        lines.append(f"                if ({guard})")
-        lines.append(f"                    throw new {exception}({csharp_string(f'{field.flag} cannot be combined with --all or a {limit.flag} above {paging.page_size}: those page through {paging.path}, which starts at the first match.')});")
 
     if paging.release_builder:
         accessor = re.sub(r"\{\w+\}", "cursor", paging.release_builder)
@@ -1832,7 +1863,7 @@ def emit_service(service: Service, manifest_name: str) -> str:
     lines.append("using System.CommandLine;")
     if any(f.parts for c in service.commands for f in (c.body.fields if c.body else [])):
         lines.append("using System.Globalization;")
-    if any(c.require_one_of or c.mutually_exclusive
+    if any(c.require_one_of or c.mutually_exclusive or c.paging
            or any(f.parts for f in (c.body.fields if c.body else []))
            for c in service.commands):
         lines.append("using System.CommandLine.Parsing;")

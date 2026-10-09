@@ -182,6 +182,16 @@ public static partial class SearchCommands
                 result.AddError("--bbox and --near cannot be used together.");
         });
 
+        // Options paging cannot combine, rejected before configuration is read.
+        command.Validators.Add(result =>
+        {
+            var all = result.GetValue(allOption);
+            if (all && result.GetResult(limitBodyOption) is not null)
+                result.AddError("--all and --limit cannot be used together: --all is every match, --limit at most that many.");
+            if ((all || result.GetValue(limitBodyOption) > 1000) && result.GetResult(offsetBodyOption) is not null)
+                result.AddError("--offset cannot be combined with --all or a --limit above 1000: those page through /query_with_cursor, which starts at the first match.");
+        });
+
         command.SetAction((parseResult, cancellationToken) =>
             CliRunner.RunAsync(parseResult, async (context, cancellationToken) =>
         {
@@ -237,10 +247,6 @@ public static partial class SearchCommands
             var allValue = parseResult.GetValue(allOption);
             if (allValue || limitValue > 1000)
             {
-                if (allValue && limitValue is not null)
-                    throw new Equinor.OsduCsharpClient.Facade.OsduException("--all and --limit cannot be used together: --all is every match, --limit at most that many.");
-                if (offsetValue is not null)
-                    throw new Equinor.OsduCsharpClient.Facade.OsduException("--offset cannot be combined with --all or a --limit above 1000: those page through /query_with_cursor, which starts at the first match.");
                 var pagedJson = await CursorPaging.CollectAsync(
                     bodyNode, allValue ? null : limitValue, 1000,
                     "limit", "cursor", "results", "totalCount",
