@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.12.1](https://github.com/equinor/osdu-csharp-cli/compare/v0.12.0...v0.12.1) (2026-10-09)
+
+
+### Bug Fixes
+
+* explain status failures, add -l for --limit, correct --offset and --valid help ([#60](https://github.com/equinor/osdu-csharp-cli/issues/60)) ([ff48c2d](https://github.com/equinor/osdu-csharp-cli/commit/ff48c2df5eb7c7ab548eb7c248a22611d5d4685b))
+
 ## [0.12.0](https://github.com/equinor/osdu-csharp-cli/compare/v0.11.2...v0.12.0) (2026-10-09)
 
 
