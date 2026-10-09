@@ -398,8 +398,9 @@ someone else's change. `--yes` skips the question but still prints those lines, 
 log shows whose version it replaced; without a terminal to ask, the command refuses rather than
 guess. `--dry-run` stops before writing, whatever is in the file.
 
-The file is checked first, and every problem is listed with its record: a missing `kind`, `acl`,
-`legal` or `data`, an id from another data partition, or an id twice. Storage takes at most 500
+The file is checked first, and every problem is listed with its record: a missing or empty
+`kind`, `acl`, `legal` or `data`, an id that is not a string, an id from another data partition,
+or an id twice. A record with no id, or a `null` one, is created with an id Storage assigns. Storage takes at most 500
 records in one request, so a longer file is refused; split it. The file is sent as it is, not
 rewritten.
 

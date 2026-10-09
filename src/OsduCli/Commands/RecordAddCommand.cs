@@ -150,11 +150,20 @@ public static class RecordAddCommand
                 if (!seen.Add(id))
                     wrong.Add("the id appears more than once in the file");
             }
+            else if (Property(record, "id") is not null)
+            {
+                // A number or a blank string read as no id at all: the dry run said Storage
+                // would assign one and skipped the check for an existing record, while the file,
+                // sent as it is, still carried the id for Storage to refuse.
+                wrong.Add("the id must be a non-empty string, or left out for Storage to assign one");
+            }
 
             if (Text(record, "kind") is null)
                 wrong.Add("kind is missing");
-            if (Property(record, "data") is not JsonObject)
-                wrong.Add("data is missing, or not an object");
+            // Empty as well as missing: written over an existing record, `{}` replaces all of
+            // its data.
+            if (Property(record, "data") is not JsonObject { Count: > 0 })
+                wrong.Add("data is missing, empty, or not an object");
             foreach (var path in new[] { "acl.owners", "acl.viewers", "legal.legaltags", "legal.otherRelevantDataCountries" })
             {
                 var segments = path.Split('.');

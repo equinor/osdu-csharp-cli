@@ -80,7 +80,7 @@ public class RecordAddTests
         Assert.Contains("nothing was sent", message);
         // One line per record, with all of its problems.
         Assert.Contains(
-            "record 2 (dev:a:1): kind is missing; data is missing, or not an object; acl.viewers is missing or empty",
+            "record 2 (dev:a:1): kind is missing; data is missing, empty, or not an object; acl.viewers is missing or empty",
             message);
         Assert.DoesNotContain("record 1", message);
     }
@@ -93,6 +93,38 @@ public class RecordAddTests
             RecordAddCommand.Read(Record("prod:reference-data--Thing:1").ToJsonString(), Partition)).Message;
 
         Assert.Contains("must start with 'dev:'", message);
+    }
+
+    [Theory]
+    [InlineData("42")]
+    [InlineData("\"\"")]
+    [InlineData("\"  \"")]
+    [InlineData("{}")]
+    public void AnIdThatIsNotANonEmptyStringIsRefused(string id)
+    {
+        // Read as no id, it skipped the existence check while the file still carried it.
+        var record = Record();
+        record["id"] = JsonNode.Parse(id);
+
+        var message = Assert.Throws<OsduException>(() => RecordAddCommand.Read(record.ToJsonString(), Partition)).Message;
+
+        Assert.Contains("record 1: the id must be a non-empty string", message);
+    }
+
+    [Fact]
+    public void ANullIdIsLeftForStorageToAssign()
+    {
+        Assert.Empty(RecordAddCommand.Ids(RecordAddCommand.Read(Record(id: null).ToJsonString(), Partition)));
+    }
+
+    [Fact]
+    public void EmptyDataIsRefused()
+    {
+        // Written over an existing record, `{}` replaces all of its data.
+        var message = Assert.Throws<OsduException>(() =>
+            RecordAddCommand.Read(Record(data: []).ToJsonString(), Partition)).Message;
+
+        Assert.Contains("data is missing, empty, or not an object", message);
     }
 
     [Fact]
