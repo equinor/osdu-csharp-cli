@@ -212,7 +212,7 @@ command (§3.2).
 
 ```
 osducs file upload   --file F                        GET  /v2/files/uploadURL  (+ PUT to signed URL)
-osducs file download --id ID [--output-file O]       GET  /v2/files/{id}/downloadURL
+osducs file download --id ID [--path P]             GET  /v2/files/{id}/downloadURL
 osducs file metadata get    --id ID                  GET  /v2/files/{id}/metadata
 osducs file metadata create --file F                 POST /v2/files/metadata
 osducs file metadata delete --id ID --yes            DELETE /v2/files/{id}/metadata
@@ -222,6 +222,14 @@ osducs file revoke-url --file F                      POST /v2/files/revokeURL
 `file upload` and `file download` are handwritten: the endpoints return signed URLs, and the
 actual byte transfer is a second request the CLI must make. That is orchestration, like
 `record add`.
+
+> **Built:** both, beside the generated `upload-url` and `download-url` rather than in their
+> place. `file download` reads the record through Storage, since the File service's metadata
+> endpoint needs an editor role that a viewer who may download lacks, and checks the bytes
+> against its checksum. `file upload` also creates the metadata record (`POST
+> /v2/files/metadata`), with access and legal settings from options or a `--metadata`
+> template. The metadata commands are `file get`, `file add` and `file delete`, as generated,
+> rather than the `file metadata …` planned above.
 
 ### dataset — Dataset (9 ops)
 

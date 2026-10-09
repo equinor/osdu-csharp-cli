@@ -20,6 +20,8 @@ osducs group member add --group users.datalake.viewers@dev.dataservices.energy -
 - **The whole core OSDU surface.** 131 commands across 12 services — Storage, Search, Schema,
   Legal, Entitlements, File, Dataset, CRS, Unit, Workflow and Wellbore DDMS — generated from the
   services' own OpenAPI specs, so a new endpoint upstream is noticed rather than missed.
+- **Moves files, not just their metadata.** `file upload` sends the bytes and creates the record
+  that describes them; `file download` saves them, checked against the record's checksum.
 - **Signs in the way your environment needs:** through a browser; as an application with a
   client secret; or with `az login`, a managed identity or a pipeline identity. With more than
   one account signed in, it lists them and waits to be told which, rather than guessing.

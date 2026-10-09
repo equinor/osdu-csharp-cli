@@ -251,5 +251,12 @@ public static class CliRunner
             Console.Error.WriteLine($"error: {exception.Message}");
             return 1;
         }
+        catch (UnauthorizedAccessException exception)
+        {
+            // A file to upload that cannot be read, or a directory to download into that
+            // cannot be written: as in Run, the user's to fix, not a stack trace.
+            Console.Error.WriteLine($"error: {exception.Message}");
+            return 1;
+        }
     }
 }
