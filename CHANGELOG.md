@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.15.0](https://github.com/equinor/osdu-csharp-cli/compare/v0.14.0...v0.15.0) (2026-10-14)
+
+
+### Features
+
+* **index:** add Indexer commands behind a confirm guard ([#66](https://github.com/equinor/osdu-csharp-cli/issues/66)) ([92b456a](https://github.com/equinor/osdu-csharp-cli/commit/92b456abd83765504d39b00b663afcc8e1e3fc14))
+
 ## [0.14.0](https://github.com/equinor/osdu-csharp-cli/compare/v0.13.0...v0.14.0) (2026-10-09)
 
 
