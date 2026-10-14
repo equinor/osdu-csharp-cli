@@ -185,10 +185,10 @@ public static partial class SearchCommands
         // Options paging cannot combine, rejected before configuration is read.
         command.Validators.Add(result =>
         {
-            var all = result.GetValue(allOption);
+            var all = OptionValues.Usable(result, allOption);
             if (all && result.GetResult(limitBodyOption) is not null)
                 result.AddError("--all and --limit cannot be used together: --all is every match, --limit at most that many.");
-            if ((all || result.GetValue(limitBodyOption) > 1000) && result.GetResult(offsetBodyOption) is not null)
+            if ((all || OptionValues.Usable(result, limitBodyOption) > 1000) && result.GetResult(offsetBodyOption) is not null)
                 result.AddError("--offset cannot be combined with --all or a --limit above 1000: those page through /query_with_cursor, which starts at the first match.");
         });
 

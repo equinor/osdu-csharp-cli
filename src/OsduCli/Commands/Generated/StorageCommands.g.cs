@@ -148,6 +148,20 @@ public static partial class StorageCommands
         command.Options.Add(recordsBodyOption);
         command.Options.Add(attributesBodyOption);
 
+        // The spec's maxItems, checked here rather than by the service.
+        command.Validators.Add(result =>
+        {
+            if (OptionValues.Usable(result, recordsBodyOption) is { Length: > 1000 })
+                result.AddError("--id takes at most 1000 values.");
+        });
+
+        // The spec's maxItems, checked here rather than by the service.
+        command.Validators.Add(result =>
+        {
+            if (OptionValues.Usable(result, attributesBodyOption) is { Length: > 10 })
+                result.AddError("--attributes takes at most 10 values.");
+        });
+
         command.SetAction((parseResult, cancellationToken) =>
             CliRunner.RunAsync(parseResult, async (context, cancellationToken) =>
         {
@@ -432,6 +446,13 @@ public static partial class StorageCommands
         command.Options.Add(filterKindsBodyOption);
         command.Options.Add(replayidBodyOption);
         command.Options.Add(yesOption);
+
+        // The spec's maxItems, checked here rather than by the service.
+        command.Validators.Add(result =>
+        {
+            if (OptionValues.Usable(result, filterKindsBodyOption) is { Length: > 1 })
+                result.AddError("--kind takes one value.");
+        });
 
         command.SetAction((parseResult, cancellationToken) =>
             CliRunner.RunAsync(parseResult, async (context, cancellationToken) =>

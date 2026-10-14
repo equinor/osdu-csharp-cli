@@ -186,6 +186,38 @@ public class ConfirmationTests : ConfigTestDirectories
     }
 
     [Fact]
+    public void AReplayTakesOneKind()
+    {
+        // The spec's maxItems: one kind, which `--kind a b` passed and Storage then refused.
+        var errors = Root().Parse(["record", "replay", "--operation", "reindex", "--kind", "a", "b"]).Errors;
+
+        Assert.Contains(errors, error => error.Message == "--kind takes one value.");
+    }
+
+    [Theory]
+    [InlineData(1000, true)]
+    [InlineData(1001, false)]
+    public void ReindexingRecordsTakesAtMostAThousand(int count, bool accepted)
+    {
+        var ids = string.Join(",", Enumerable.Range(0, count).Select(i => $"dev:x:{i}"));
+
+        var errors = Root().Parse(["index", "reindex-records", "--id", ids]).Errors;
+
+        Assert.Equal(accepted, errors.Count == 0);
+    }
+
+    [Theory]
+    [InlineData("record search --kind k --limit")]
+    [InlineData("record search --kind k --all --limit")]
+    [InlineData("record replay --operation reindex --kind")]
+    public void AValueLeftOutIsAParseErrorNotACrash(string line)
+    {
+        // The checks read option values, which threw for one given without a value. Reported,
+        // whichever error comes first: beside --all it is the conflict.
+        Assert.NotEmpty(Root().Parse(line.Split(' ')).Errors);
+    }
+
+    [Fact]
     public async Task ADeleteSaysWhatAndWhereAndStopsWithoutAYes()
     {
         // A profile signing in as an application, so nothing can open a browser; the command

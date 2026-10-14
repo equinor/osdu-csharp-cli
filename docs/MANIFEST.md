@@ -155,8 +155,9 @@ A map from body property to option. A dotted name reaches into a nested object: 
 | `comma-separated` | no | `true` splits each value on commas as well as accepting the flag repeated, so `-f a,b -f c` is three values. Needs `type: string[]`, and cannot be combined with `parts` or with allowed values from the spec. Without it a comma is part of the value, which is right for values that may contain one. |
 
 A field inherits the allowed values of an `enum` in the body schema, including one on an array's
-items. An optional field the user did not give is left out of the body rather than sent as `null`
-or as an empty array.
+items. A list field also inherits the schema's `maxItems`, checked before anything is sent:
+`record replay --kind a b` is refused with "--kind takes one value." An optional field the user did
+not give is left out of the body rather than sent as `null` or as an empty array.
 
 ### `output`
 

@@ -530,6 +530,8 @@ class BodyField:
     enum_values: list[str]
     parts: list[str]
     comma_separated: bool = False
+    # The spec's maxItems for a list: Storage's replay takes one kind, the Indexer 1000 ids.
+    max_items: int | None = None
 
     @property
     def var(self) -> str:
@@ -1236,6 +1238,10 @@ def build_command(entry: dict, operation: dict, where: str, models_root: str,
                 enum_values=allowed_values(field_name, field_cfg, field_schema, where),
                 parts=[str(part) for part in (field_cfg.get("parts") or [])],
                 comma_separated=comma_separated,
+                # `parts` already takes an exact count of its own.
+                max_items=(field_schema.get("maxItems")
+                           if field_cfg.get("type", "").endswith("[]") and not field_cfg.get("parts")
+                           and isinstance(field_schema.get("maxItems"), int) else None),
             ))
 
         fixed = fixed_body_values(body_cfg, fields_cfg, field_schemas, spec, where)
@@ -1572,6 +1578,10 @@ def allowed_values(name: str, cfg: dict, schema: dict, where: str) -> list[str]:
     if from_spec:
         raise ManifestError(f"{where}: body field {name!r}: the spec already lists its values, "
                             f"{from_spec}; `allowed:` is for a field whose spec does not")
+    # Allowed values are checked as text; on an int or bool option the check does not compile.
+    if cfg.get("type", "string") not in ("string", "string[]"):
+        raise ManifestError(f"{where}: body field {name!r}: `allowed:` needs `type: string` or "
+                            f"`string[]`, not {cfg.get('type')!r}")
     if cfg.get("comma-separated"):
         # As with the spec's own values: their parser would replace the splitting one.
         raise ManifestError(f"{where}: body field {name!r}: `comma-separated` cannot be combined "
@@ -1789,6 +1799,20 @@ def emit_command(service: Service, command: Command) -> list[str]:
     if command.paging:
         lines += paging_validator(command)
 
+    for bodyfield in (command.body.fields if command.body else []):
+        if bodyfield.max_items is not None:
+            most = ("one value" if bodyfield.max_items == 1
+                    else f"at most {bodyfield.max_items} values")
+            lines += [
+                "",
+                "        // The spec's maxItems, checked here rather than by the service.",
+                "        command.Validators.Add(result =>",
+                "        {",
+                f"            if (OptionValues.Usable(result, {bodyfield.option_var}) is {{ Length: > {bodyfield.max_items} }})",
+                f"                result.AddError({csharp_string(f'{bodyfield.flag} takes {most}.')});",
+                "        });",
+            ]
+
     lines.append("")
     lines.append("        command.SetAction((parseResult, cancellationToken) =>")
     lines.append("            CliRunner.RunAsync(parseResult, async (context, cancellationToken) =>")
@@ -1991,12 +2015,12 @@ def paging_validator(command: Command) -> list[str]:
         "        // Options paging cannot combine, rejected before configuration is read.",
         "        command.Validators.Add(result =>",
         "        {",
-        "            var all = result.GetValue(allOption);",
+        "            var all = OptionValues.Usable(result, allOption);",
         f"            if (all && result.GetResult({limit.option_var}) is not null)",
         f"                result.AddError({csharp_string(f'--all and {limit.flag} cannot be used together: --all is every match, {limit.flag} at most that many.')});",
     ]
     for field in paging.not_with:
-        lines.append(f"            if ((all || result.GetValue({limit.option_var}) > {paging.page_size}) "
+        lines.append(f"            if ((all || OptionValues.Usable(result, {limit.option_var}) > {paging.page_size}) "
                      f"&& result.GetResult({field.option_var}) is not null)")
         lines.append(f"                result.AddError({csharp_string(f'{field.flag} cannot be combined with --all or a {limit.flag} above {paging.page_size}: those page through {paging.path}, which starts at the first match.')});")
     lines.append("        });")

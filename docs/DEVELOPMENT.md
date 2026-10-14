@@ -80,6 +80,7 @@ Both packages come from GitHub Packages, which needs a token even though they ar
 | `Runtime/AzureTokenProvider.cs` | Signs in through `az login`, a managed or workload identity, or `AZURE_*` variables, for the `azure` mode. |
 | `Runtime/AccountScopedTokenProvider.cs` | Refuses to guess when more than one account is signed in and none was chosen. |
 | `Runtime/Confirmation.cs` | Says what a command is about to do and where, and asks first, for a manifest's `confirm` and for `record add`. |
+| `Runtime/OptionValues.cs` | Reads an option's value inside a parse-time check without throwing when it was given without one. |
 | `Runtime/SignedUrlTransfer.cs` | Sends and fetches bytes at a signed storage URL, without the OSDU token. |
 | `Runtime/CursorPaging.cs` | Follows a cursor endpoint page by page, for a manifest's `paging`. |
 | `Runtime/TextBodyParseNodeFactory.cs` | Reads an HTML or plain-text error page, so it becomes a one-line error rather than a crash. |

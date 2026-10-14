@@ -207,6 +207,13 @@ public static partial class LegalCommands
         var command = new Command("validate", "Check which of the given LegalTag names are invalid, and why.");
         command.Options.Add(namesBodyOption);
 
+        // The spec's maxItems, checked here rather than by the service.
+        command.Validators.Add(result =>
+        {
+            if (OptionValues.Usable(result, namesBodyOption) is { Length: > 25 })
+                result.AddError("--name takes at most 25 values.");
+        });
+
         command.SetAction((parseResult, cancellationToken) =>
             CliRunner.RunAsync(parseResult, async (context, cancellationToken) =>
         {

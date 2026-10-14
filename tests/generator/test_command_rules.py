@@ -419,9 +419,42 @@ class TestAllowed:
         with pytest.raises(ManifestError, match="as strings"):
             build(self.entry(allowed=allowed), BODY_OPERATION)
 
+    @pytest.mark.parametrize("cs_type", ["int", "bool", "double[]"])
+    def test_they_are_for_text(self, cs_type):
+        # Checked as text; on an int or bool option the check did not compile.
+        with pytest.raises(ManifestError, match="needs `type: string`"):
+            build(self.entry(allowed=["1"], type=cs_type), BODY_OPERATION)
+
     def test_they_cannot_be_split_on_commas(self):
         with pytest.raises(ManifestError, match="comma-separated"):
             build(self.entry(allowed=["a"], type="string[]", **{"comma-separated": True}), BODY_OPERATION)
+
+
+class TestMaxItems:
+    """A list option carries the spec's maxItems, to be checked before anything is sent."""
+
+    SPEC = {"components": {"schemas": {"QueryRequest": {"properties": {
+        "kind": {"type": "string"},
+        "returnedFields": {"type": "array", "items": {"type": "string"}, "maxItems": 1},
+        "excludedFields": {"type": "array", "items": {"type": "number"}, "maxItems": 2},
+    }}}}}
+
+    @staticmethod
+    def field(**config):
+        return {"command": "record replay", "op": {"method": "post", "path": "/query"},
+                "body": {"fields": {"returnedFields": {"flag": "--kind", **config}}}, "output": "raw"}
+
+    def test_a_list_carries_it(self):
+        assert build(self.field(type="string[]"), BODY_OPERATION, self.SPEC).body.fields[0].max_items == 1
+
+    def test_a_single_value_does_not(self):
+        assert build(self.field(), BODY_OPERATION, self.SPEC).body.fields[0].max_items is None
+
+    def test_parts_count_for_themselves(self):
+        entry = {"command": "record replay", "op": {"method": "post", "path": "/query"},
+                 "body": {"fields": {"excludedFields": {"flag": "--box", "type": "double[]", "parts": ["a", "b"]}}},
+                 "output": "raw"}
+        assert build(entry, BODY_OPERATION, self.SPEC).body.fields[0].max_items is None
 
 
 class TestParamValidation:

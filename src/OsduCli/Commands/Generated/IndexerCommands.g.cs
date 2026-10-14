@@ -107,6 +107,13 @@ public static partial class IndexerCommands
         var command = new Command("reindex-records", "Re-index specific records from Storage.");
         command.Options.Add(recordidsBodyOption);
 
+        // The spec's maxItems, checked here rather than by the service.
+        command.Validators.Add(result =>
+        {
+            if (OptionValues.Usable(result, recordidsBodyOption) is { Length: > 1000 })
+                result.AddError("--id takes at most 1000 values.");
+        });
+
         command.SetAction((parseResult, cancellationToken) =>
             CliRunner.RunAsync(parseResult, async (context, cancellationToken) =>
         {
