@@ -17,9 +17,12 @@ osducs group member add --group users.datalake.viewers@dev.dataservices.energy -
   [`osducli`](https://community.opengroup.org/osdu/platform/data-flow/data-loading/osdu-cli)
   profiles in `~/.osducli/` and follows the environment it has selected, without changing them.
   The two run side by side, and moving a profile over is one command.
-- **The whole core OSDU surface.** 131 commands across 12 services — Storage, Search, Schema,
-  Legal, Entitlements, File, Dataset, CRS, Unit, Workflow and Wellbore DDMS — generated from the
-  services' own OpenAPI specs, so a new endpoint upstream is noticed rather than missed.
+- **The whole core OSDU surface.** 136 commands across 13 services — Storage, Search, Indexer,
+  Schema, Legal, Entitlements, File, Dataset, CRS, Unit, Workflow and Wellbore DDMS — generated
+  from the services' own OpenAPI specs, so a new endpoint upstream is noticed rather than missed.
+- **Operator commands, with a guard.** Re-index a kind, records or a whole data partition, or
+  delete a kind's index. Anything destructive or partition-wide says what it is about to do and
+  where, and asks first; `--yes` for scripts.
 - **Moves files, not just their metadata.** `file upload` sends the bytes and creates the record
   that describes them; `file download` saves them, checked against the record's checksum.
 - **Signs in the way your environment needs:** through a browser; as an application with a

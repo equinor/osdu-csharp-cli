@@ -15,6 +15,7 @@ from __future__ import annotations
 
 import argparse
 import pathlib
+import re
 import sys
 
 import yaml
@@ -73,6 +74,12 @@ def options(command: dict) -> list[tuple[str, str, bool]]:
         fields = body.get("fields") or {}
         excluded = [fields[name]["flag"] for name in [paging["limit"], *(paging.get("not-with") or [])]]
         found.append(("`--all`", all_option_help(paging["page-size"], paging["op"]["path"], excluded), False))
+    if confirm := command.get("confirm"):
+        from generate_cli import yes_option_help
+        when = confirm.get("when")
+        found.append(("`--yes`", yes_option_help(
+            (command.get("params") or {}).get(when, (body.get("fields") or {}).get(when, {})).get("flag")
+            if when else None), False))
     return found
 
 
@@ -92,6 +99,12 @@ def rules(command: dict) -> list[str]:
     for group in groups:
         stated.append(" and ".join(f"`{lookup[name].get('flag')}`" for name in group)
                       + " cannot be combined.")
+    if confirm := command.get("confirm"):
+        # What the question says, with each option it names shown as a slot to fill.
+        message = re.sub(r"\{([^{}]*)\}", r"`<\1>`", " ".join(confirm["message"].split()))
+        when = f", when `{lookup[confirm['when']]['flag']}` is given" if confirm.get("when") else ""
+        stated.append(f"Says what it is about to do and asks before going ahead{when}: "
+                      f"*{message}* `--yes` skips the question.")
     return stated
 
 

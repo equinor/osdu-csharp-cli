@@ -32,8 +32,10 @@ error: 403 from the service. The user is not authorized to perform this action
        `record search` answers the same question through the Search service, which most users can reach.
 ```
 
-The role line appears for any command whose endpoint documents one — 74 of the 131 do. Ask
-your OSDU administrator for the role, or take the alternative.
+The role line appears for any command whose endpoint documents one — 79 of the 136 do. Ask
+your OSDU administrator for the role, or take the alternative. It also appears on a `401` that
+says the same thing: ADME answers a missing entitlement either way, and the operator commands,
+such as `index`, are where it does.
 
 `record list` is the common case: it uses Storage's kind-scoped query, which needs
 `service.storage.admin`. **Use `record search` instead.**

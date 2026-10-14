@@ -83,7 +83,7 @@ public static class RecordAddCommand
                 return 0;
             }
 
-            if (!Confirm(plan, parseResult.GetValue(yes), Console.IsInputRedirected ? null : Ask, context.Output))
+            if (!Confirm(plan, parseResult.GetValue(yes), Console.IsInputRedirected ? null : Confirmation.Ask, context.Output))
                 return 1;
 
             var response = await PutAsync(context.Client.Storage.Records, context.Client.GetRequestAdapter("storage"),
@@ -379,13 +379,6 @@ public static class RecordAddCommand
 
         output.WriteNote("Nothing was written.");
         return false;
-    }
-
-    /// <summary>Asks on stderr, so stdout stays the result even when it is piped.</summary>
-    private static string? Ask(string question)
-    {
-        Console.Error.Write(question + " ");
-        return Console.ReadLine();
     }
 
     // ---- writing ----------------------------------------------------------------------------

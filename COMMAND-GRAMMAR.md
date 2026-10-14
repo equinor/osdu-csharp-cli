@@ -55,12 +55,17 @@ manifest's `handwritten:` block, pointing here.
 interactive confirm. Withholding capability to prevent accidents is a UX failure, not a
 safety feature.
 
+> **Built:** a manifest's `confirm:` key (see [MANIFEST.md](docs/MANIFEST.md#confirm)). Before
+> anything is sent the command says what it is about to do, and in which data partition on
+> which server, then asks; `--yes` skips the question but not the statement, and with no
+> terminal to ask at the command refuses. The `index` commands are the first to use it.
+
 ---
 
 ## 2. The tree
 
-> **Status: built.** Every tree in this section is implemented — 131 generated commands
-> across 12 services plus the hand-written `osducs status`. Where the delivered shape differs
+> **Status: built.** Every tree in this section is implemented — 136 generated commands
+> across 13 services plus the hand-written `osducs status`. Where the delivered shape differs
 > from the sketch below, the delivered shape is authoritative; run `osdu <noun> --help` to
 > see it. Two changes were made during implementation:
 >
@@ -103,8 +108,8 @@ behind `--yes` (R6), and `delete`/`purge` now name the soft/hard distinction tha
 
 **Built today:** `list`, `get`, `headers`, `delete`, `version list`, `version get`, and the
 hand-written `add`, which asks before updating a record that exists (R6); `patch`, `purge` and `version purge` are still
-excluded in the manifest pending the `--yes` guard (R6), which the generator cannot yet
-express.
+excluded in the manifest. The generator can now express the guard (`confirm:`), so they are
+next.
 
 ### group, member — Entitlements (12 ops)
 
@@ -207,6 +212,22 @@ command (§3.2).
 > `close-cursor` command. A `--limit` above 1000, or `--all`, sends the same request to
 > `/query_with_cursor` and follows the cursor to the end, releasing it when the command stops
 > early. The manifest's `paging:` key expresses it; see [MANIFEST.md](docs/MANIFEST.md#paging).
+
+### index — Indexer (8 ops)
+
+```
+osducs index reindex           --kind K [--force-clean]    POST   /reindex
+osducs index reindex-records   --id ID...                  POST   /reindex/records
+osducs index reindex-partition [--force-clean]             PATCH  /reindex
+osducs index delete            --kind K                    DELETE /index
+osducs index provision                                     PUT    /partitions/provision
+```
+
+The search index is the noun: what an operator re-indexes or deletes. Every operation is an
+operator's, left out while the CLI was taken to be for data users; the operations team is who
+uses it. `delete`, `reindex-partition` and `provision` ask first (R6), and `reindex` does with
+`--force-clean`, which deletes the kind's index before rebuilding it. `/info` is reported by
+`osducs status`; the readiness and liveness probes are excluded.
 
 ### file — File (6 ops)
 

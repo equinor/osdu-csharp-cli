@@ -23,6 +23,7 @@ public static class GeneratedCommands
         tree.Describe("group", "Work with entitlement groups — the access control lists of OSDU.");
         tree.Describe("member", "Work with members — the users and service principals inside groups.");
         tree.Describe("file", "Work with files — upload and download bytes, and the metadata that describes them.");
+        tree.Describe("index", "Operate on the search index — re-index a kind, records or the whole data partition, and delete a kind's index.");
         tree.Describe("legaltag", "Work with LegalTags — the compliance metadata attached to every record.");
         tree.Describe("schema", "Work with schemas — the definitions behind every record kind.");
         tree.Describe("record", "Work with records — the kind-agnostic unit of OSDU data. Search lives here.");
@@ -64,6 +65,7 @@ public static class GeneratedCommands
         tree.Node("group");
         tree.Node("member");
         tree.Node("file");
+        tree.Node("index");
         tree.Node("legaltag");
         tree.Node("schema");
         tree.Node("record");
@@ -105,6 +107,7 @@ public static class GeneratedCommands
         DatasetCommands.Attach(tree);
         EntitlementsCommands.Attach(tree);
         FileCommands.Attach(tree);
+        IndexerCommands.Attach(tree);
         LegalCommands.Attach(tree);
         SchemaServiceCommands.Attach(tree);
         SearchCommands.Attach(tree);

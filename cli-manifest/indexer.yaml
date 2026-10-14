@@ -1,0 +1,113 @@
+# CLI manifest for the OSDU Indexer service.
+#
+# The Indexer keeps Search's index in step with Storage. Every endpoint is an operator's: re-
+# indexing a kind after a schema or mapping change, re-indexing records missing from search,
+# deleting a kind's index, and the partition-wide re-index and provisioning. They were left
+# out while the CLI was assumed to be for data users; the operations team is who uses it.
+#
+# The ones that delete an index or reach across the whole partition say what they are about to
+# do and ask first (`confirm:`, COMMAND-GRAMMAR R6). Their examples are never run by
+# tools/smoke_test.py, which runs examples against a live instance.
+
+service: indexer
+spec: indexer
+client: Indexer
+description: Indexer service — keeps Search's index in step with Storage.
+
+groups:
+  index: >-
+    Operate on the search index — re-index a kind, records or the whole data partition, and
+    delete a kind's index.
+
+commands:
+  - command: index reindex
+    summary: Re-index every record of a kind from Storage.
+    op: { method: post, path: /reindex }
+    params:
+      force_clean:
+        flag: --force-clean
+        help: >-
+          Delete the kind's index first and rebuild it from scratch, as a changed mapping needs.
+          Until it finishes, searches for the kind find only what has been re-indexed.
+    body:
+      fields:
+        kind: { flag: --kind, short: -k, required: true, help: "Kind to re-index, e.g. osdu:wks:master-data--Well:1.0.0." }
+    confirm:
+      message: >-
+        Delete the search index of {kind} and rebuild it from Storage. Until it finishes,
+        searches for the kind find only what has been re-indexed.
+      when: force_clean
+    examples:
+      - args: --kind "osdu:wks:master-data--Well:1.0.0"
+        skip: Re-indexes a kind on the instance it runs against; an operator's action, not a check.
+    output: raw
+
+  - command: index reindex-records
+    summary: Re-index specific records from Storage.
+    op: { method: post, path: /reindex/records }
+    body:
+      fields:
+        recordIds:
+          flag: --id
+          required: true
+          type: "string[]"
+          comma-separated: true
+          help: Ids of the records to re-index, at most 1000. Repeat the flag or comma-separate.
+    examples:
+      - args: --id "opendes:master-data--Well:1000,opendes:master-data--Well:1001"
+        skip: >
+          Record ids are scoped to a data partition, so any literal id is wrong on another
+          instance; and re-indexing is an operator's action, not a check.
+    output: raw
+
+  - command: index reindex-partition
+    summary: Re-index every kind in the data partition from Storage.
+    op: { method: patch, path: /reindex }
+    params:
+      force_clean:
+        flag: --force-clean
+        help: >-
+          Delete each kind's index first and rebuild it from scratch. Until it finishes,
+          searches find only what has been re-indexed.
+    confirm:
+      message: >-
+        Re-index every kind in the data partition from Storage, a long job for the Indexer and
+        Elasticsearch. With --force-clean every index is deleted first, and searches find only
+        what has been re-indexed until it finishes.
+    output: raw
+
+  - command: index delete
+    summary: Delete the search index of a kind.
+    op: { method: delete, path: /index }
+    params:
+      kind: { flag: --kind, short: -k, required: true, help: "Kind whose index to delete, e.g. osdu:wks:master-data--Well:1.0.0." }
+    confirm:
+      message: >-
+        Delete the search index of {kind}. Its records stay in Storage, but searches for the
+        kind find nothing until it is re-indexed.
+    examples:
+      - args: --kind "osdu:wks:master-data--Well:1.0.0"
+        skip: Deletes an index on the instance it runs against.
+    output: raw
+
+  - command: index provision
+    summary: Provision the Indexer for the data partition.
+    op: { method: put, path: /partitions/provision }
+    confirm:
+      message: >-
+        Provision the Indexer for the data partition, which is done once when a partition is
+        set up.
+    output: raw
+
+exclude:
+  - op: { method: get, path: /readiness_check }
+    reason: Infrastructure probe, covered by `osducs status`.
+  - op: { method: get, path: /liveness_check }
+    reason: Infrastructure probe, covered by `osducs status`.
+
+handwritten:
+  - command: status
+    op: { method: get, path: /info }
+    reason: >
+      Reported by `osducs status`, which probes every service's /info in one command rather
+      than giving each service its own. See cli-manifest/storage.yaml for the rationale.

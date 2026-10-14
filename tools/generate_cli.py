@@ -590,6 +590,16 @@ class Paging:
 
 
 @dataclass
+class Confirm:
+    """What a command says and asks before it does something that cannot be undone, or that
+    reaches across a whole data partition (COMMAND-GRAMMAR R6: a guard, not an exclusion).
+    """
+    message: str              # what is about to happen, with {option} placeholders
+    values: dict[str, "Param | BodyField"]  # the options the placeholders name
+    when: "Param | BodyField | None"         # a true/false option that alone makes it ask
+
+
+@dataclass
 class Command:
     path: list[str]       # e.g. ["storage", "version", "get"]
     summary: str
@@ -610,6 +620,7 @@ class Command:
     forbidden_hint: str | None
     message: str | None
     paging: Paging | None = None
+    confirm: Confirm | None = None
 
     @property
     def name(self) -> str:
@@ -687,7 +698,8 @@ MANIFEST_KEYS = {
     "top": {"service", "spec", "client", "models", "description", "groups", "scope",
             "section", "commands", "handwritten", "exclude"},
     "command": {"command", "summary", "op", "builder", "params", "body", "output",
-                "examples", "require-one-of", "mutually-exclusive", "forbidden-hint", "paging"},
+                "examples", "require-one-of", "mutually-exclusive", "forbidden-hint", "paging",
+                "confirm"},
     "op": {"method", "path"},
     # No `type`: a parameter's C# type is derived from the spec. The key used to be accepted
     # here and never read, so 25 manifest entries stated a type that had no effect.
@@ -698,6 +710,7 @@ MANIFEST_KEYS = {
     "output": {"root", "columns", "columns-from", "total-from", "cursor-from", "message"},
     "example": {"args", "skip"},
     "paging": {"op", "release", "limit", "page-size", "cursor", "not-with"},
+    "confirm": {"message", "when"},
     "handwritten": {"command", "op", "reason"},
     "exclude": {"op", "reason"},
 }
@@ -1306,6 +1319,19 @@ def build_command(entry: dict, operation: dict, where: str, models_root: str,
     if entry.get("paging") is not None:
         paging = build_paging(entry["paging"], paging_operations, body, output, where, spec)
 
+    confirm = None
+    if entry.get("confirm") is not None:
+        if paging is not None:
+            raise ManifestError(f"{where}: `confirm:` and `paging:` cannot be combined: paging is "
+                                "for reading, which needs no confirmation")
+        confirm = build_confirm(entry["confirm"], params, body, where)
+        # tools/smoke_test.py runs examples against a live instance: one of these would do
+        # what the question guards against, or wait at a terminal for an answer.
+        for example in entry.get("examples") or []:
+            if not (isinstance(example, dict) and example.get("skip")):
+                raise ManifestError(f"{where}: an example of a command with `confirm:` needs a "
+                                    "`skip:` reason, since tools/smoke_test.py would run it")
+
     return Command(
         path=path,
         summary=entry.get("summary", ""),
@@ -1326,7 +1352,57 @@ def build_command(entry: dict, operation: dict, where: str, models_root: str,
         forbidden_hint=entry.get("forbidden-hint"),
         message=output.get("message"),
         paging=paging,
+        confirm=confirm,
     )
+
+
+def build_confirm(cfg: object, params: list[Param], body: "Body | None", where: str) -> Confirm:
+    """Checks a command's `confirm:` and resolves the options its message and `when` name.
+
+    The message is what a person reads before agreeing, so a placeholder must name an option
+    that always has a value: an optional one would put "null" in front of them. `when` must be
+    a true/false option, since its being set is the whole condition.
+    """
+    if not isinstance(cfg, dict):
+        raise ManifestError(f"{where}: `confirm:` must be a mapping with `message:` and, "
+                            "optionally, `when:`")
+    check_keys("confirm", cfg, f"{where}: confirm")
+    message = cfg.get("message")
+    if not isinstance(message, str) or not message.strip():
+        raise ManifestError(f"{where}: confirm `message:` must say what the command is about to do")
+    # One line, as a folded YAML block may not be.
+    message = " ".join(message.split())
+
+    options: dict[str, Param | BodyField] = {param.name: param for param in params}
+    if body is not None:
+        options.update({field.name: field for field in body.fields})
+    required = sorted(name for name, option in options.items() if option.required)
+    values = {}
+    for name in re.findall(r"\{([^{}]*)\}", message):
+        option = options.get(name)
+        if option is None or not option.required:
+            raise ManifestError(f"{where}: confirm message names {{{name}}}, which is not a required "
+                                f"option of this command: {required}")
+        values[name] = option
+    if "{" in re.sub(r"\{[^{}]*\}", "", message) or "}" in re.sub(r"\{[^{}]*\}", "", message):
+        raise ManifestError(f"{where}: confirm message has an unmatched brace: {message!r}")
+
+    when = None
+    if cfg.get("when") is not None:
+        # A list or a mapping here is not a name, and as a dictionary key it raised TypeError
+        # rather than saying what is wrong.
+        when = options.get(cfg["when"]) if isinstance(cfg["when"], str) else None
+        if when is None or when.cs_type.rstrip("?") != "bool":
+            raise ManifestError(f"{where}: confirm `when:` must name a true/false option of this "
+                                f"command, not {cfg['when']!r}")
+
+    taken = {option.flag for option in options.values()} | {
+        option.short for option in options.values() if option.short}
+    if body is not None and not body.from_fields:
+        taken |= {body.flag, body.short}
+    if "--yes" in taken:
+        raise ManifestError(f"{where}: `confirm:` adds --yes, which this command already uses")
+    return Confirm(message=message, values=values, when=when)
 
 
 def build_paging(cfg: dict, operations: tuple[dict, dict | None] | None, body: "Body | None",
@@ -1621,6 +1697,10 @@ def emit_command(service: Service, command: Command) -> list[str]:
         lines += option_declaration("--all", None, "bool",
                                     all_option_help(paging.page_size, paging.path, excluded),
                                     False, "allOption")
+    if command.confirm:
+        when = command.confirm.when
+        lines += option_declaration("--yes", None, "bool",
+                                    yes_option_help(when.flag if when else None), False, "yesOption")
 
     lines.append("")
     lines.append(f"        var command = new Command({csharp_string(command.name)}, "
@@ -1635,6 +1715,8 @@ def emit_command(service: Service, command: Command) -> list[str]:
             lines.append(f"        command.Options.Add({command.body.var});")
     if command.paging:
         lines.append("        command.Options.Add(allOption);")
+    if command.confirm:
+        lines.append("        command.Options.Add(yesOption);")
 
     if command.require_one_of:
         by_name = {param.name: param for param in command.params}
@@ -1746,6 +1828,9 @@ def emit_command(service: Service, command: Command) -> list[str]:
             lines.append(f"                bodyJson, {command.body.model}"
                          f".CreateFromDiscriminatorValue, cancellationToken);")
 
+    if command.confirm:
+        lines += confirm_check(command.confirm)
+
     accessor = re.sub(r"\{(\w+)\}", lambda m: camel(m.group(1)), command.builder)
     target = f"context.Client.{service.client}.{accessor}"
 
@@ -1806,6 +1891,42 @@ def emit_command(service: Service, command: Command) -> list[str]:
     lines.append("        return command;")
     lines.append("    }")
     return lines
+
+
+def yes_option_help(when_flag: str | None) -> str:
+    """The help for the `--yes` a command with `confirm` gets, shared with the command reference."""
+    asks = f"With {when_flag}, the command" if when_flag else "The command"
+    return (f"Go ahead without asking. {asks} says what it is about to do and asks first, and "
+            "refuses when there is no terminal to ask at.")
+
+
+def confirm_message(confirm: Confirm) -> str:
+    """The message as a C# expression: its text, with the options it names put in."""
+    pieces = []
+    for literal, name in re.findall(r"([^{]*)(?:\{([^{}]*)\})?", confirm.message):
+        if literal:
+            # Not csharp_string, which trims: the spaces around a placeholder are the message's.
+            pieces.append(csharp_literal(literal))
+        if name:
+            option = confirm.values[name]
+            collection = option.is_collection if isinstance(option, BodyField) else option.cs_type.endswith("[]")
+            pieces.append(f"Confirmation.List({option.var})" if collection else f"{option.var}")
+    return " + ".join(pieces) if len(pieces) > 1 or pieces[0].startswith('"') else f'"" + {pieces[0]}'
+
+
+def confirm_check(confirm: Confirm) -> list[str]:
+    """Says what is about to happen and asks, before the request is sent; a no ends the command."""
+    condition = "!Confirmation.Confirm("
+    if confirm.when is not None:
+        condition = f"{confirm.when.var} == true && " + condition
+    return [
+        "",
+        "            // Said, and asked, before anything is sent; --yes skips only the question.",
+        f"            if ({condition}",
+        f"                    {confirm_message(confirm)},",
+        "                    parseResult.GetValue(yesOption), context))",
+        "                return 1;",
+    ]
 
 
 def all_option_help(page_size: int, path: str, excluded_flags: list[str]) -> str:

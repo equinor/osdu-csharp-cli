@@ -79,6 +79,7 @@ Each item under `commands:`.
 | `mutually-exclusive` | no | Params or body fields that cannot be combined: one group as `[a, b]`, or several as `[[a, b], [c, d]]`. See [`mutually-exclusive`](../COMMAND-GRAMMAR.md#mutually-exclusive). |
 | `forbidden-hint` | no | An extra line printed under a 403, for example pointing to a command most users can run instead. The roles the operation needs are added without this key: the generator reads them from the spec's "Allowed roles" or "Required roles" text. |
 | `paging` | no | A cursor endpoint to send the same request to when one page of results is not enough. Adds `--all`. See [`paging`](#paging). |
+| `confirm` | no | What the command says and asks before it does something that cannot be undone, or that reaches across a whole data partition. Adds `--yes`. See [`confirm`](#confirm). |
 
 ### `op`
 
@@ -208,6 +209,24 @@ must take the `limit` field, the `cursor`, and every property the other body fie
 values write to; the generator refuses one that does not, unless the field is listed in
 `not-with` by its own name. The added `--all` cannot be combined with the `limit` field's
 option.
+
+### `confirm`
+
+For an operation that deletes, or reaches across a whole data partition: COMMAND-GRAMMAR's R6,
+a guard rather than an exclusion. Before anything is sent, the command writes the message and
+the data partition and server it is about to act on to stderr, then asks `Go ahead? [y/N]`.
+`--yes` skips the question but not the message, so a script's log still says what it did. With
+no terminal to ask at and no `--yes`, the command refuses. A no ends it with exit code 1.
+
+| Key | Required | What it does |
+|---|---|---|
+| `message` | yes | What is about to happen, in a sentence or two. `{name}` puts in the value of a required param or body field, so the question names what it applies to: `Delete the search index of {kind}.` A list's values are shown three at a time and a count. |
+| `when` | no | A true/false option that alone makes the command ask, such as `force_clean`: re-indexing a kind is routine, deleting its index first is not. |
+
+An example of a command with `confirm` needs a `skip:` reason, since
+[the smoke test](DEVELOPMENT.md#smoke-testing-the-examples) runs examples against a live
+instance. `confirm` cannot be combined with `paging`, which is for reading, and the command
+cannot already use `--yes`.
 
 ## `handwritten`
 

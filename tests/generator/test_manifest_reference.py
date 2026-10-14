@@ -30,6 +30,7 @@ SECTIONS = {
     "output": "### `output`",
     "example": "### `examples`",
     "paging": "### `paging`",
+    "confirm": "### `confirm`",
     "handwritten": "## `handwritten`",
     "exclude": "## `exclude`",
 }
