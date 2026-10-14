@@ -68,6 +68,9 @@ public static class StatusCommand
         ("file", async (context, cancellationToken) =>
             await OsduJson.ToJsonAsync(
                 await context.Client.File.V2.Info.GetAsync(cancellationToken: cancellationToken))),
+        ("indexer", async (context, cancellationToken) =>
+            await OsduJson.ToJsonAsync(
+                await context.Client.Indexer.Info.GetAsync(cancellationToken: cancellationToken))),
         ("legal", async (context, cancellationToken) =>
             await OsduJson.ToJsonAsync(
                 await context.Client.Legal.Info.GetAsync(cancellationToken: cancellationToken))),

@@ -195,14 +195,19 @@ public static class CliRunner
         {
             // Non-2xx from an OSDU service. The status is what the user needs; the Kiota
             // stack trace above it is not.
+            var detail = Describe(exception);
             Console.Error.WriteLine(
-                $"error: {exception.ResponseStatusCode} from the service. "
-                + (Describe(exception) ?? string.Empty));
+                $"error: {exception.ResponseStatusCode} from the service. " + (detail ?? string.Empty));
 
             // "The user is not authorized to perform this action" does not say which
             // authorisation, and several OSDU endpoints need an admin role a normal user will
-            // never hold. Without this the only way to find out is to read the spec.
-            if (exception.ResponseStatusCode == 403)
+            // never hold. Without this the only way to find out is to read the spec. ADME
+            // answers a missing entitlement with 401 as often as 403, in the same words, and
+            // the operator endpoints are where it does; a 401 for a rejected token says
+            // something else, and gets no role line.
+            if (exception.ResponseStatusCode == 403
+                || (exception.ResponseStatusCode == 401
+                    && detail?.Contains("not authorized to perform this action", StringComparison.OrdinalIgnoreCase) == true))
             {
                 if (requiredRoles is not null)
                     Console.Error.WriteLine($"       this endpoint requires {requiredRoles}");

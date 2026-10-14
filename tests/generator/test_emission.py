@@ -161,6 +161,27 @@ CASES = {
         operation(body={"$ref": "#/components/schemas/QueryRequest"}),
         (operation(body={"$ref": "#/components/schemas/CursorQueryRequest"}), operation()),
     ),
+    # Says and asks before the request, naming what it applies to; only with --force-clean.
+    "confirm_when": (
+        {"command": "index reindex", "summary": "Re-index a kind.",
+         "op": {"method": "post", "path": "/reindex"},
+         "params": {"force_clean": {"flag": "--force-clean", "help": "Clean first."}},
+         "body": {"fields": {"kind": {"flag": "--kind", "required": True, "help": "Kind."}}},
+         "confirm": {"message": "Delete the index of {kind} and rebuild it.", "when": "force_clean"},
+         "output": "raw"},
+        operation(parameters=[{"name": "force_clean", "in": "query", "schema": {"type": "boolean"}}],
+                  body={"$ref": "#/components/schemas/QueryRequest"}),
+    ),
+    # Always asks; a list is shown a few values at a time.
+    "confirm_list": (
+        {"command": "index purge", "summary": "Purge.",
+         "op": {"method": "post", "path": "/purge"},
+         "body": {"fields": {"returnedFields": {"flag": "--id", "type": "string[]", "required": True,
+                                                "help": "Ids."}}},
+         "confirm": {"message": "Purge {returnedFields} \"for good\"."},
+         "output": "raw"},
+        operation(body={"$ref": "#/components/schemas/QueryRequest"}),
+    ),
     "require_one_of": (
         {"command": "crs get", "summary": "Get a CRS.",
          "op": {"method": "get", "path": "/v3/coordinate-reference-system"},

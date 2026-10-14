@@ -20,7 +20,7 @@ crs-catalog     ok      0.29.2-SNAPSHOT  2026-08-05T09:49:35.371Z
 crs-conversion  ok      0.29.2-SNAPSHOT  2026-08-05T09:49:28.770Z
 storage         ok      0.29.4-SNAPSHOT  2026-08-05T19:04:12.267Z
 wellbore-ddms   ok      0.29
-...            (12 services in all)
+...            (13 services in all)
 ```
 
 That first line is deliberate: with a default profile in play, which environment you are
@@ -476,6 +476,33 @@ One upload takes at most 5.24 GB, Azure's limit for a single request; a larger f
 Neither command sends the OSDU token to storage, since the signed URL authorises itself, and
 neither prints that URL. `file upload-url` and `file download-url` still hand it out for other
 tools.
+
+## Operations
+
+The `index` commands re-index from Storage, and delete a kind's index. They need operator roles,
+`service.search.admin` or `users.datalake.ops`; a refusal names the one each command needs.
+
+```bash
+osducs index reindex --kind "osdu:wks:master-data--Well:1.0.0"                # re-index a kind in place
+osducs index reindex --kind "osdu:wks:master-data--Well:1.0.0" --force-clean  # delete its index first, for a changed mapping
+osducs index reindex-records --id "dev:master-data--Well:1000,dev:master-data--Well:1001"
+osducs index delete --kind "osdu:wks:master-data--Well:1.0.0"
+osducs index reindex-partition                                                 # every kind in the data partition
+```
+
+A command that deletes, or reaches across the whole data partition, says what it is about to do
+and where, and asks:
+
+```
+Delete the search index of osdu:wks:master-data--Well:1.0.0. Its records stay in Storage, but searches for the kind find nothing until it is re-indexed.
+Data partition dev on https://<instance>.energy.azure.com.
+Go ahead? [y/N]
+```
+
+`--yes` skips the question but not the two lines above it, so a script's log still says what it
+did and where. Without a terminal to ask at, and without `--yes`, the command refuses rather
+than guess. `index reindex` asks only with `--force-clean`: re-indexing a kind in place is
+routine, deleting its index first is not.
 
 ## Shell completion
 

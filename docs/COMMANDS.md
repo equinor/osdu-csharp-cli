@@ -21,6 +21,7 @@ their options; `record add` is in [USAGE.md](USAGE.md#writing-records), and the 
 | [`dataset`](#dataset) | `get`, `add`, `delete`, `undelete`, `upload-url`, `download-url`, `revoke-url` |
 | [`file`](#file) | `get`, `add`, `delete`, `upload-url`, `download-url`, `revoke-url` |
 | [`group`](#group) | `list`, `add`, `delete`, `member list`, `member add`, `member delete`, `member count` |
+| [`index`](#index) | `reindex`, `reindex-records`, `reindex-partition`, `delete`, `provision` |
 | [`intervalset`](#intervalset) | `get`, `add`, `delete`, `version list`, `version get` |
 | [`legaltag`](#legaltag) | `list`, `get`, `add`, `update`, `delete`, `validate`, `properties` |
 | [`logacquisition`](#logacquisition) | `get`, `add`, `delete`, `version list`, `version get` |
@@ -327,6 +328,82 @@ List the members of a group.
 | `-g`, `--group` | yes | Group email address. |
 | `--role` |  | Return only members with this role. |
 | `--include-type` |  | Include each member's type in the output. |
+
+## index
+
+### `osducs index delete`
+
+Delete the search index of a kind.
+
+`DELETE /index` — indexer
+
+| Option | Required | Description |
+|---|---|---|
+| `-k`, `--kind` | yes | Kind whose index to delete, e.g. osdu:wks:master-data--Well:1.0.0. |
+| `--yes` |  | Go ahead without asking. The command says what it is about to do and asks first, and refuses when there is no terminal to ask at. |
+
+> Says what it is about to do and asks before going ahead: *Delete the search index of `<kind>`. Its records stay in Storage, but searches for the kind find nothing until it is re-indexed.* `--yes` skips the question.
+
+```bash
+osducs index delete --kind "osdu:wks:master-data--Well:1.0.0"
+```
+
+### `osducs index provision`
+
+Provision the Indexer for the data partition.
+
+`PUT /partitions/provision` — indexer
+
+| Option | Required | Description |
+|---|---|---|
+| `--yes` |  | Go ahead without asking. The command says what it is about to do and asks first, and refuses when there is no terminal to ask at. |
+
+> Says what it is about to do and asks before going ahead: *Provision the Indexer for the data partition, which is done once when a partition is set up.* `--yes` skips the question.
+
+### `osducs index reindex`
+
+Re-index every record of a kind from Storage.
+
+`POST /reindex` — indexer
+
+| Option | Required | Description |
+|---|---|---|
+| `--force-clean` |  | Delete the kind's index first and rebuild it from scratch, as a changed mapping needs. Until it finishes, searches for the kind find only what has been re-indexed. |
+| `-k`, `--kind` | yes | Kind to re-index, e.g. osdu:wks:master-data--Well:1.0.0. |
+| `--yes` |  | Go ahead without asking. With --force-clean, the command says what it is about to do and asks first, and refuses when there is no terminal to ask at. |
+
+> Says what it is about to do and asks before going ahead, when `--force-clean` is given: *Delete the search index of `<kind>` and rebuild it from Storage. Until it finishes, searches for the kind find only what has been re-indexed.* `--yes` skips the question.
+
+```bash
+osducs index reindex --kind "osdu:wks:master-data--Well:1.0.0"
+```
+
+### `osducs index reindex-partition`
+
+Re-index every kind in the data partition from Storage.
+
+`PATCH /reindex` — indexer
+
+| Option | Required | Description |
+|---|---|---|
+| `--force-clean` |  | Delete each kind's index first and rebuild it from scratch. Until it finishes, searches find only what has been re-indexed. |
+| `--yes` |  | Go ahead without asking. The command says what it is about to do and asks first, and refuses when there is no terminal to ask at. |
+
+> Says what it is about to do and asks before going ahead: *Re-index every kind in the data partition from Storage, a long job for the Indexer and Elasticsearch. With --force-clean every index is deleted first, and searches find only what has been re-indexed until it finishes.* `--yes` skips the question.
+
+### `osducs index reindex-records`
+
+Re-index specific records from Storage.
+
+`POST /reindex/records` — indexer
+
+| Option | Required | Description |
+|---|---|---|
+| `--id` | yes | Ids of the records to re-index, at most 1000. Repeat the flag or comma-separate. |
+
+```bash
+osducs index reindex-records --id "opendes:master-data--Well:1000,opendes:master-data--Well:1001"
+```
 
 ## intervalset
 

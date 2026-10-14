@@ -294,11 +294,87 @@ class TestPaging:
         with pytest.raises(ManifestError, match="must be a top-level body field"):
             self.build(self.entry(fields=fields))
 
+    def test_a_paged_command_cannot_confirm(self):
+        entry = self.entry()
+        entry["confirm"] = {"message": "m"}
+        with pytest.raises(ManifestError, match="cannot be combined"):
+            self.build(entry)
+
     def test_unknown_paging_keys_are_refused(self):
         entry = self.entry()
         entry["paging"]["pages"] = 3
         with pytest.raises(ManifestError, match="unknown paging key"):
             self.build(entry)
+
+
+class TestConfirm:
+    """`confirm:` says and asks before a command deletes or reaches across a partition."""
+
+    OPERATION = {
+        "parameters": [
+            {"name": "kind", "in": "query", "required": True, "schema": {"type": "string"}},
+            {"name": "note", "in": "query", "schema": {"type": "string"}},
+            {"name": "force_clean", "in": "query", "schema": {"type": "boolean"}},
+        ],
+        "responses": OPERATION["responses"],
+    }
+
+    @staticmethod
+    def entry(confirm, **extra):
+        entry = {"command": "index delete", "op": {"method": "delete", "path": "/index"},
+                 "params": {"kind": {"flag": "--kind", "required": True},
+                            "note": {"flag": "--note"},
+                            "force_clean": {"flag": "--force-clean"}},
+                 "confirm": confirm, "output": "raw"}
+        entry.update(extra)
+        return entry
+
+    def build(self, entry):
+        return build(entry, self.OPERATION)
+
+    def test_it_is_carried_onto_the_command(self):
+        confirm = self.build(self.entry({"message": "Delete the index\n  of {kind}."})).confirm
+        # One line, as a folded YAML block may not be.
+        assert confirm.message == "Delete the index of {kind}."
+        assert list(confirm.values) == ["kind"] and confirm.when is None
+
+    def test_when_names_a_true_false_option(self):
+        assert self.build(self.entry({"message": "m", "when": "force_clean"})).confirm.when.name == "force_clean"
+        with pytest.raises(ManifestError, match="true/false option"):
+            self.build(self.entry({"message": "m", "when": "kind"}))
+        with pytest.raises(ManifestError, match="true/false option"):
+            self.build(self.entry({"message": "m", "when": "nonsense"}))
+
+    @pytest.mark.parametrize("name", ["note", "nonsense"])
+    def test_a_placeholder_names_a_required_option(self, name):
+        # An optional one would put "null" in front of the person agreeing.
+        with pytest.raises(ManifestError, match="not a required option"):
+            self.build(self.entry({"message": f"Delete {{{name}}}."}))
+
+    def test_an_unmatched_brace_is_refused(self):
+        with pytest.raises(ManifestError, match="unmatched brace"):
+            self.build(self.entry({"message": "Delete {kind."}))
+
+    @pytest.mark.parametrize("confirm", ["Delete it.", {"message": ""}, {"when": "force_clean"}])
+    def test_it_needs_a_message_in_a_mapping(self, confirm):
+        with pytest.raises(ManifestError, match="confirm"):
+            self.build(self.entry(confirm))
+
+    def test_unknown_keys_are_refused(self):
+        with pytest.raises(ManifestError, match="unknown confirm key"):
+            self.build(self.entry({"message": "m", "ask": True}))
+
+    def test_a_command_already_using_yes_is_refused(self):
+        entry = self.entry({"message": "m"})
+        entry["params"]["note"]["flag"] = "--yes"
+        with pytest.raises(ManifestError, match="already uses"):
+            self.build(entry)
+
+    def test_its_examples_must_be_skipped(self):
+        # tools/smoke_test.py runs examples against a live instance.
+        with pytest.raises(ManifestError, match="skip"):
+            self.build(self.entry({"message": "m"}, examples=["--kind k"]))
+        self.build(self.entry({"message": "m"}, examples=[{"args": "--kind k", "skip": "Deletes an index."}]))
 
 
 class TestParamValidation:
