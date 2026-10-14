@@ -182,6 +182,17 @@ CASES = {
          "output": "raw"},
         operation(body={"$ref": "#/components/schemas/QueryRequest"}),
     ),
+    # Asks only when the list option is left out: one kind is routine, every kind is not.
+    "confirm_unless": (
+        {"command": "record replay", "summary": "Replay.",
+         "op": {"method": "post", "path": "/replay"},
+         "body": {"fields": {
+             "kind": {"flag": "--operation", "required": True, "help": "Operation."},
+             "returnedFields": {"flag": "--kind", "type": "string[]", "help": "Kind."}}},
+         "confirm": {"message": "Replay every kind as a {kind}.", "unless": "returnedFields"},
+         "output": "raw"},
+        operation(body={"$ref": "#/components/schemas/QueryRequest"}),
+    ),
     "require_one_of": (
         {"command": "crs get", "summary": "Get a CRS.",
          "op": {"method": "get", "path": "/v3/coordinate-reference-system"},

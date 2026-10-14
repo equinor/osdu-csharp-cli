@@ -40,6 +40,12 @@ public static class CliRunner
     /// </remarks>
     internal static string? Describe(ApiException exception)
     {
+        // Kiota's own text for a status the spec declares no error body for. It describes the
+        // client, not the failure: `record replay-status` with an unknown id printed it after
+        // "404 from the service", which says all there is.
+        if (exception.Message.StartsWith("The server returned an unexpected status code", StringComparison.Ordinal))
+            return null;
+
         if (!string.IsNullOrWhiteSpace(exception.Message))
             return exception.Message;
 

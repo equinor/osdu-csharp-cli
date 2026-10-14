@@ -350,6 +350,20 @@ class TestConfirm:
         with pytest.raises(ManifestError, match="true/false option"):
             self.build(self.entry({"message": "m", "when": when}))
 
+    def test_unless_names_an_optional_option(self):
+        # Asks only without it: replaying one kind is routine, every kind is not.
+        assert self.build(self.entry({"message": "m", "unless": "note"})).confirm.unless.name == "note"
+
+    @pytest.mark.parametrize("unless", ["kind", "nonsense", ["note"]])
+    def test_unless_cannot_name_a_required_or_unknown_option(self, unless):
+        # A required option is always given, so the question would never be asked.
+        with pytest.raises(ManifestError, match="optional option"):
+            self.build(self.entry({"message": "m", "unless": unless}))
+
+    def test_when_and_unless_cannot_be_combined(self):
+        with pytest.raises(ManifestError, match="not both"):
+            self.build(self.entry({"message": "m", "when": "force_clean", "unless": "note"}))
+
     @pytest.mark.parametrize("name", ["note", "nonsense"])
     def test_a_placeholder_names_a_required_option(self, name):
         # An optional one would put "null" in front of the person agreeing.

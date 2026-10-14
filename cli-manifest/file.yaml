@@ -40,6 +40,9 @@ commands:
     op: { method: delete, path: "/v2/files/{id}/metadata" }
     params:
       id: { flag: --id, short: -id, required: true, help: File metadata record id to delete. }
+    confirm:
+      message: >-
+        Delete the file record {id} and the stored file it describes.
     output:
       message: File and metadata deleted
 

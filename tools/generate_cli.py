@@ -597,6 +597,9 @@ class Confirm:
     message: str              # what is about to happen, with {option} placeholders
     values: dict[str, "Param | BodyField"]  # the options the placeholders name
     when: "Param | BodyField | None"         # a true/false option that alone makes it ask
+    # An option whose absence alone makes it ask: replaying one kind is routine, replaying
+    # the whole partition, which no --kind means, is not.
+    unless: "Param | BodyField | None" = None
 
 
 @dataclass
@@ -710,7 +713,7 @@ MANIFEST_KEYS = {
     "output": {"root", "columns", "columns-from", "total-from", "cursor-from", "message"},
     "example": {"args", "skip"},
     "paging": {"op", "release", "limit", "page-size", "cursor", "not-with"},
-    "confirm": {"message", "when"},
+    "confirm": {"message", "when", "unless"},
     "handwritten": {"command", "op", "reason"},
     "exclude": {"op", "reason"},
 }
@@ -1396,13 +1399,23 @@ def build_confirm(cfg: object, params: list[Param], body: "Body | None", where: 
             raise ManifestError(f"{where}: confirm `when:` must name a true/false option of this "
                                 f"command, not {cfg['when']!r}")
 
+    unless = None
+    if cfg.get("unless") is not None:
+        if when is not None:
+            raise ManifestError(f"{where}: confirm takes `when:` or `unless:`, not both")
+        unless = options.get(cfg["unless"]) if isinstance(cfg["unless"], str) else None
+        # A required option is always given, so the question would never be asked.
+        if unless is None or unless.required:
+            raise ManifestError(f"{where}: confirm `unless:` must name an optional option of this "
+                                f"command, not {cfg['unless']!r}")
+
     taken = {option.flag for option in options.values()} | {
         option.short for option in options.values() if option.short}
     if body is not None and not body.from_fields:
         taken |= {body.flag, body.short}
     if "--yes" in taken:
         raise ManifestError(f"{where}: `confirm:` adds --yes, which this command already uses")
-    return Confirm(message=message, values=values, when=when)
+    return Confirm(message=message, values=values, when=when, unless=unless)
 
 
 def build_paging(cfg: dict, operations: tuple[dict, dict | None] | None, body: "Body | None",
@@ -1698,9 +1711,11 @@ def emit_command(service: Service, command: Command) -> list[str]:
                                     all_option_help(paging.page_size, paging.path, excluded),
                                     False, "allOption")
     if command.confirm:
-        when = command.confirm.when
+        when, unless = command.confirm.when, command.confirm.unless
         lines += option_declaration("--yes", None, "bool",
-                                    yes_option_help(when.flag if when else None), False, "yesOption")
+                                    yes_option_help(when.flag if when else None,
+                                                    unless.flag if unless else None),
+                                    False, "yesOption")
 
     lines.append("")
     lines.append(f"        var command = new Command({csharp_string(command.name)}, "
@@ -1893,9 +1908,10 @@ def emit_command(service: Service, command: Command) -> list[str]:
     return lines
 
 
-def yes_option_help(when_flag: str | None) -> str:
+def yes_option_help(when_flag: str | None, unless_flag: str | None = None) -> str:
     """The help for the `--yes` a command with `confirm` gets, shared with the command reference."""
-    asks = f"With {when_flag}, the command" if when_flag else "The command"
+    asks = (f"With {when_flag}, the command" if when_flag
+            else f"Without {unless_flag}, the command" if unless_flag else "The command")
     return (f"Go ahead without asking. {asks} says what it is about to do and asks first, and "
             "refuses when there is no terminal to ask at.")
 
@@ -1919,6 +1935,12 @@ def confirm_check(confirm: Confirm) -> list[str]:
     condition = "!Confirmation.Confirm("
     if confirm.when is not None:
         condition = f"{confirm.when.var} == true && " + condition
+    elif (unless := confirm.unless) is not None:
+        collection = unless.is_collection if isinstance(unless, BodyField) else unless.cs_type.endswith("[]")
+        absent = (f"{unless.var} is not {{ Length: > 0 }}" if collection
+                  else f"{unless.var} != true" if unless.cs_type.rstrip("?") == "bool"
+                  else f"{unless.var} is null")
+        condition = f"{absent} && " + condition
     return [
         "",
         "            // Said, and asked, before anything is sent; --yes skips only the question.",

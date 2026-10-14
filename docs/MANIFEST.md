@@ -222,6 +222,7 @@ no terminal to ask at and no `--yes`, the command refuses. A no ends it with exi
 |---|---|---|
 | `message` | yes | What is about to happen, in a sentence or two. `{name}` puts in the value of a required param or body field, so the question names what it applies to: `Delete the search index of {kind}.` A list's values are shown three at a time and a count. |
 | `when` | no | A true/false option that alone makes the command ask, such as `force_clean`: re-indexing a kind is routine, deleting its index first is not. |
+| `unless` | no | An optional option whose absence alone makes the command ask, such as `filter.kinds`: replaying one kind is routine, replaying every kind in the partition, which leaving it out means, is not. Cannot be combined with `when`. |
 
 An example of a command with `confirm` needs a `skip:` reason, since
 [the smoke test](DEVELOPMENT.md#smoke-testing-the-examples) runs examples against a live

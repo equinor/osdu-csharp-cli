@@ -114,6 +114,50 @@ public class ConfirmationTests : ConfigTestDirectories
         Assert.Equal(asks, command.Options.Any(option => option.Name == "--yes"));
     }
 
+    private static IEnumerable<(string Path, Command Command)> Commands(Command parent, string path = "")
+    {
+        foreach (var command in parent.Subcommands)
+        {
+            var named = (path + " " + command.Name).Trim();
+            yield return (named, command);
+            foreach (var nested in Commands(command, named))
+                yield return nested;
+        }
+    }
+
+    [Fact]
+    public void EveryDeleteAndPurgeAsks()
+    {
+        // Nobody scripts against these yet, so every delete asks first now, not only the new
+        // operator commands: a mistyped id is as gone either way.
+        var unguarded = Commands(Root())
+            .Where(entry => entry.Command.Name is "delete" or "purge" && entry.Command.Subcommands.Count == 0)
+            .Where(entry => entry.Command.Options.All(option => option.Name != "--yes"))
+            .Select(entry => entry.Path)
+            .ToList();
+
+        Assert.Empty(unguarded);
+        Assert.True(Commands(Root()).Count(entry => entry.Command.Name is "delete" or "purge") >= 20);
+    }
+
+    [Fact]
+    public void AReplayAsksAndItsStatusDoesNot()
+    {
+        var record = Root().Subcommands.Single(command => command.Name == "record");
+
+        Assert.Contains(record.Subcommands.Single(c => c.Name == "replay").Options, option => option.Name == "--yes");
+        Assert.DoesNotContain(record.Subcommands.Single(c => c.Name == "replay-status").Options, option => option.Name == "--yes");
+    }
+
+    [Fact]
+    public void AVersionPurgeSaysWhichVersionsBeforeAnythingElse()
+    {
+        // With none of the three the service does not say what it would delete.
+        var errors = Root().Parse(["record", "version", "purge", "--id", "dev:x:1"]).Errors;
+
+        Assert.Contains(errors, error => error.Message == "One of --version-ids or --limit or --from is required.");
+    }
+
     [Fact]
     public async Task ADeleteSaysWhatAndWhereAndStopsWithoutAYes()
     {

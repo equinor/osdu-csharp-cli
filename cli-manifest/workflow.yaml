@@ -49,6 +49,9 @@ commands:
     op: { method: delete, path: "/v1/workflow/{workflow_name}" }
     params:
       workflow_name: { flag: --name, short: -n, required: true, help: Workflow name to delete. }
+    confirm:
+      message: >-
+        Delete the workflow {workflow_name}.
     output:
       message: Workflow deleted
 

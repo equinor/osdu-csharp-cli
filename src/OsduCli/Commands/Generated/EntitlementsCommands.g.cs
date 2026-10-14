@@ -120,14 +120,25 @@ public static partial class EntitlementsCommands
             Description = "Group email address.",
             Required = true,
         };
+        var yesOption = new Option<bool>("--yes")
+        {
+            Description = "Go ahead without asking. The command says what it is about to do and asks first, and refuses when there is no terminal to ask at.",
+        };
 
         var command = new Command("delete", "Delete a group.");
         command.Options.Add(groupEmailOption);
+        command.Options.Add(yesOption);
 
         command.SetAction((parseResult, cancellationToken) =>
             CliRunner.RunAsync(parseResult, async (context, cancellationToken) =>
         {
             var groupEmail = parseResult.GetValue(groupEmailOption)!;
+
+            // Said, and asked, before anything is sent; --yes skips only the question.
+            if (!Confirmation.Confirm(
+                    "Delete the group " + groupEmail + ". Its members lose the access it gave them.",
+                    parseResult.GetValue(yesOption), context))
+                return 1;
 
             await context.Client.Entitlements.Groups[groupEmail].DeleteAsync(cancellationToken: cancellationToken);
 
@@ -246,16 +257,27 @@ public static partial class EntitlementsCommands
             Description = "Member email address to remove.",
             Required = true,
         };
+        var yesOption = new Option<bool>("--yes")
+        {
+            Description = "Go ahead without asking. The command says what it is about to do and asks first, and refuses when there is no terminal to ask at.",
+        };
 
         var command = new Command("delete", "Remove one member from one group.");
         command.Options.Add(groupEmailOption);
         command.Options.Add(memberEmailOption);
+        command.Options.Add(yesOption);
 
         command.SetAction((parseResult, cancellationToken) =>
             CliRunner.RunAsync(parseResult, async (context, cancellationToken) =>
         {
             var groupEmail = parseResult.GetValue(groupEmailOption)!;
             var memberEmail = parseResult.GetValue(memberEmailOption)!;
+
+            // Said, and asked, before anything is sent; --yes skips only the question.
+            if (!Confirmation.Confirm(
+                    "Remove " + memberEmail + " from " + groupEmail + ".",
+                    parseResult.GetValue(yesOption), context))
+                return 1;
 
             await context.Client.Entitlements.Groups[groupEmail].Members[memberEmail].DeleteAsync(cancellationToken: cancellationToken);
 
@@ -365,14 +387,25 @@ public static partial class EntitlementsCommands
             Description = "Member email address to remove.",
             Required = true,
         };
+        var yesOption = new Option<bool>("--yes")
+        {
+            Description = "Go ahead without asking. The command says what it is about to do and asks first, and refuses when there is no terminal to ask at.",
+        };
 
         var command = new Command("delete", "Remove a member from every group in the partition.");
         command.Options.Add(memberEmailOption);
+        command.Options.Add(yesOption);
 
         command.SetAction((parseResult, cancellationToken) =>
             CliRunner.RunAsync(parseResult, async (context, cancellationToken) =>
         {
             var memberEmail = parseResult.GetValue(memberEmailOption)!;
+
+            // Said, and asked, before anything is sent; --yes skips only the question.
+            if (!Confirmation.Confirm(
+                    "Remove " + memberEmail + " from every group in the data partition.",
+                    parseResult.GetValue(yesOption), context))
+                return 1;
 
             await context.Client.Entitlements.Members[memberEmail].DeleteAsync(cancellationToken: cancellationToken);
 

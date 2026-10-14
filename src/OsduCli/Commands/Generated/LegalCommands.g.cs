@@ -165,14 +165,25 @@ public static partial class LegalCommands
             Description = "LegalTag name to delete.",
             Required = true,
         };
+        var yesOption = new Option<bool>("--yes")
+        {
+            Description = "Go ahead without asking. The command says what it is about to do and asks first, and refuses when there is no terminal to ask at.",
+        };
 
         var command = new Command("delete", "Delete a LegalTag by name.");
         command.Options.Add(nameOption);
+        command.Options.Add(yesOption);
 
         command.SetAction((parseResult, cancellationToken) =>
             CliRunner.RunAsync(parseResult, async (context, cancellationToken) =>
         {
             var name = parseResult.GetValue(nameOption)!;
+
+            // Said, and asked, before anything is sent; --yes skips only the question.
+            if (!Confirmation.Confirm(
+                    "Delete the legal tag " + name + ". Data that carries it becomes invalid.",
+                    parseResult.GetValue(yesOption), context))
+                return 1;
 
             await context.Client.Legal.Legaltags[name].DeleteAsync(cancellationToken: cancellationToken);
 

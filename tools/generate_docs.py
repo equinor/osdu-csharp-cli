@@ -76,10 +76,11 @@ def options(command: dict) -> list[tuple[str, str, bool]]:
         found.append(("`--all`", all_option_help(paging["page-size"], paging["op"]["path"], excluded), False))
     if confirm := command.get("confirm"):
         from generate_cli import yes_option_help
-        when = confirm.get("when")
+        def flag(name):
+            return (command.get("params") or {}).get(name, (body.get("fields") or {}).get(name, {})).get("flag")
         found.append(("`--yes`", yes_option_help(
-            (command.get("params") or {}).get(when, (body.get("fields") or {}).get(when, {})).get("flag")
-            if when else None), False))
+            flag(confirm["when"]) if confirm.get("when") else None,
+            flag(confirm["unless"]) if confirm.get("unless") else None), False))
     return found
 
 
@@ -102,7 +103,9 @@ def rules(command: dict) -> list[str]:
     if confirm := command.get("confirm"):
         # What the question says, with each option it names shown as a slot to fill.
         message = re.sub(r"\{([^{}]*)\}", r"`<\1>`", " ".join(confirm["message"].split()))
-        when = f", when `{lookup[confirm['when']]['flag']}` is given" if confirm.get("when") else ""
+        when = (f", when `{lookup[confirm['when']]['flag']}` is given" if confirm.get("when")
+                else f", unless `{lookup[confirm['unless']]['flag']}` is given" if confirm.get("unless")
+                else "")
         stated.append(f"Says what it is about to do and asks before going ahead{when}: "
                       f"*{message}* `--yes` skips the question.")
     return stated

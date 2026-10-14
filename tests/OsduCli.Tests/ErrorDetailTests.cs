@@ -32,6 +32,17 @@ public class ErrorDetailTests
             ])))));
 
     [Fact]
+    public void KiotasOwnTextForAnUndeclaredStatusIsLeftOut()
+    {
+        // Describes the client, not the failure; "404 from the service" says all there is.
+        var exception = new Microsoft.Kiota.Abstractions.ApiException(
+            "The server returned an unexpected status code and no error factory is registered for this code: 404")
+        { ResponseStatusCode = 404 };
+
+        Assert.Null(CliRunner.Describe(exception));
+    }
+
+    [Fact]
     public void TheSummaryAndTheSpecificFailuresAreBothReported()
     {
         // "Validation Error" alone sends the user to read the raw response.

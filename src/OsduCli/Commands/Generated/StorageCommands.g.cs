@@ -8,6 +8,7 @@
 // it cannot belongs in a partial class under Commands/Handwritten/ via the Customize hook.
 
 using System.CommandLine;
+using System.CommandLine.Parsing;
 using System.Text.Json.Nodes;
 using Microsoft.Kiota.Abstractions.Serialization;
 using Equinor.OsduCli.Runtime;
@@ -25,8 +26,12 @@ public static partial class StorageCommands
         tree.Node("record").Subcommands.Add(BuildRecordGet());
         tree.Node("record").Subcommands.Add(BuildRecordHeaders());
         tree.Node("record").Subcommands.Add(BuildRecordDelete());
+        tree.Node("record").Subcommands.Add(BuildRecordPurge());
         tree.Node("record version").Subcommands.Add(BuildRecordVersionList());
         tree.Node("record version").Subcommands.Add(BuildRecordVersionGet());
+        tree.Node("record version").Subcommands.Add(BuildRecordVersionPurge());
+        tree.Node("record").Subcommands.Add(BuildRecordReplay());
+        tree.Node("record").Subcommands.Add(BuildRecordReplayStatus());
 
         Customize(tree);
     }
@@ -175,19 +180,67 @@ public static partial class StorageCommands
             Description = "Record id to delete.",
             Required = true,
         };
+        var yesOption = new Option<bool>("--yes")
+        {
+            Description = "Go ahead without asking. The command says what it is about to do and asks first, and refuses when there is no terminal to ask at.",
+        };
 
         var command = new Command("delete", "Soft-delete a record by id.");
         command.Options.Add(idOption);
+        command.Options.Add(yesOption);
 
         command.SetAction((parseResult, cancellationToken) =>
             CliRunner.RunAsync(parseResult, async (context, cancellationToken) =>
         {
             var id = parseResult.GetValue(idOption)!;
 
+            // Said, and asked, before anything is sent; --yes skips only the question.
+            if (!Confirmation.Confirm(
+                    "Delete the record " + id + ". Storage keeps its versions until it is purged, and the deletion can be reverted.",
+                    parseResult.GetValue(yesOption), context))
+                return 1;
+
             await context.Client.Storage.Records.WithIdDelete(id).PostAsync(cancellationToken: cancellationToken);
 
             return context.Output.WriteMessage("1 record deleted");
         }, cancellationToken, "service.storage.creator or service.storage.admin"));
+
+        return command;
+    }
+
+    /// <summary>Permanently delete a record and every version of it.</summary>
+    /// <remarks>DELETE /records/{id} on the Storage service.</remarks>
+    private static Command BuildRecordPurge()
+    {
+        var idOption = new Option<string>("--id", "-id")
+        {
+            Description = "Record id to purge.",
+            Required = true,
+        };
+        var yesOption = new Option<bool>("--yes")
+        {
+            Description = "Go ahead without asking. The command says what it is about to do and asks first, and refuses when there is no terminal to ask at.",
+        };
+
+        var command = new Command("purge", "Permanently delete a record and every version of it.");
+        command.Options.Add(idOption);
+        command.Options.Add(yesOption);
+
+        command.SetAction((parseResult, cancellationToken) =>
+            CliRunner.RunAsync(parseResult, async (context, cancellationToken) =>
+        {
+            var id = parseResult.GetValue(idOption)!;
+
+            // Said, and asked, before anything is sent; --yes skips only the question.
+            if (!Confirmation.Confirm(
+                    "Permanently delete the record " + id + " and every version of it. This cannot be undone.",
+                    parseResult.GetValue(yesOption), context))
+                return 1;
+
+            await context.Client.Storage.Records[id].DeleteAsync(cancellationToken: cancellationToken);
+
+            return context.Output.WriteMessage("Record purged");
+        }, cancellationToken, "service.storage.admin"));
 
         return command;
     }
@@ -261,6 +314,164 @@ public static partial class StorageCommands
                 await OsduJson.ToJsonAsync(result),
                 OutputSpec.Table(null, ("Id", "id"), ("Version", "version"), ("Kind", "kind"), ("CreateUser", "createUser"), ("CreateTime", "createTime")));
         }, cancellationToken, "service.storage.viewer, service.storage.creator or service.storage.admin"));
+
+        return command;
+    }
+
+    /// <summary>Permanently delete versions of a record, keeping the latest.</summary>
+    /// <remarks>DELETE /records/{id}/versions on the Storage service.</remarks>
+    private static Command BuildRecordVersionPurge()
+    {
+        var idOption = new Option<string>("--id", "-id")
+        {
+            Description = "Record id.",
+            Required = true,
+        };
+        var versionidsOption = new Option<string>("--version-ids")
+        {
+            Description = "Versions to delete, comma-separated.",
+        };
+        var limitOption = new Option<int?>("--limit", "-l")
+        {
+            Description = "How many versions to delete; the service's limit parameter.",
+        };
+        var fromOption = new Option<long?>("--from")
+        {
+            Description = "The version to delete from; the service's from parameter.",
+        };
+        var yesOption = new Option<bool>("--yes")
+        {
+            Description = "Go ahead without asking. The command says what it is about to do and asks first, and refuses when there is no terminal to ask at.",
+        };
+
+        var command = new Command("purge", "Permanently delete versions of a record, keeping the latest.");
+        command.Options.Add(idOption);
+        command.Options.Add(versionidsOption);
+        command.Options.Add(limitOption);
+        command.Options.Add(fromOption);
+        command.Options.Add(yesOption);
+
+        // A parse-time validator, so this costs no config load, no
+        // token and no round trip. The service rejects the request
+        // anyway; it should not have to.
+        command.Validators.Add(result =>
+        {
+            if (result.GetResult(versionidsOption) is null && result.GetResult(limitOption) is null && result.GetResult(fromOption) is null)
+                result.AddError("One of --version-ids or --limit or --from is required.");
+        });
+
+        command.SetAction((parseResult, cancellationToken) =>
+            CliRunner.RunAsync(parseResult, async (context, cancellationToken) =>
+        {
+            var id = parseResult.GetValue(idOption)!;
+            var versionids = parseResult.GetValue(versionidsOption);
+            var limit = parseResult.GetValue(limitOption);
+            var from = parseResult.GetValue(fromOption);
+
+            // Said, and asked, before anything is sent; --yes skips only the question.
+            if (!Confirmation.Confirm(
+                    "Permanently delete versions of the record " + id + ", keeping its latest. This cannot be undone.",
+                    parseResult.GetValue(yesOption), context))
+                return 1;
+
+            await context.Client.Storage.Records[id].Versions.DeleteAsync(configuration =>
+            {
+                configuration.QueryParameters.VersionIds = versionids;
+                configuration.QueryParameters.Limit = limit;
+                configuration.QueryParameters.From = from;
+            }, cancellationToken);
+
+            return context.Output.WriteMessage("Record versions purged");
+        }, cancellationToken));
+
+        return command;
+    }
+
+    /// <summary>Send records from Storage to their consumers again, to rebuild the index or more.</summary>
+    /// <remarks>POST /replay on the Storage service.</remarks>
+    private static Command BuildRecordReplay()
+    {
+        var operationBodyOption = new Option<string>("--operation")
+        {
+            Description = "reindex to send the records to the Indexer, or replay to publish them as record changes to every consumer, the Indexer included.",
+            Required = true,
+        };
+        var filterKindsBodyOption = new Option<string[]>("--kind", "-k")
+        {
+            Description = "The kind to replay; the service takes one. Without it, every kind in the data partition.",
+            AllowMultipleArgumentsPerToken = true,
+        };
+        var replayidBodyOption = new Option<string>("--replay-id")
+        {
+            Description = "An id for the replay, to follow it by. The service makes one up when omitted.",
+        };
+        var yesOption = new Option<bool>("--yes")
+        {
+            Description = "Go ahead without asking. Without --kind, the command says what it is about to do and asks first, and refuses when there is no terminal to ask at.",
+        };
+
+        var command = new Command("replay", "Send records from Storage to their consumers again, to rebuild the index or more.");
+        command.Options.Add(operationBodyOption);
+        command.Options.Add(filterKindsBodyOption);
+        command.Options.Add(replayidBodyOption);
+        command.Options.Add(yesOption);
+
+        command.SetAction((parseResult, cancellationToken) =>
+            CliRunner.RunAsync(parseResult, async (context, cancellationToken) =>
+        {
+            var bodyNode = new JsonObject();
+            var operationValue = parseResult.GetValue(operationBodyOption)!;
+            bodyNode["operation"] = JsonValue.Create(operationValue);
+            var filterKindsValue = parseResult.GetValue(filterKindsBodyOption);
+            if (filterKindsValue is { Length: > 0 })
+                CliContext.Child(bodyNode, "filter")["kinds"] = new JsonArray(filterKindsValue.Select(item => (JsonNode)JsonValue.Create(item)!).ToArray());
+            var replayidValue = parseResult.GetValue(replayidBodyOption);
+            if (replayidValue is not null)
+                bodyNode["replayId"] = JsonValue.Create(replayidValue);
+            var bodyJson = bodyNode.ToJsonString();
+            var body = await KiotaJsonSerializer.DeserializeAsync<ReplayRequest>(
+                bodyJson, ReplayRequest.CreateFromDiscriminatorValue, cancellationToken);
+
+            // Said, and asked, before anything is sent; --yes skips only the question.
+            if (filterKindsValue is not { Length: > 0 } && !Confirmation.Confirm(
+                    "Replay every kind in the data partition from Storage, as a " + operationValue + ": a long job for Storage and everything that consumes its records.",
+                    parseResult.GetValue(yesOption), context))
+                return 1;
+
+            var result = await context.Client.Storage.Replay.PostAsync(body, cancellationToken: cancellationToken);
+
+            return context.Output.Write(
+                await OsduJson.ToJsonAsync(result),
+                OutputSpec.Table(null, ("ReplayId", "replayId")));
+        }, cancellationToken, "users.datalake.ops"));
+
+        return command;
+    }
+
+    /// <summary>Show how far a replay has got; -o json breaks it down by kind.</summary>
+    /// <remarks>GET /replay/status/{id} on the Storage service.</remarks>
+    private static Command BuildRecordReplayStatus()
+    {
+        var idOption = new Option<string>("--id", "-id")
+        {
+            Description = "Replay id, as `record replay` printed it.",
+            Required = true,
+        };
+
+        var command = new Command("replay-status", "Show how far a replay has got; -o json breaks it down by kind.");
+        command.Options.Add(idOption);
+
+        command.SetAction((parseResult, cancellationToken) =>
+            CliRunner.RunAsync(parseResult, async (context, cancellationToken) =>
+        {
+            var id = parseResult.GetValue(idOption)!;
+
+            var result = await context.Client.Storage.Replay.Status[id].GetAsync(cancellationToken: cancellationToken);
+
+            return context.Output.Write(
+                await OsduJson.ToJsonAsync(result),
+                OutputSpec.Table(null, ("ReplayId", "replayId"), ("Operation", "operation"), ("State", "overallState"), ("Processed", "processedRecords"), ("Total", "totalRecords"), ("Elapsed", "elapsedTime")));
+        }, cancellationToken, "users.datalake.ops"));
 
         return command;
     }

@@ -103,14 +103,25 @@ public static partial class FileCommands
             Description = "File metadata record id to delete.",
             Required = true,
         };
+        var yesOption = new Option<bool>("--yes")
+        {
+            Description = "Go ahead without asking. The command says what it is about to do and asks first, and refuses when there is no terminal to ask at.",
+        };
 
         var command = new Command("delete", "Delete a file and its metadata record.");
         command.Options.Add(idOption);
+        command.Options.Add(yesOption);
 
         command.SetAction((parseResult, cancellationToken) =>
             CliRunner.RunAsync(parseResult, async (context, cancellationToken) =>
         {
             var id = parseResult.GetValue(idOption)!;
+
+            // Said, and asked, before anything is sent; --yes skips only the question.
+            if (!Confirmation.Confirm(
+                    "Delete the file record " + id + " and the stored file it describes.",
+                    parseResult.GetValue(yesOption), context))
+                return 1;
 
             await context.Client.File.V2.Files[id].Metadata.DeleteAsync(cancellationToken: cancellationToken);
 

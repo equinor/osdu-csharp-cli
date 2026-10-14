@@ -42,6 +42,9 @@ commands:
     op: { method: post, path: "/metadataRecord/{id}/softDelete" }
     params:
       id: { flag: --id, short: -id, required: true, help: Dataset metadata record id. }
+    confirm:
+      message: >-
+        Delete the dataset record {id}. `dataset undelete` restores it.
     output:
       message: Dataset metadata record soft-deleted
 

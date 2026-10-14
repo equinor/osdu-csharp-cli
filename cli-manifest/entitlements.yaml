@@ -59,6 +59,9 @@ commands:
     op: { method: delete, path: "/groups/{group_email}" }
     params:
       group_email: { flag: --group, short: -g, required: true, help: Group email address. }
+    confirm:
+      message: >-
+        Delete the group {group_email}. Its members lose the access it gave them.
     output:
       message: Group deleted
 
@@ -102,6 +105,9 @@ commands:
     params:
       group_email:  { flag: --group, short: -g, required: true, help: Group email address. }
       member_email: { flag: --member, short: -m, required: true, help: Member email address to remove. }
+    confirm:
+      message: >-
+        Remove {member_email} from {group_email}.
     output:
       message: Member removed from group
 
@@ -140,6 +146,9 @@ commands:
     op: { method: delete, path: "/members/{member_email}" }
     params:
       member_email: { flag: --member, short: -m, required: true, help: Member email address to remove. }
+    confirm:
+      message: >-
+        Remove {member_email} from every group in the data partition.
     output:
       message: Member removed from all groups
 

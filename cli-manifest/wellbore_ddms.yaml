@@ -97,6 +97,9 @@ commands:
     op: { method: delete, path: "/ddms/v3/wells/{record_id}" }
     params:
       record_id: { flag: --id, short: -id, required: true, help: Well record id to delete. }
+    confirm:
+      message: >-
+        Delete the record {record_id}. Records that refer to it are not deleted with it.
     output:
       message: 1 record deleted
 
@@ -141,6 +144,9 @@ commands:
     op: { method: delete, path: "/ddms/v3/wellbores/{record_id}" }
     params:
       record_id: { flag: --id, short: -id, required: true, help: Wellbore record id to delete. }
+    confirm:
+      message: >-
+        Delete the record {record_id}. Records that refer to it are not deleted with it.
     output:
       message: 1 record deleted
 
@@ -185,6 +191,9 @@ commands:
     op: { method: delete, path: "/ddms/v3/welllogs/{record_id}" }
     params:
       record_id: { flag: --id, short: -id, required: true, help: WellLog record id to delete. }
+    confirm:
+      message: >-
+        Delete the record {record_id}. Records that refer to it are not deleted with it.
     output:
       message: 1 record deleted
 
@@ -273,6 +282,9 @@ commands:
     op: { method: delete, path: "/ddms/v3/wellboretrajectories/{record_id}" }
     params:
       record_id: { flag: --id, short: -id, required: true, help: WellboreTrajectory record id to delete. }
+    confirm:
+      message: >-
+        Delete the record {record_id}. Records that refer to it are not deleted with it.
     output:
       message: 1 record deleted
 
@@ -344,6 +356,9 @@ commands:
     op: { method: delete, path: "/ddms/v3/wellboremarkersets/{record_id}" }
     params:
       record_id: { flag: --id, short: -id, required: true, help: WellboreMarkerSet record id to delete. }
+    confirm:
+      message: >-
+        Delete the record {record_id}. Records that refer to it are not deleted with it.
     output:
       message: 1 record deleted
 
@@ -388,6 +403,9 @@ commands:
     op: { method: delete, path: "/ddms/v3/wellboreintervalsets/{record_id}" }
     params:
       record_id: { flag: --id, short: -id, required: true, help: WellboreIntervalSet record id to delete. }
+    confirm:
+      message: >-
+        Delete the record {record_id}. Records that refer to it are not deleted with it.
     output:
       message: 1 record deleted
 
@@ -432,6 +450,9 @@ commands:
     op: { method: delete, path: "/ddms/v3/welllogacquisition/{record_id}" }
     params:
       record_id: { flag: --id, short: -id, required: true, help: WellLogAcquisition record id to delete. }
+    confirm:
+      message: >-
+        Delete the record {record_id}. Records that refer to it are not deleted with it.
     output:
       message: 1 record deleted
 
@@ -476,6 +497,9 @@ commands:
     op: { method: delete, path: "/ddms/v3/ppfgdataset/{record_id}" }
     params:
       record_id: { flag: --id, short: -id, required: true, help: PPFGDataset record id to delete. }
+    confirm:
+      message: >-
+        Delete the record {record_id}. Records that refer to it are not deleted with it.
     output:
       message: 1 record deleted
 
@@ -547,6 +571,9 @@ commands:
     op: { method: delete, path: "/ddms/v3/wellpressuretestrawmeasurement/{record_id}" }
     params:
       record_id: { flag: --id, short: -id, required: true, help: WellPressureTestRawMeasurement record id to delete. }
+    confirm:
+      message: >-
+        Delete the record {record_id}. Records that refer to it are not deleted with it.
     output:
       message: 1 record deleted
 

@@ -58,13 +58,14 @@ safety feature.
 > **Built:** a manifest's `confirm:` key (see [MANIFEST.md](docs/MANIFEST.md#confirm)). Before
 > anything is sent the command says what it is about to do, and in which data partition on
 > which server, then asks; `--yes` skips the question but not the statement, and with no
-> terminal to ask at the command refuses. The `index` commands are the first to use it.
+> terminal to ask at the command refuses. The `index` commands were the first to use it;
+> every `delete` and `purge` asks too, and `record replay` does without `--kind`.
 
 ---
 
 ## 2. The tree
 
-> **Status: built.** Every tree in this section is implemented — 136 generated commands
+> **Status: built.** Every tree in this section is implemented — 140 generated commands
 > across 13 services plus the hand-written `osducs status`. Where the delivered shape differs
 > from the sketch below, the delivered shape is authoritative; run `osdu <noun> --help` to
 > see it. Two changes were made during implementation:
@@ -89,6 +90,8 @@ osducs record purge     --id ID --yes                   DELETE /records/{id}
 osducs record version list  --id ID                     GET  /records/versions/{id}
 osducs record version get   --id ID --record-version V  GET  /records/{id}/{version}
 osducs record version purge --id ID --yes               DELETE /records/{id}/versions
+osducs record replay    --operation O [--kind K]        POST /replay
+osducs record replay-status --id ID                     GET  /replay/status/{id}
 ```
 
 | Not exposed | Reason |
@@ -98,18 +101,18 @@ osducs record version purge --id ID --yes               DELETE /records/{id}/ver
 | `POST /query/records/headers` | Same family, headers only |
 | `POST /query/records:batch` | Frame-of-reference batch fetch; specialised |
 | `PATCH /records` | Bulk metadata patch; `record patch` covers the single case |
-| `PUT /records/copy` | Namespace copy — an admin operation |
-| `POST /records/delete` | Bulk soft-delete; too easy to fire by accident |
-| `POST /replay` + `GET /replay/status/{id}` | Operator tooling; triggers a full reindex |
+| `PUT /records/copy` | Namespace copy; on the operators' list |
+| `POST /records/delete` | Bulk soft-delete; its body is a bare array of ids, which options cannot build yet |
 
 **Change from what is implemented today:** the two hard-purge endpoints move from excluded to exposed
 behind `--yes` (R6), and `delete`/`purge` now name the soft/hard distinction that
 `POST /records/{id}:delete` vs `DELETE /records/{id}` hides.
 
 **Built today:** `list`, `get`, `headers`, `delete`, `version list`, `version get`, and the
-hand-written `add`, which asks before updating a record that exists (R6); `patch`, `purge` and `version purge` are still
-excluded in the manifest. The generator can now express the guard (`confirm:`), so they are
-next.
+hand-written `add`, which asks before updating a record that exists (R6); `purge`,
+`version purge` and `replay` with `replay-status`, the first three asking first (`replay` only
+without `--kind`, since one kind is routine and every kind is not). `delete` asks too. `patch`
+is still excluded.
 
 ### group, member — Entitlements (12 ops)
 
