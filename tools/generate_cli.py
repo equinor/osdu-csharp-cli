@@ -1389,7 +1389,9 @@ def build_confirm(cfg: object, params: list[Param], body: "Body | None", where: 
 
     when = None
     if cfg.get("when") is not None:
-        when = options.get(cfg["when"])
+        # A list or a mapping here is not a name, and as a dictionary key it raised TypeError
+        # rather than saying what is wrong.
+        when = options.get(cfg["when"]) if isinstance(cfg["when"], str) else None
         if when is None or when.cs_type.rstrip("?") != "bool":
             raise ManifestError(f"{where}: confirm `when:` must name a true/false option of this "
                                 f"command, not {cfg['when']!r}")

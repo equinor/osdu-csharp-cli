@@ -345,6 +345,11 @@ class TestConfirm:
         with pytest.raises(ManifestError, match="true/false option"):
             self.build(self.entry({"message": "m", "when": "nonsense"}))
 
+    @pytest.mark.parametrize("when", [["force_clean"], {"name": "force_clean"}])
+    def test_when_that_is_not_a_name_is_refused_with_the_reason(self, when):
+        with pytest.raises(ManifestError, match="true/false option"):
+            self.build(self.entry({"message": "m", "when": when}))
+
     @pytest.mark.parametrize("name", ["note", "nonsense"])
     def test_a_placeholder_names_a_required_option(self, name):
         # An optional one would put "null" in front of the person agreeing.

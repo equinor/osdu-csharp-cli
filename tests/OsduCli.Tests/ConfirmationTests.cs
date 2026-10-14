@@ -1,4 +1,5 @@
 using System.CommandLine;
+using System.Globalization;
 using Equinor.OsduCli.Commands.Generated;
 using Equinor.OsduCli.Runtime;
 using Equinor.OsduCsharpClient.Facade;
@@ -70,6 +71,23 @@ public class ConfirmationTests : ConfigTestDirectories
     [InlineData(new[] { "a", "b", "c", "d", "e" }, "a, b, c and 2 more")]
     public void AListIsShortenedRatherThanBuryingTheQuestion(string[] values, string expected) =>
         Assert.Equal(expected, Confirmation.List(values));
+
+    [Fact]
+    public void AListOfNumbersIsWrittenTheSameEverywhere()
+    {
+        // A manifest may name a double[] option; under a culture with a decimal comma, 1.5
+        // came out as 1,5 and ran into the separator.
+        var original = CultureInfo.CurrentCulture;
+        CultureInfo.CurrentCulture = CultureInfo.GetCultureInfo("nb-NO");
+        try
+        {
+            Assert.Equal("1.5, 2.25, 3 and 1 more", Confirmation.List(new[] { 1.5, 2.25, 3.0, 4.0 }));
+        }
+        finally
+        {
+            CultureInfo.CurrentCulture = original;
+        }
+    }
 
     // ---- the index commands ---------------------------------------------------------------
 

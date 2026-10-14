@@ -1,3 +1,4 @@
+using System.Globalization;
 using Equinor.OsduCsharpClient.Facade;
 
 namespace Equinor.OsduCli.Runtime;
@@ -56,10 +57,17 @@ public static class Confirmation
     /// Values for a message, all of them when there are a few and the first few and a count
     /// otherwise: a thousand record ids would bury the question.
     /// </summary>
-    public static string List(IReadOnlyCollection<string>? values, int shown = 3) =>
-        values is null || values.Count == 0
-            ? "none"
-            : values.Count <= shown
-                ? string.Join(", ", values)
-                : $"{string.Join(", ", values.Take(shown))} and {values.Count - shown} more";
+    /// <remarks>
+    /// Any element type, since a manifest may name a list of numbers as readily as of ids, and
+    /// written the same on every machine: <c>1.5</c>, not <c>1,5</c>.
+    /// </remarks>
+    public static string List<T>(IReadOnlyCollection<T>? values, int shown = 3)
+    {
+        if (values is null || values.Count == 0)
+            return "none";
+        var written = values.Take(shown).Select(value => Convert.ToString(value, CultureInfo.InvariantCulture));
+        return values.Count <= shown
+            ? string.Join(", ", written)
+            : $"{string.Join(", ", written)} and {values.Count - shown} more";
+    }
 }
