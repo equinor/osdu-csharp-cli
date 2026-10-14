@@ -396,6 +396,34 @@ class TestConfirm:
         self.build(self.entry({"message": "m"}, examples=[{"args": "--kind k", "skip": "Deletes an index."}]))
 
 
+class TestAllowed:
+    """`allowed:` gives a body field the values its spec names only in prose."""
+
+    @staticmethod
+    def entry(**field):
+        return {"command": "record replay", "op": {"method": "post", "path": "/query"},
+                "body": {"fields": {"kind": {"flag": "--operation", **field}}}, "output": "raw"}
+
+    def test_they_become_the_options_values(self):
+        field = build(self.entry(allowed=["reindex", "replay"]), BODY_OPERATION).body.fields[0]
+        assert field.enum_values == ["reindex", "replay"]
+
+    def test_the_specs_own_values_are_not_restated(self):
+        spec = {"components": {"schemas": {"QueryRequest": {"properties": {
+            "kind": {"type": "string", "enum": ["A", "B"]}}}}}}
+        with pytest.raises(ManifestError, match="already lists"):
+            build(self.entry(allowed=["A"]), BODY_OPERATION, spec)
+
+    @pytest.mark.parametrize("allowed", ["reindex", [], [""], [1]])
+    def test_they_are_a_list_of_strings(self, allowed):
+        with pytest.raises(ManifestError, match="as strings"):
+            build(self.entry(allowed=allowed), BODY_OPERATION)
+
+    def test_they_cannot_be_split_on_commas(self):
+        with pytest.raises(ManifestError, match="comma-separated"):
+            build(self.entry(allowed=["a"], type="string[]", **{"comma-separated": True}), BODY_OPERATION)
+
+
 class TestParamValidation:
     def test_a_param_absent_from_the_spec_is_rejected(self):
         # Catches an upstream rename: the manifest names a parameter the operation no

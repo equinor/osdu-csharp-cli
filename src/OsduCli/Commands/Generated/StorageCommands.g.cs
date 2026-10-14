@@ -329,7 +329,7 @@ public static partial class StorageCommands
         };
         var versionidsOption = new Option<string>("--version-ids")
         {
-            Description = "Versions to delete, comma-separated.",
+            Description = "Versions to delete, comma-separated. Cannot be combined with --limit or --from.",
         };
         var limitOption = new Option<int?>("--limit", "-l")
         {
@@ -358,6 +358,22 @@ public static partial class StorageCommands
         {
             if (result.GetResult(versionidsOption) is null && result.GetResult(limitOption) is null && result.GetResult(fromOption) is null)
                 result.AddError("One of --version-ids or --limit or --from is required.");
+        });
+
+        // Contradictory options, rejected before the service has to
+        // decide which one it believes.
+        command.Validators.Add(result =>
+        {
+            if (result.GetResult(versionidsOption) is not null && result.GetResult(limitOption) is not null)
+                result.AddError("--version-ids and --limit cannot be used together.");
+        });
+
+        // Contradictory options, rejected before the service has to
+        // decide which one it believes.
+        command.Validators.Add(result =>
+        {
+            if (result.GetResult(versionidsOption) is not null && result.GetResult(fromOption) is not null)
+                result.AddError("--version-ids and --from cannot be used together.");
         });
 
         command.SetAction((parseResult, cancellationToken) =>
@@ -393,9 +409,10 @@ public static partial class StorageCommands
     {
         var operationBodyOption = new Option<string>("--operation")
         {
-            Description = "reindex to send the records to the Indexer, or replay to publish them as record changes to every consumer, the Indexer included.",
+            Description = "reindex to send the records to the Indexer, or replay to publish them as record changes to every consumer, the Indexer included. One of: reindex, replay.",
             Required = true,
         };
+        operationBodyOption.AcceptAnyCasingFromAmong("reindex", "replay");
         var filterKindsBodyOption = new Option<string[]>("--kind", "-k")
         {
             Description = "The kind to replay; the service takes one. Without it, every kind in the data partition.",
@@ -433,7 +450,7 @@ public static partial class StorageCommands
                 bodyJson, ReplayRequest.CreateFromDiscriminatorValue, cancellationToken);
 
             // Said, and asked, before anything is sent; --yes skips only the question.
-            if (filterKindsValue is not { Length: > 0 } && !Confirmation.Confirm(
+            if (parseResult.GetResult(filterKindsBodyOption) is null && !Confirmation.Confirm(
                     "Replay every kind in the data partition from Storage, as a " + operationValue + ": a long job for Storage and everything that consumes its records.",
                     parseResult.GetValue(yesOption), context))
                 return 1;

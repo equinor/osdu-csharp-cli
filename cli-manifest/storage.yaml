@@ -170,10 +170,13 @@ commands:
     op: { method: delete, path: "/records/{id}/versions" }
     params:
       id:         { flag: --id, short: -id, required: true, help: Record id. }
-      versionIds: { flag: --version-ids, help: "Versions to delete, comma-separated." }
+      versionIds: { flag: --version-ids, help: "Versions to delete, comma-separated. Cannot be combined with --limit or --from." }
       limit:      { flag: --limit, short: -l, help: "How many versions to delete; the service's limit parameter." }
       from:       { flag: --from, help: "The version to delete from; the service's from parameter." }
     require-one-of: [versionIds, limit, from]
+    # Named versions, or a count and a starting point; mixing them left what is deleted to how
+    # the service ranks them.
+    mutually-exclusive: [[versionIds, limit], [versionIds, from]]
     confirm:
       message: >-
         Permanently delete versions of the record {id}, keeping its latest. This cannot be
@@ -198,6 +201,8 @@ commands:
           help: >-
             reindex to send the records to the Indexer, or replay to publish them as record
             changes to every consumer, the Indexer included.
+          # The spec names them in its description only.
+          allowed: [reindex, replay]
         filter.kinds:
           flag: --kind
           short: -k

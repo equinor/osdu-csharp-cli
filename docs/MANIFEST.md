@@ -151,6 +151,7 @@ A map from body property to option. A dotted name reaches into a nested object: 
 | `help` | no | Help text. There is no default. |
 | `type` | no | The option's C# type. Defaults to `string`; the manifests also use `string[]`, `int`, `bool`, `double` and `double[]`. An array type accepts several values after one flag. |
 | `parts` | no | Paths to spread one option's comma-separated numbers across, such as a bounding box's four coordinates. Needs `type: double[]`, and exactly one value per path. See [`parts`](../COMMAND-GRAMMAR.md#parts). |
+| `allowed` | no | The values the option takes, for a field whose spec names them only in prose: `[reindex, replay]`. Refused at parse time like the spec's own enum, in any casing, and listed in help. Cannot be given when the spec has an enum, or with `comma-separated`. |
 | `comma-separated` | no | `true` splits each value on commas as well as accepting the flag repeated, so `-f a,b -f c` is three values. Needs `type: string[]`, and cannot be combined with `parts` or with allowed values from the spec. Without it a comma is part of the value, which is right for values that may contain one. |
 
 A field inherits the allowed values of an `enum` in the body schema, including one on an array's

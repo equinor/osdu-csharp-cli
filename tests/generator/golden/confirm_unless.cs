@@ -36,7 +36,7 @@
                 bodyJson, QueryRequest.CreateFromDiscriminatorValue, cancellationToken);
 
             // Said, and asked, before anything is sent; --yes skips only the question.
-            if (returnedfieldsValue is not { Length: > 0 } && !Confirmation.Confirm(
+            if (parseResult.GetResult(returnedfieldsBodyOption) is null && !Confirmation.Confirm(
                     "Replay every kind as a " + kindValue + ".",
                     parseResult.GetValue(yesOption), context))
                 return 1;

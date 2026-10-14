@@ -158,6 +158,33 @@ public class ConfirmationTests : ConfigTestDirectories
         Assert.Contains(errors, error => error.Message == "One of --version-ids or --limit or --from is required.");
     }
 
+    [Theory]
+    [InlineData("--version-ids 1,2 --limit 5", "--version-ids and --limit cannot be used together.")]
+    [InlineData("--version-ids 1,2 --from 3", "--version-ids and --from cannot be used together.")]
+    public void NamedVersionsAndACountCannotBeMixed(string options, string expected)
+    {
+        // Mixed, what is deleted for good was left to how the service ranks them.
+        var errors = Root().Parse(["record", "version", "purge", "--id", "dev:x:1", .. options.Split(' ')]).Errors;
+
+        Assert.Contains(errors, error => error.Message == expected);
+    }
+
+    [Fact]
+    public void ACountAndAStartingPointCanBeCombined() =>
+        Assert.Empty(Root().Parse(["record", "version", "purge", "--id", "dev:x:1", "--limit", "5", "--from", "3"]).Errors);
+
+    [Theory]
+    [InlineData("reindex", true)]
+    [InlineData("REPLAY", true)]
+    [InlineData("reindx", false)]
+    public void AReplaysOperationIsOneTheServiceKnows(string operation, bool accepted)
+    {
+        // Named only in the spec's prose; a typo went to Storage.
+        var errors = Root().Parse(["record", "replay", "--operation", operation, "--kind", "k"]).Errors;
+
+        Assert.Equal(accepted, errors.Count == 0);
+    }
+
     [Fact]
     public async Task ADeleteSaysWhatAndWhereAndStopsWithoutAYes()
     {

@@ -1115,12 +1115,16 @@ Permanently delete versions of a record, keeping the latest.
 | Option | Required | Description |
 |---|---|---|
 | `-id`, `--id` | yes | Record id. |
-| `--version-ids` |  | Versions to delete, comma-separated. |
+| `--version-ids` |  | Versions to delete, comma-separated. Cannot be combined with --limit or --from. |
 | `-l`, `--limit` |  | How many versions to delete; the service's limit parameter. |
 | `--from` |  | The version to delete from; the service's from parameter. |
 | `--yes` |  | Go ahead without asking. The command says what it is about to do and asks first, and refuses when there is no terminal to ask at. |
 
 > One of `--version-ids` or `--limit` or `--from` is required.
+
+> `--version-ids` and `--limit` cannot be combined.
+
+> `--version-ids` and `--from` cannot be combined.
 
 > Says what it is about to do and asks before going ahead: *Permanently delete versions of the record `<id>`, keeping its latest. This cannot be undone.* `--yes` skips the question.
 
