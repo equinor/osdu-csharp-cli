@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.16.0](https://github.com/equinor/osdu-csharp-cli/compare/v0.15.0...v0.16.0) (2026-10-15)
+
+
+### Features
+
+* **record:** add replay, purge and version purge, and ask before every delete ([#68](https://github.com/equinor/osdu-csharp-cli/issues/68)) ([f93a303](https://github.com/equinor/osdu-csharp-cli/commit/f93a30356ed743a7849e2d80f411d67594549e69))
+
 ## [0.15.0](https://github.com/equinor/osdu-csharp-cli/compare/v0.14.0...v0.15.0) (2026-10-14)
 
 
