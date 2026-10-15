@@ -167,6 +167,30 @@ public class CursorPagingTests
     }
 
     [Fact]
+    public async Task AnEndCursorEndsItEvenAfterAFullPage()
+    {
+        // Entitlements on Azure answers its last page with "0", an offset that followed would
+        // start the list again: with 2000 groups in pages of 1000, the third page was the first.
+        var requests = new List<JsonObject>();
+        Task<string?> Fetch(JsonObject page, CancellationToken _)
+        {
+            requests.Add(page);
+            var offset = int.Parse(page["cursor"]?.GetValue<string>() ?? "0");
+            var items = new JsonArray([.. Enumerable.Range(offset, Math.Max(0, Math.Min(1000, 2000 - offset)))
+                .Select(i => (JsonNode)new JsonObject { ["id"] = $"r{i}" })]);
+            var next = offset + 1000 < 2000 ? (offset + 1000).ToString() : "0";
+            return Task.FromResult<string?>(new JsonObject { ["results"] = items, ["cursor"] = next }.ToJsonString());
+        }
+
+        var collected = (JsonObject)JsonNode.Parse(await CursorPaging.CollectAsync(
+            Request, null, 1000, "limit", "cursor", "results", null, Fetch, (_, _) => Task.CompletedTask, null,
+            TestContext.Current.CancellationToken, endCursor: "0"))!;
+
+        Assert.Equal(2, requests.Count);
+        Assert.Equal(Enumerable.Range(0, 2000).Select(i => $"r{i}"), Ids(collected));
+    }
+
+    [Fact]
     public async Task AFailedReleaseDoesNotChangeTheOutcome()
     {
         var collected = JsonNode.Parse(await CursorPaging.CollectAsync(

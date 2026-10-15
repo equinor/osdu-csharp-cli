@@ -35,13 +35,19 @@ public static class CursorPaging
     /// <param name="fetch">Sends one page's request and returns the response as JSON.</param>
     /// <param name="release">Releases a cursor the command stops following before its end.</param>
     /// <param name="progress">Where to report progress, or null for nowhere.</param>
+    /// <param name="endCursor">
+    /// A cursor value that means there is nothing more, besides none at all. Entitlements on
+    /// Azure answers its last page of groups with <c>"0"</c>, an offset that followed would
+    /// start the list again.
+    /// </param>
     public static async Task<string> CollectAsync(
         JsonObject request, int? limit, int pageSize,
         string limitProperty, string cursorProperty, string resultsProperty, string? totalProperty,
         Func<JsonObject, CancellationToken, Task<string?>> fetch,
         Func<string, CancellationToken, Task> release,
         TextWriter? progress,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        string? endCursor = null)
     {
         var results = new JsonArray();
         long? total = null;
@@ -74,7 +80,7 @@ public static class CursorPaging
                 }
 
                 cursor = response?[cursorProperty] is JsonValue next && next.TryGetValue<string>(out var text)
-                         && !string.IsNullOrEmpty(text)
+                         && !string.IsNullOrEmpty(text) && text != endCursor
                     ? text
                     : null;
 

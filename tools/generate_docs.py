@@ -38,7 +38,8 @@ the thing they act on: searching records is `osducs record search`. See
 Hand-written commands — `osducs status`, `osducs record add`, `osducs file upload`,
 `osducs file download`, `osducs completion` — are not listed here, since no manifest describes
 their options; `record add` is in [USAGE.md](USAGE.md#writing-records), and the file commands in
-[USAGE.md](USAGE.md#files). Run `osducs --help` for the full tree.
+[USAGE.md](USAGE.md#files). Neither are `group list`'s `--all` and `--type`, added by hand; see
+[USAGE.md](USAGE.md#operations). Run `osducs --help` for the full tree.
 
 """
 

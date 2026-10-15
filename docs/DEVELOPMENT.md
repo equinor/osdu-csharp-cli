@@ -70,6 +70,7 @@ Both packages come from GitHub Packages, which needs a token even though they ar
 | `Commands/ConfigCommand.cs` | `osducs config`: create, list, select and show profiles. |
 | `Commands/CompletionCommand.cs` | `osducs completion`: shell completion scripts, and the hidden command they call. |
 | `Commands/RecordAddCommand.cs` | `osducs record add`: creates or updates records of any kind, asking before it updates one that exists. |
+| `Commands/GroupListAll.cs` | `osducs group list --all`: every group in the data partition, added to the generated `group list`. |
 | `Commands/FileUploadCommand.cs`, `FileDownloadCommand.cs` | `osducs file upload` and `file download`: a file's bytes through the File service's signed URLs, checked against its checksum. |
 | `Runtime/CommandTree.cs` | Joins commands from several manifests under one noun, such as `crs`. |
 | `Runtime/CliRunner.cs` | Runs every command: builds the context, and turns failures into one-line errors and exit codes. |
@@ -96,6 +97,8 @@ service through its `Customize` hook, in `Commands/Handwritten/`. Storage's is t
 `Commands/RecordAddCommand.cs`. The manifest lists the endpoint under `handwritten`, so the
 coverage check knows it is accounted for. File's adds `file upload` and `file download`; the
 endpoints they call already have generated commands, so its manifest needs no entry.
+Entitlements' extends a generated command instead: it adds `--all` and `--type` to `group list`
+and keeps the generated action for everything else.
 
 ### What happens when a command runs
 

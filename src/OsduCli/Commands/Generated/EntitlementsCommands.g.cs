@@ -40,7 +40,7 @@ public static partial class EntitlementsCommands
     /// </summary>
     static partial void Customize(CommandTree tree);
 
-    /// <summary>List groups the caller belongs to.</summary>
+    /// <summary>List the groups you belong to, or with --all every group in the data partition.</summary>
     /// <remarks>GET /groups on the Entitlements service.</remarks>
     private static Command BuildGroupList()
     {
@@ -49,7 +49,7 @@ public static partial class EntitlementsCommands
             Description = "Include the caller's role in each group.",
         };
 
-        var command = new Command("list", "List groups the caller belongs to.");
+        var command = new Command("list", "List the groups you belong to, or with --all every group in the data partition.");
         command.Options.Add(rolerequiredOption);
 
         command.SetAction((parseResult, cancellationToken) =>
