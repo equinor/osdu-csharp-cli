@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.17.0](https://github.com/equinor/osdu-csharp-cli/compare/v0.16.0...v0.17.0) (2026-10-15)
+
+
+### Features
+
+* **group:** list every group in the data partition with group list --all ([#70](https://github.com/equinor/osdu-csharp-cli/issues/70)) ([e2d6c0e](https://github.com/equinor/osdu-csharp-cli/commit/e2d6c0eba2a55d730290932b988bcbea95b22073))
+
 ## [0.16.0](https://github.com/equinor/osdu-csharp-cli/compare/v0.15.0...v0.16.0) (2026-10-15)
 
 
