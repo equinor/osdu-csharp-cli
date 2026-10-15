@@ -152,14 +152,25 @@ public static partial class WellboreDdmsCommands
             Description = "Well record id to delete.",
             Required = true,
         };
+        var yesOption = new Option<bool>("--yes")
+        {
+            Description = "Go ahead without asking. The command says what it is about to do and asks first, and refuses when there is no terminal to ask at.",
+        };
 
         var command = new Command("delete", "Soft-delete a Well record by id.");
         command.Options.Add(recordIdOption);
+        command.Options.Add(yesOption);
 
         command.SetAction((parseResult, cancellationToken) =>
             CliRunner.RunAsync(parseResult, async (context, cancellationToken) =>
         {
             var recordId = parseResult.GetValue(recordIdOption)!;
+
+            // Said, and asked, before anything is sent; --yes skips only the question.
+            if (!Confirmation.Confirm(
+                    "Delete the record " + recordId + ". Records that refer to it are not deleted with it.",
+                    parseResult.GetValue(yesOption), context))
+                return 1;
 
             await context.Client.WellboreDdms.Ddms.V3.Wells[recordId].DeleteAsync(cancellationToken: cancellationToken);
 
@@ -299,14 +310,25 @@ public static partial class WellboreDdmsCommands
             Description = "Wellbore record id to delete.",
             Required = true,
         };
+        var yesOption = new Option<bool>("--yes")
+        {
+            Description = "Go ahead without asking. The command says what it is about to do and asks first, and refuses when there is no terminal to ask at.",
+        };
 
         var command = new Command("delete", "Soft-delete a Wellbore record by id.");
         command.Options.Add(recordIdOption);
+        command.Options.Add(yesOption);
 
         command.SetAction((parseResult, cancellationToken) =>
             CliRunner.RunAsync(parseResult, async (context, cancellationToken) =>
         {
             var recordId = parseResult.GetValue(recordIdOption)!;
+
+            // Said, and asked, before anything is sent; --yes skips only the question.
+            if (!Confirmation.Confirm(
+                    "Delete the record " + recordId + ". Records that refer to it are not deleted with it.",
+                    parseResult.GetValue(yesOption), context))
+                return 1;
 
             await context.Client.WellboreDdms.Ddms.V3.Wellbores[recordId].DeleteAsync(cancellationToken: cancellationToken);
 
@@ -446,14 +468,25 @@ public static partial class WellboreDdmsCommands
             Description = "WellLog record id to delete.",
             Required = true,
         };
+        var yesOption = new Option<bool>("--yes")
+        {
+            Description = "Go ahead without asking. The command says what it is about to do and asks first, and refuses when there is no terminal to ask at.",
+        };
 
         var command = new Command("delete", "Soft-delete a WellLog record by id.");
         command.Options.Add(recordIdOption);
+        command.Options.Add(yesOption);
 
         command.SetAction((parseResult, cancellationToken) =>
             CliRunner.RunAsync(parseResult, async (context, cancellationToken) =>
         {
             var recordId = parseResult.GetValue(recordIdOption)!;
+
+            // Said, and asked, before anything is sent; --yes skips only the question.
+            if (!Confirmation.Confirm(
+                    "Delete the record " + recordId + ". Records that refer to it are not deleted with it.",
+                    parseResult.GetValue(yesOption), context))
+                return 1;
 
             await context.Client.WellboreDdms.Ddms.V3.Welllogs[recordId].DeleteAsync(cancellationToken: cancellationToken);
 
@@ -829,14 +862,25 @@ public static partial class WellboreDdmsCommands
             Description = "WellboreTrajectory record id to delete.",
             Required = true,
         };
+        var yesOption = new Option<bool>("--yes")
+        {
+            Description = "Go ahead without asking. The command says what it is about to do and asks first, and refuses when there is no terminal to ask at.",
+        };
 
         var command = new Command("delete", "Soft-delete a WellboreTrajectory record by id.");
         command.Options.Add(recordIdOption);
+        command.Options.Add(yesOption);
 
         command.SetAction((parseResult, cancellationToken) =>
             CliRunner.RunAsync(parseResult, async (context, cancellationToken) =>
         {
             var recordId = parseResult.GetValue(recordIdOption)!;
+
+            // Said, and asked, before anything is sent; --yes skips only the question.
+            if (!Confirmation.Confirm(
+                    "Delete the record " + recordId + ". Records that refer to it are not deleted with it.",
+                    parseResult.GetValue(yesOption), context))
+                return 1;
 
             await context.Client.WellboreDdms.Ddms.V3.Wellboretrajectories[recordId].DeleteAsync(cancellationToken: cancellationToken);
 
@@ -1131,14 +1175,25 @@ public static partial class WellboreDdmsCommands
             Description = "WellboreMarkerSet record id to delete.",
             Required = true,
         };
+        var yesOption = new Option<bool>("--yes")
+        {
+            Description = "Go ahead without asking. The command says what it is about to do and asks first, and refuses when there is no terminal to ask at.",
+        };
 
         var command = new Command("delete", "Soft-delete a WellboreMarkerSet record by id.");
         command.Options.Add(recordIdOption);
+        command.Options.Add(yesOption);
 
         command.SetAction((parseResult, cancellationToken) =>
             CliRunner.RunAsync(parseResult, async (context, cancellationToken) =>
         {
             var recordId = parseResult.GetValue(recordIdOption)!;
+
+            // Said, and asked, before anything is sent; --yes skips only the question.
+            if (!Confirmation.Confirm(
+                    "Delete the record " + recordId + ". Records that refer to it are not deleted with it.",
+                    parseResult.GetValue(yesOption), context))
+                return 1;
 
             await context.Client.WellboreDdms.Ddms.V3.Wellboremarkersets[recordId].DeleteAsync(cancellationToken: cancellationToken);
 
@@ -1278,14 +1333,25 @@ public static partial class WellboreDdmsCommands
             Description = "WellboreIntervalSet record id to delete.",
             Required = true,
         };
+        var yesOption = new Option<bool>("--yes")
+        {
+            Description = "Go ahead without asking. The command says what it is about to do and asks first, and refuses when there is no terminal to ask at.",
+        };
 
         var command = new Command("delete", "Soft-delete a WellboreIntervalSet record by id.");
         command.Options.Add(recordIdOption);
+        command.Options.Add(yesOption);
 
         command.SetAction((parseResult, cancellationToken) =>
             CliRunner.RunAsync(parseResult, async (context, cancellationToken) =>
         {
             var recordId = parseResult.GetValue(recordIdOption)!;
+
+            // Said, and asked, before anything is sent; --yes skips only the question.
+            if (!Confirmation.Confirm(
+                    "Delete the record " + recordId + ". Records that refer to it are not deleted with it.",
+                    parseResult.GetValue(yesOption), context))
+                return 1;
 
             await context.Client.WellboreDdms.Ddms.V3.Wellboreintervalsets[recordId].DeleteAsync(cancellationToken: cancellationToken);
 
@@ -1425,14 +1491,25 @@ public static partial class WellboreDdmsCommands
             Description = "WellLogAcquisition record id to delete.",
             Required = true,
         };
+        var yesOption = new Option<bool>("--yes")
+        {
+            Description = "Go ahead without asking. The command says what it is about to do and asks first, and refuses when there is no terminal to ask at.",
+        };
 
         var command = new Command("delete", "Soft-delete a WellLogAcquisition record by id.");
         command.Options.Add(recordIdOption);
+        command.Options.Add(yesOption);
 
         command.SetAction((parseResult, cancellationToken) =>
             CliRunner.RunAsync(parseResult, async (context, cancellationToken) =>
         {
             var recordId = parseResult.GetValue(recordIdOption)!;
+
+            // Said, and asked, before anything is sent; --yes skips only the question.
+            if (!Confirmation.Confirm(
+                    "Delete the record " + recordId + ". Records that refer to it are not deleted with it.",
+                    parseResult.GetValue(yesOption), context))
+                return 1;
 
             await context.Client.WellboreDdms.Ddms.V3.Welllogacquisition[recordId].DeleteAsync(cancellationToken: cancellationToken);
 
@@ -1572,14 +1649,25 @@ public static partial class WellboreDdmsCommands
             Description = "PPFGDataset record id to delete.",
             Required = true,
         };
+        var yesOption = new Option<bool>("--yes")
+        {
+            Description = "Go ahead without asking. The command says what it is about to do and asks first, and refuses when there is no terminal to ask at.",
+        };
 
         var command = new Command("delete", "Soft-delete a PPFGDataset record by id.");
         command.Options.Add(recordIdOption);
+        command.Options.Add(yesOption);
 
         command.SetAction((parseResult, cancellationToken) =>
             CliRunner.RunAsync(parseResult, async (context, cancellationToken) =>
         {
             var recordId = parseResult.GetValue(recordIdOption)!;
+
+            // Said, and asked, before anything is sent; --yes skips only the question.
+            if (!Confirmation.Confirm(
+                    "Delete the record " + recordId + ". Records that refer to it are not deleted with it.",
+                    parseResult.GetValue(yesOption), context))
+                return 1;
 
             await context.Client.WellboreDdms.Ddms.V3.Ppfgdataset[recordId].DeleteAsync(cancellationToken: cancellationToken);
 
@@ -1874,14 +1962,25 @@ public static partial class WellboreDdmsCommands
             Description = "WellPressureTestRawMeasurement record id to delete.",
             Required = true,
         };
+        var yesOption = new Option<bool>("--yes")
+        {
+            Description = "Go ahead without asking. The command says what it is about to do and asks first, and refuses when there is no terminal to ask at.",
+        };
 
         var command = new Command("delete", "Soft-delete a WellPressureTestRawMeasurement record by id.");
         command.Options.Add(recordIdOption);
+        command.Options.Add(yesOption);
 
         command.SetAction((parseResult, cancellationToken) =>
             CliRunner.RunAsync(parseResult, async (context, cancellationToken) =>
         {
             var recordId = parseResult.GetValue(recordIdOption)!;
+
+            // Said, and asked, before anything is sent; --yes skips only the question.
+            if (!Confirmation.Confirm(
+                    "Delete the record " + recordId + ". Records that refer to it are not deleted with it.",
+                    parseResult.GetValue(yesOption), context))
+                return 1;
 
             await context.Client.WellboreDdms.Ddms.V3.Wellpressuretestrawmeasurement[recordId].DeleteAsync(cancellationToken: cancellationToken);
 

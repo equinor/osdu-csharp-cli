@@ -67,6 +67,9 @@ commands:
     op: { method: delete, path: "/legaltags/{name}" }
     params:
       name: { flag: --name, short: -n, required: true, help: LegalTag name to delete. }
+    confirm:
+      message: >-
+        Delete the legal tag {name}. Data that carries it becomes invalid.
     output:
       message: LegalTag deleted
 

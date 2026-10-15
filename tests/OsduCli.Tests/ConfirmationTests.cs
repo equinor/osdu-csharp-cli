@@ -114,6 +114,109 @@ public class ConfirmationTests : ConfigTestDirectories
         Assert.Equal(asks, command.Options.Any(option => option.Name == "--yes"));
     }
 
+    private static IEnumerable<(string Path, Command Command)> Commands(Command parent, string path = "")
+    {
+        foreach (var command in parent.Subcommands)
+        {
+            var named = (path + " " + command.Name).Trim();
+            yield return (named, command);
+            foreach (var nested in Commands(command, named))
+                yield return nested;
+        }
+    }
+
+    [Fact]
+    public void EveryDeleteAndPurgeAsks()
+    {
+        // Nobody scripts against these yet, so every delete asks first now, not only the new
+        // operator commands: a mistyped id is as gone either way.
+        var unguarded = Commands(Root())
+            .Where(entry => entry.Command.Name is "delete" or "purge" && entry.Command.Subcommands.Count == 0)
+            .Where(entry => entry.Command.Options.All(option => option.Name != "--yes"))
+            .Select(entry => entry.Path)
+            .ToList();
+
+        Assert.Empty(unguarded);
+        Assert.True(Commands(Root()).Count(entry => entry.Command.Name is "delete" or "purge") >= 20);
+    }
+
+    [Fact]
+    public void AReplayAsksAndItsStatusDoesNot()
+    {
+        var record = Root().Subcommands.Single(command => command.Name == "record");
+
+        Assert.Contains(record.Subcommands.Single(c => c.Name == "replay").Options, option => option.Name == "--yes");
+        Assert.DoesNotContain(record.Subcommands.Single(c => c.Name == "replay-status").Options, option => option.Name == "--yes");
+    }
+
+    [Fact]
+    public void AVersionPurgeSaysWhichVersionsBeforeAnythingElse()
+    {
+        // With none of the three the service does not say what it would delete.
+        var errors = Root().Parse(["record", "version", "purge", "--id", "dev:x:1"]).Errors;
+
+        Assert.Contains(errors, error => error.Message == "One of --version-ids or --limit or --from is required.");
+    }
+
+    [Theory]
+    [InlineData("--version-ids 1,2 --limit 5", "--version-ids and --limit cannot be used together.")]
+    [InlineData("--version-ids 1,2 --from 3", "--version-ids and --from cannot be used together.")]
+    public void NamedVersionsAndACountCannotBeMixed(string options, string expected)
+    {
+        // Mixed, what is deleted for good was left to how the service ranks them.
+        var errors = Root().Parse(["record", "version", "purge", "--id", "dev:x:1", .. options.Split(' ')]).Errors;
+
+        Assert.Contains(errors, error => error.Message == expected);
+    }
+
+    [Fact]
+    public void ACountAndAStartingPointCanBeCombined() =>
+        Assert.Empty(Root().Parse(["record", "version", "purge", "--id", "dev:x:1", "--limit", "5", "--from", "3"]).Errors);
+
+    [Theory]
+    [InlineData("reindex", true)]
+    [InlineData("REPLAY", true)]
+    [InlineData("reindx", false)]
+    public void AReplaysOperationIsOneTheServiceKnows(string operation, bool accepted)
+    {
+        // Named only in the spec's prose; a typo went to Storage.
+        var errors = Root().Parse(["record", "replay", "--operation", operation, "--kind", "k"]).Errors;
+
+        Assert.Equal(accepted, errors.Count == 0);
+    }
+
+    [Fact]
+    public void AReplayTakesOneKind()
+    {
+        // The spec's maxItems: one kind, which `--kind a b` passed and Storage then refused.
+        var errors = Root().Parse(["record", "replay", "--operation", "reindex", "--kind", "a", "b"]).Errors;
+
+        Assert.Contains(errors, error => error.Message == "--kind takes one value.");
+    }
+
+    [Theory]
+    [InlineData(1000, true)]
+    [InlineData(1001, false)]
+    public void ReindexingRecordsTakesAtMostAThousand(int count, bool accepted)
+    {
+        var ids = string.Join(",", Enumerable.Range(0, count).Select(i => $"dev:x:{i}"));
+
+        var errors = Root().Parse(["index", "reindex-records", "--id", ids]).Errors;
+
+        Assert.Equal(accepted, errors.Count == 0);
+    }
+
+    [Theory]
+    [InlineData("record search --kind k --limit")]
+    [InlineData("record search --kind k --all --limit")]
+    [InlineData("record replay --operation reindex --kind")]
+    public void AValueLeftOutIsAParseErrorNotACrash(string line)
+    {
+        // The checks read option values, which threw for one given without a value. Reported,
+        // whichever error comes first: beside --all it is the conflict.
+        Assert.NotEmpty(Root().Parse(line.Split(' ')).Errors);
+    }
+
     [Fact]
     public async Task ADeleteSaysWhatAndWhereAndStopsWithoutAYes()
     {

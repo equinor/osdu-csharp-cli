@@ -151,11 +151,13 @@ A map from body property to option. A dotted name reaches into a nested object: 
 | `help` | no | Help text. There is no default. |
 | `type` | no | The option's C# type. Defaults to `string`; the manifests also use `string[]`, `int`, `bool`, `double` and `double[]`. An array type accepts several values after one flag. |
 | `parts` | no | Paths to spread one option's comma-separated numbers across, such as a bounding box's four coordinates. Needs `type: double[]`, and exactly one value per path. See [`parts`](../COMMAND-GRAMMAR.md#parts). |
+| `allowed` | no | The values the option takes, for a field whose spec names them only in prose: `[reindex, replay]`. Refused at parse time like the spec's own enum, in any casing, and listed in help. Cannot be given when the spec has an enum, or with `comma-separated`. |
 | `comma-separated` | no | `true` splits each value on commas as well as accepting the flag repeated, so `-f a,b -f c` is three values. Needs `type: string[]`, and cannot be combined with `parts` or with allowed values from the spec. Without it a comma is part of the value, which is right for values that may contain one. |
 
 A field inherits the allowed values of an `enum` in the body schema, including one on an array's
-items. An optional field the user did not give is left out of the body rather than sent as `null`
-or as an empty array.
+items. A list field also inherits the schema's `maxItems`, checked before anything is sent:
+`record replay --kind a b` is refused with "--kind takes one value." An optional field the user did
+not give is left out of the body rather than sent as `null` or as an empty array.
 
 ### `output`
 
@@ -222,6 +224,7 @@ no terminal to ask at and no `--yes`, the command refuses. A no ends it with exi
 |---|---|---|
 | `message` | yes | What is about to happen, in a sentence or two. `{name}` puts in the value of a required param or body field, so the question names what it applies to: `Delete the search index of {kind}.` A list's values are shown three at a time and a count. |
 | `when` | no | A true/false option that alone makes the command ask, such as `force_clean`: re-indexing a kind is routine, deleting its index first is not. |
+| `unless` | no | An optional option whose absence alone makes the command ask, such as `filter.kinds`: replaying one kind is routine, replaying every kind in the partition, which leaving it out means, is not. Cannot be combined with `when`. |
 
 An example of a command with `confirm` needs a `skip:` reason, since
 [the smoke test](DEVELOPMENT.md#smoke-testing-the-examples) runs examples against a live

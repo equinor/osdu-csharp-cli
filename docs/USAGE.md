@@ -479,8 +479,10 @@ tools.
 
 ## Operations
 
-The `index` commands re-index from Storage, and delete a kind's index. They need operator roles,
-`service.search.admin` or `users.datalake.ops`; a refusal names the one each command needs.
+The `index` commands re-index from Storage, and delete a kind's index; `record replay` sends
+records from Storage to what consumes them again, and `record purge` deletes for good. They need
+operator roles, such as `service.search.admin`, `users.datalake.ops` or `service.storage.admin`;
+a refusal names the one each command needs.
 
 ```bash
 osducs index reindex --kind "osdu:wks:master-data--Well:1.0.0"                # re-index a kind in place
@@ -488,7 +490,15 @@ osducs index reindex --kind "osdu:wks:master-data--Well:1.0.0" --force-clean  # 
 osducs index reindex-records --id "dev:master-data--Well:1000,dev:master-data--Well:1001"
 osducs index delete --kind "osdu:wks:master-data--Well:1.0.0"
 osducs index reindex-partition                                                 # every kind in the data partition
+osducs record replay --operation reindex --kind "osdu:wks:master-data--Well:1.0.0"
+osducs record replay-status --id f506be08-b51f-4cdd-a9ee-d9454ad51600         # -o json for each kind
+osducs record purge --id "dev:master-data--Well:1000"                         # the record and every version, for good
+osducs record version purge --id "dev:master-data--Well:1000" --limit 5       # versions, keeping the latest
 ```
+
+`record replay` takes `--operation reindex`, which sends the records to the Indexer, or `replay`,
+which publishes them as record changes to every consumer. It prints a replay id to follow with
+`record replay-status`.
 
 A command that deletes, or reaches across the whole data partition, says what it is about to do
 and where, and asks:
@@ -502,7 +512,8 @@ Go ahead? [y/N]
 `--yes` skips the question but not the two lines above it, so a script's log still says what it
 did and where. Without a terminal to ask at, and without `--yes`, the command refuses rather
 than guess. `index reindex` asks only with `--force-clean`: re-indexing a kind in place is
-routine, deleting its index first is not.
+routine, deleting its index first is not. `record replay` asks only without `--kind`, for the
+same reason. Every `delete` asks as well, `record delete` and `group member delete` included.
 
 ## Shell completion
 

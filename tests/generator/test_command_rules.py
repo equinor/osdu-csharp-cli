@@ -350,6 +350,20 @@ class TestConfirm:
         with pytest.raises(ManifestError, match="true/false option"):
             self.build(self.entry({"message": "m", "when": when}))
 
+    def test_unless_names_an_optional_option(self):
+        # Asks only without it: replaying one kind is routine, every kind is not.
+        assert self.build(self.entry({"message": "m", "unless": "note"})).confirm.unless.name == "note"
+
+    @pytest.mark.parametrize("unless", ["kind", "nonsense", ["note"]])
+    def test_unless_cannot_name_a_required_or_unknown_option(self, unless):
+        # A required option is always given, so the question would never be asked.
+        with pytest.raises(ManifestError, match="optional option"):
+            self.build(self.entry({"message": "m", "unless": unless}))
+
+    def test_when_and_unless_cannot_be_combined(self):
+        with pytest.raises(ManifestError, match="not both"):
+            self.build(self.entry({"message": "m", "when": "force_clean", "unless": "note"}))
+
     @pytest.mark.parametrize("name", ["note", "nonsense"])
     def test_a_placeholder_names_a_required_option(self, name):
         # An optional one would put "null" in front of the person agreeing.
@@ -380,6 +394,67 @@ class TestConfirm:
         with pytest.raises(ManifestError, match="skip"):
             self.build(self.entry({"message": "m"}, examples=["--kind k"]))
         self.build(self.entry({"message": "m"}, examples=[{"args": "--kind k", "skip": "Deletes an index."}]))
+
+
+class TestAllowed:
+    """`allowed:` gives a body field the values its spec names only in prose."""
+
+    @staticmethod
+    def entry(**field):
+        return {"command": "record replay", "op": {"method": "post", "path": "/query"},
+                "body": {"fields": {"kind": {"flag": "--operation", **field}}}, "output": "raw"}
+
+    def test_they_become_the_options_values(self):
+        field = build(self.entry(allowed=["reindex", "replay"]), BODY_OPERATION).body.fields[0]
+        assert field.enum_values == ["reindex", "replay"]
+
+    def test_the_specs_own_values_are_not_restated(self):
+        spec = {"components": {"schemas": {"QueryRequest": {"properties": {
+            "kind": {"type": "string", "enum": ["A", "B"]}}}}}}
+        with pytest.raises(ManifestError, match="already lists"):
+            build(self.entry(allowed=["A"]), BODY_OPERATION, spec)
+
+    @pytest.mark.parametrize("allowed", ["reindex", [], [""], [1]])
+    def test_they_are_a_list_of_strings(self, allowed):
+        with pytest.raises(ManifestError, match="as strings"):
+            build(self.entry(allowed=allowed), BODY_OPERATION)
+
+    @pytest.mark.parametrize("cs_type", ["int", "bool", "double[]"])
+    def test_they_are_for_text(self, cs_type):
+        # Checked as text; on an int or bool option the check did not compile.
+        with pytest.raises(ManifestError, match="needs `type: string`"):
+            build(self.entry(allowed=["1"], type=cs_type), BODY_OPERATION)
+
+    def test_they_cannot_be_split_on_commas(self):
+        with pytest.raises(ManifestError, match="comma-separated"):
+            build(self.entry(allowed=["a"], type="string[]", **{"comma-separated": True}), BODY_OPERATION)
+
+
+class TestMaxItems:
+    """A list option carries the spec's maxItems, to be checked before anything is sent."""
+
+    SPEC = {"components": {"schemas": {"QueryRequest": {"properties": {
+        "kind": {"type": "string"},
+        "returnedFields": {"type": "array", "items": {"type": "string"}, "maxItems": 1},
+        "excludedFields": {"type": "array", "items": {"type": "number"}, "maxItems": 2},
+    }}}}}
+
+    @staticmethod
+    def field(**config):
+        return {"command": "record replay", "op": {"method": "post", "path": "/query"},
+                "body": {"fields": {"returnedFields": {"flag": "--kind", **config}}}, "output": "raw"}
+
+    def test_a_list_carries_it(self):
+        assert build(self.field(type="string[]"), BODY_OPERATION, self.SPEC).body.fields[0].max_items == 1
+
+    def test_a_single_value_does_not(self):
+        assert build(self.field(), BODY_OPERATION, self.SPEC).body.fields[0].max_items is None
+
+    def test_parts_count_for_themselves(self):
+        entry = {"command": "record replay", "op": {"method": "post", "path": "/query"},
+                 "body": {"fields": {"excludedFields": {"flag": "--box", "type": "double[]", "parts": ["a", "b"]}}},
+                 "output": "raw"}
+        assert build(entry, BODY_OPERATION, self.SPEC).body.fields[0].max_items is None
 
 
 class TestParamValidation:

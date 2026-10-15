@@ -33,6 +33,10 @@ SPEC = {"components": {"schemas": {
         "order": {"type": "array", "items": {"type": "string", "enum": ["ASC", "DESC"]}}}},
     "SpatialFilter": {"properties": {"field": {"type": "string"}}},
     "Record": {"properties": {"kind": {"type": "string"}}},
+    "ReplayRequest": {"properties": {
+        "filter": {"$ref": "#/components/schemas/ReplayFilter"}}},
+    "ReplayFilter": {"properties": {
+        "kinds": {"type": "array", "items": {"type": "string"}, "maxItems": 1}}},
     "CursorQueryRequest": {"properties": {
         "kind": {"type": "string"}, "limit": {"type": "integer"}, "cursor": {"type": "string"}}},
 }}}
@@ -181,6 +185,25 @@ CASES = {
          "confirm": {"message": "Purge {returnedFields} \"for good\"."},
          "output": "raw"},
         operation(body={"$ref": "#/components/schemas/QueryRequest"}),
+    ),
+    # Asks only when the list option is left out: one kind is routine, every kind is not.
+    "confirm_unless": (
+        {"command": "record replay", "summary": "Replay.",
+         "op": {"method": "post", "path": "/replay"},
+         "body": {"fields": {
+             "kind": {"flag": "--operation", "required": True, "help": "Operation."},
+             "returnedFields": {"flag": "--kind", "type": "string[]", "help": "Kind."}}},
+         "confirm": {"message": "Replay every kind as a {kind}.", "unless": "returnedFields"},
+         "output": "raw"},
+        operation(body={"$ref": "#/components/schemas/QueryRequest"}),
+    ),
+    # The spec's maxItems, as a parse-time check on the list option.
+    "array_max_items": (
+        {"command": "record replay", "summary": "Replay.",
+         "op": {"method": "post", "path": "/replay"},
+         "body": {"fields": {"filter.kinds": {"flag": "--kind", "type": "string[]", "help": "Kind."}}},
+         "output": "raw"},
+        operation(body={"$ref": "#/components/schemas/ReplayRequest"}),
     ),
     "require_one_of": (
         {"command": "crs get", "summary": "Get a CRS.",

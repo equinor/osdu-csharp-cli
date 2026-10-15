@@ -30,7 +30,7 @@ their options; `record add` is in [USAGE.md](USAGE.md#writing-records), and the 
 | [`member`](#member) | `group list`, `delete` |
 | [`ppfg`](#ppfg) | `get`, `add`, `delete`, `version list`, `version get`, `data get`, `version data` |
 | [`pressuretest`](#pressuretest) | `get`, `add`, `delete`, `version list`, `version get`, `data get`, `version data` |
-| [`record`](#record) | `search`, `aggregate`, `list`, `get`, `headers`, `delete`, `version list`, `version get` |
+| [`record`](#record) | `search`, `aggregate`, `list`, `get`, `headers`, `delete`, `purge`, `version list`, `version get`, `version purge`, `replay`, `replay-status` |
 | [`schema`](#schema) | `list`, `get`, `add`, `update` |
 | [`trajectory`](#trajectory) | `get`, `add`, `delete`, `version list`, `version get`, `data get`, `version data` |
 | [`unit`](#unit) | `list`, `get`, `search`, `by-symbol`, `by-measurement`, `by-system`, `preferred`, `maps`, `conversion scale`, `conversion abcd`, `catalog get`, `catalog search`, `catalog map-states`, `catalog last-modified` |
@@ -129,6 +129,9 @@ Soft-delete a dataset metadata record.
 | Option | Required | Description |
 |---|---|---|
 | `-id`, `--id` | yes | Dataset metadata record id. |
+| `--yes` |  | Go ahead without asking. The command says what it is about to do and asks first, and refuses when there is no terminal to ask at. |
+
+> Says what it is about to do and asks before going ahead: *Delete the dataset record `<id>`. `dataset undelete` restores it.* `--yes` skips the question.
 
 ### `osducs dataset download-url`
 
@@ -204,6 +207,9 @@ Delete a file and its metadata record.
 | Option | Required | Description |
 |---|---|---|
 | `-id`, `--id` | yes | File metadata record id to delete. |
+| `--yes` |  | Go ahead without asking. The command says what it is about to do and asks first, and refuses when there is no terminal to ask at. |
+
+> Says what it is about to do and asks before going ahead: *Delete the file record `<id>` and the stored file it describes.* `--yes` skips the question.
 
 ### `osducs file download-url`
 
@@ -268,6 +274,9 @@ Delete a group.
 | Option | Required | Description |
 |---|---|---|
 | `-g`, `--group` | yes | Group email address. |
+| `--yes` |  | Go ahead without asking. The command says what it is about to do and asks first, and refuses when there is no terminal to ask at. |
+
+> Says what it is about to do and asks before going ahead: *Delete the group `<group_email>`. Its members lose the access it gave them.* `--yes` skips the question.
 
 ### `osducs group list`
 
@@ -316,6 +325,9 @@ Remove one member from one group.
 |---|---|---|
 | `-g`, `--group` | yes | Group email address. |
 | `-m`, `--member` | yes | Member email address to remove. |
+| `--yes` |  | Go ahead without asking. The command says what it is about to do and asks first, and refuses when there is no terminal to ask at. |
+
+> Says what it is about to do and asks before going ahead: *Remove `<member_email>` from `<group_email>`.* `--yes` skips the question.
 
 ### `osducs group member list`
 
@@ -426,6 +438,9 @@ Soft-delete a WellboreIntervalSet record by id.
 | Option | Required | Description |
 |---|---|---|
 | `-id`, `--id` | yes | WellboreIntervalSet record id to delete. |
+| `--yes` |  | Go ahead without asking. The command says what it is about to do and asks first, and refuses when there is no terminal to ask at. |
+
+> Says what it is about to do and asks before going ahead: *Delete the record `<record_id>`. Records that refer to it are not deleted with it.* `--yes` skips the question.
 
 ### `osducs intervalset get`
 
@@ -479,6 +494,9 @@ Delete a LegalTag by name.
 | Option | Required | Description |
 |---|---|---|
 | `-n`, `--name` | yes | LegalTag name to delete. |
+| `--yes` |  | Go ahead without asking. The command says what it is about to do and asks first, and refuses when there is no terminal to ask at. |
+
+> Says what it is about to do and asks before going ahead: *Delete the legal tag `<name>`. Data that carries it becomes invalid.* `--yes` skips the question.
 
 ### `osducs legaltag get`
 
@@ -555,6 +573,9 @@ Soft-delete a WellLogAcquisition record by id.
 | Option | Required | Description |
 |---|---|---|
 | `-id`, `--id` | yes | WellLogAcquisition record id to delete. |
+| `--yes` |  | Go ahead without asking. The command says what it is about to do and asks first, and refuses when there is no terminal to ask at. |
+
+> Says what it is about to do and asks before going ahead: *Delete the record `<record_id>`. Records that refer to it are not deleted with it.* `--yes` skips the question.
 
 ### `osducs logacquisition get`
 
@@ -608,6 +629,9 @@ Soft-delete a WellboreMarkerSet record by id.
 | Option | Required | Description |
 |---|---|---|
 | `-id`, `--id` | yes | WellboreMarkerSet record id to delete. |
+| `--yes` |  | Go ahead without asking. The command says what it is about to do and asks first, and refuses when there is no terminal to ask at. |
+
+> Says what it is about to do and asks before going ahead: *Delete the record `<record_id>`. Records that refer to it are not deleted with it.* `--yes` skips the question.
 
 ### `osducs markerset get`
 
@@ -697,6 +721,9 @@ Remove a member from every group in the partition.
 | Option | Required | Description |
 |---|---|---|
 | `-m`, `--member` | yes | Member email address to remove. |
+| `--yes` |  | Go ahead without asking. The command says what it is about to do and asks first, and refuses when there is no terminal to ask at. |
+
+> Says what it is about to do and asks before going ahead: *Remove `<member_email>` from every group in the data partition.* `--yes` skips the question.
 
 ### `osducs member group list`
 
@@ -748,6 +775,9 @@ Soft-delete a PPFGDataset record by id.
 | Option | Required | Description |
 |---|---|---|
 | `-id`, `--id` | yes | PPFGDataset record id to delete. |
+| `--yes` |  | Go ahead without asking. The command says what it is about to do and asks first, and refuses when there is no terminal to ask at. |
+
+> Says what it is about to do and asks before going ahead: *Delete the record `<record_id>`. Records that refer to it are not deleted with it.* `--yes` skips the question.
 
 ### `osducs ppfg get`
 
@@ -834,6 +864,9 @@ Soft-delete a WellPressureTestRawMeasurement record by id.
 | Option | Required | Description |
 |---|---|---|
 | `-id`, `--id` | yes | WellPressureTestRawMeasurement record id to delete. |
+| `--yes` |  | Go ahead without asking. The command says what it is about to do and asks first, and refuses when there is no terminal to ask at. |
+
+> Says what it is about to do and asks before going ahead: *Delete the record `<record_id>`. Records that refer to it are not deleted with it.* `--yes` skips the question.
 
 ### `osducs pressuretest get`
 
@@ -911,6 +944,9 @@ Soft-delete a record by id.
 | Option | Required | Description |
 |---|---|---|
 | `-id`, `--id` | yes | Record id to delete. |
+| `--yes` |  | Go ahead without asking. The command says what it is about to do and asks first, and refuses when there is no terminal to ask at. |
+
+> Says what it is about to do and asks before going ahead: *Delete the record `<id>`. Storage keeps its versions until it is purged, and the deletion can be reverted.* `--yes` skips the question.
 
 ### `osducs record get`
 
@@ -956,6 +992,56 @@ List records of a given kind.
 
 ```bash
 osducs record list --kind "osdu:wks:master-data--Well:1.2.0" --limit 5
+```
+
+### `osducs record purge`
+
+Permanently delete a record and every version of it.
+
+`DELETE /records/{id}` — storage
+
+| Option | Required | Description |
+|---|---|---|
+| `-id`, `--id` | yes | Record id to purge. |
+| `--yes` |  | Go ahead without asking. The command says what it is about to do and asks first, and refuses when there is no terminal to ask at. |
+
+> Says what it is about to do and asks before going ahead: *Permanently delete the record `<id>` and every version of it. This cannot be undone.* `--yes` skips the question.
+
+```bash
+osducs record purge --id "opendes:master-data--Well:1000"
+```
+
+### `osducs record replay`
+
+Send records from Storage to their consumers again, to rebuild the index or more.
+
+`POST /replay` — storage
+
+| Option | Required | Description |
+|---|---|---|
+| `--operation` | yes | reindex to send the records to the Indexer, or replay to publish them as record changes to every consumer, the Indexer included. |
+| `-k`, `--kind` |  | The kind to replay; the service takes one. Without it, every kind in the data partition. |
+| `--replay-id` |  | An id for the replay, to follow it by. The service makes one up when omitted. |
+| `--yes` |  | Go ahead without asking. Without --kind, the command says what it is about to do and asks first, and refuses when there is no terminal to ask at. |
+
+> Says what it is about to do and asks before going ahead, unless `--kind` is given: *Replay every kind in the data partition from Storage, as a `<operation>`: a long job for Storage and everything that consumes its records.* `--yes` skips the question.
+
+```bash
+osducs record replay --operation reindex --kind "osdu:wks:master-data--Well:1.0.0"
+```
+
+### `osducs record replay-status`
+
+Show how far a replay has got; -o json breaks it down by kind.
+
+`GET /replay/status/{id}` — storage
+
+| Option | Required | Description |
+|---|---|---|
+| `-id`, `--id` | yes | Replay id, as `record replay` printed it. |
+
+```bash
+osducs record replay-status --id "f506be08-b51f-4cdd-a9ee-d9454ad51600"
 ```
 
 ### `osducs record search`
@@ -1019,6 +1105,32 @@ List all versions of a record.
 | Option | Required | Description |
 |---|---|---|
 | `-id`, `--id` | yes | Record id. |
+
+### `osducs record version purge`
+
+Permanently delete versions of a record, keeping the latest.
+
+`DELETE /records/{id}/versions` — storage
+
+| Option | Required | Description |
+|---|---|---|
+| `-id`, `--id` | yes | Record id. |
+| `--version-ids` |  | Versions to delete, comma-separated. Cannot be combined with --limit or --from. |
+| `-l`, `--limit` |  | How many versions to delete; the service's limit parameter. |
+| `--from` |  | The version to delete from; the service's from parameter. |
+| `--yes` |  | Go ahead without asking. The command says what it is about to do and asks first, and refuses when there is no terminal to ask at. |
+
+> One of `--version-ids` or `--limit` or `--from` is required.
+
+> `--version-ids` and `--limit` cannot be combined.
+
+> `--version-ids` and `--from` cannot be combined.
+
+> Says what it is about to do and asks before going ahead: *Permanently delete versions of the record `<id>`, keeping its latest. This cannot be undone.* `--yes` skips the question.
+
+```bash
+osducs record version purge --id "opendes:master-data--Well:1000" --limit 5
+```
 
 ## schema
 
@@ -1114,6 +1226,9 @@ Soft-delete a WellboreTrajectory record by id.
 | Option | Required | Description |
 |---|---|---|
 | `-id`, `--id` | yes | WellboreTrajectory record id to delete. |
+| `--yes` |  | Go ahead without asking. The command says what it is about to do and asks first, and refuses when there is no terminal to ask at. |
+
+> Says what it is about to do and asks before going ahead: *Delete the record `<record_id>`. Records that refer to it are not deleted with it.* `--yes` skips the question.
 
 ### `osducs trajectory get`
 
@@ -1364,6 +1479,9 @@ Soft-delete a Well record by id.
 | Option | Required | Description |
 |---|---|---|
 | `-id`, `--id` | yes | Well record id to delete. |
+| `--yes` |  | Go ahead without asking. The command says what it is about to do and asks first, and refuses when there is no terminal to ask at. |
+
+> Says what it is about to do and asks before going ahead: *Delete the record `<record_id>`. Records that refer to it are not deleted with it.* `--yes` skips the question.
 
 ### `osducs well get`
 
@@ -1417,6 +1535,9 @@ Soft-delete a Wellbore record by id.
 | Option | Required | Description |
 |---|---|---|
 | `-id`, `--id` | yes | Wellbore record id to delete. |
+| `--yes` |  | Go ahead without asking. The command says what it is about to do and asks first, and refuses when there is no terminal to ask at. |
+
+> Says what it is about to do and asks before going ahead: *Delete the record `<record_id>`. Records that refer to it are not deleted with it.* `--yes` skips the question.
 
 ### `osducs wellbore get`
 
@@ -1497,6 +1618,9 @@ Soft-delete a WellLog record by id.
 | Option | Required | Description |
 |---|---|---|
 | `-id`, `--id` | yes | WellLog record id to delete. |
+| `--yes` |  | Go ahead without asking. The command says what it is about to do and asks first, and refuses when there is no terminal to ask at. |
+
+> Says what it is about to do and asks before going ahead: *Delete the record `<record_id>`. Records that refer to it are not deleted with it.* `--yes` skips the question.
 
 ### `osducs welllog get`
 
@@ -1579,6 +1703,9 @@ Delete a workflow definition by name.
 | Option | Required | Description |
 |---|---|---|
 | `-n`, `--name` | yes | Workflow name to delete. |
+| `--yes` |  | Go ahead without asking. The command says what it is about to do and asks first, and refuses when there is no terminal to ask at. |
+
+> Says what it is about to do and asks before going ahead: *Delete the workflow `<workflow_name>`.* `--yes` skips the question.
 
 ### `osducs workflow get`
 
