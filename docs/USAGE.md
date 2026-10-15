@@ -480,9 +480,10 @@ tools.
 ## Operations
 
 The `index` commands re-index from Storage, and delete a kind's index; `record replay` sends
-records from Storage to what consumes them again, and `record purge` deletes for good. They need
-operator roles, such as `service.search.admin`, `users.datalake.ops` or `service.storage.admin`;
-a refusal names the one each command needs.
+records from Storage to what consumes them again, and `record purge` deletes for good.
+`group list --all` lists every group in the data partition, where `group list` lists yours. They
+need operator roles, such as `service.search.admin`, `users.datalake.ops` or
+`service.storage.admin`; a refusal names the one each command needs.
 
 ```bash
 osducs index reindex --kind "osdu:wks:master-data--Well:1.0.0"                # re-index a kind in place
@@ -494,6 +495,8 @@ osducs record replay --operation reindex --kind "osdu:wks:master-data--Well:1.0.
 osducs record replay-status --id f506be08-b51f-4cdd-a9ee-d9454ad51600         # -o json for each kind
 osducs record purge --id "dev:master-data--Well:1000"                         # the record and every version, for good
 osducs record version purge --id "dev:master-data--Well:1000" --limit 5       # versions, keeping the latest
+osducs group list --all                                                        # every group in the data partition
+osducs group list --all --type data                                            # data groups only; also user, service
 ```
 
 `record replay` takes `--operation reindex`, which sends the records to the Indexer, or `replay`,

@@ -21,7 +21,8 @@ osducs group member add --group users.datalake.viewers@dev.dataservices.energy -
   Schema, Legal, Entitlements, File, Dataset, CRS, Unit, Workflow and Wellbore DDMS — generated
   from the services' own OpenAPI specs, so a new endpoint upstream is noticed rather than missed.
 - **Operator commands, with a guard.** Re-index a kind, records or a whole data partition,
-  replay records from Storage, purge records and versions for good, or delete a kind's index.
+  replay records from Storage, purge records and versions for good, delete a kind's index, or
+  list every group in the partition.
   Anything destructive or partition-wide, every delete included, says what it is about to do and
   where, and asks first; `--yes` for scripts.
 - **Moves files, not just their metadata.** `file upload` sends the bytes and creates the record

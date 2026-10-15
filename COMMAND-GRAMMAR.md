@@ -141,6 +141,11 @@ so. Today that second one is `entitlements mygroups`.
 **Caveat:** `group list --all` is a *different endpoint* from `group list`, which R2 forbids.
 See §3.2.
 
+> **Built:** `group list --all [--type data|user|service]`, hand-written onto the generated
+> `group list` through the Entitlements `Customize` hook, following the cursor to the end. It
+> needs `users.datalake.ops` or `service.entitlements.admin`. `--type` defaults to every group,
+> and is refused without `--all`, as `--role-required` is with it.
+
 ### workflow, run — Workflow (11 ops)
 
 ```
@@ -375,7 +380,9 @@ osducs workflow create --system              POST /v1/workflow  vs POST /v1/work
 
 The third is resolved by not exposing system workflows. The second is resolved by `paging:`, a
 narrower mechanism than `variants:`: the CLI follows the cursor itself, so the user never
-chooses between the endpoints. The first is not resolved. Note that the CLI
+chooses between the endpoints. The first is resolved by hand: `--all` changes what is listed,
+not only how many, and brings options of its own, so it extends the generated command in
+`Commands/GroupListAll.cs` rather than a manifest key with one user. Note that the CLI
 already rejected exactly this pattern once, deliberately: `storage get` is id-only because
 the Python CLI's `--kind`/`--id` dispatch "cannot be expressed as one operation".
 

@@ -22,7 +22,7 @@ groups:
 
 commands:
   - command: group list
-    summary: List groups the caller belongs to.
+    summary: List the groups you belong to, or with --all every group in the data partition.
     op: { method: get, path: /groups }
     params:
       roleRequired: { flag: --role-required, help: Include the caller's role in each group. }
@@ -158,11 +158,6 @@ exclude:
       Bulk membership patch with an operation list in the body. `group member add` and
       `group member delete` cover the single-edge cases a CLI user performs; the patch form
       is for programmatic reconciliation.
-  - op: { method: get, path: /groups/all }
-    reason: >
-      Partition-wide group listing, paged with a cursor. Belongs as `group list --all`, which
-      needs one command to dispatch across two endpoints — COMMAND-GRAMMAR.md §3.2. Left out
-      rather than given a second command name that describes the endpoint instead of the task.
   - op: { method: post, path: /tenant-provisioning }
     reason: Provisions a new data partition. Platform operations, and irreversible.
   - op: { method: get, path: /_ah/readiness_check }
@@ -171,6 +166,13 @@ exclude:
     reason: Infrastructure probe, covered by `osducs status`.
 
 handwritten:
+  - command: group list --all
+    op: { method: get, path: /groups/all }
+    reason: >
+      Every group in the data partition, paged by a cursor. `--all` sends `group list` to this
+      endpoint, with options of its own, which one manifest entry cannot express
+      (COMMAND-GRAMMAR.md §3.2). Commands/GroupListAll.cs, through the Customize hook.
+
   - command: status
     op: { method: get, path: /info }
     reason: >
