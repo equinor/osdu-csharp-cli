@@ -157,6 +157,21 @@ public static class CliRunner
         }
     }
 
+    /// <summary>
+    /// What stopped a request, from the innermost exception that says: <c>"The SSL connection
+    /// could not be established"</c> is only the outer of three, and the useful one is
+    /// <c>"Operation timed out"</c>.
+    /// </summary>
+    internal static string Reason(HttpRequestException exception)
+    {
+        var innermost = (Exception)exception;
+        while (innermost.InnerException is { } inner)
+            innermost = inner;
+        return ReferenceEquals(innermost, exception) || string.IsNullOrWhiteSpace(innermost.Message)
+            ? exception.Message
+            : $"{exception.Message.TrimEnd('.')}: {innermost.Message}";
+    }
+
     /// <summary>What a refused sign-in's message says is wrong, on one line.</summary>
     /// <remarks>
     /// Kept from its AADSTS code on, which says what is wrong; MSAL puts a paragraph of general
@@ -250,6 +265,20 @@ public static class CliRunner
         {
             // A malformed --file payload. The user's typo, not a bug worth a stack trace.
             Console.Error.WriteLine($"error: invalid JSON in request body. {exception.Message}");
+            return 1;
+        }
+        catch (HttpRequestException exception)
+        {
+            // The request never got an answer: no network, a VPN down, a TLS handshake that
+            // timed out. It escaped as a stack trace; what went wrong is in the inner message.
+            Console.Error.WriteLine($"error: could not reach the service. {Reason(exception)}");
+            return 1;
+        }
+        catch (OperationCanceledException exception) when (exception.InnerException is TimeoutException)
+        {
+            // HttpClient's own time limit, which it reports as a cancellation; "cancelled" said
+            // the user had stopped it.
+            Console.Error.WriteLine("error: the service did not answer in time.");
             return 1;
         }
         catch (OperationCanceledException)

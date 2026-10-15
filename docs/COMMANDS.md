@@ -18,8 +18,10 @@ their options; `record add` is in [USAGE.md](USAGE.md#writing-records), and the 
 
 | Noun | Commands |
 |---|---|
+| [`action`](#action) | `get`, `add`, `test`, `match`, `delete` |
 | [`crs`](#crs) | `get`, `transform`, `area-of-use`, `convert`, `convert-trajectory`, `convert-geojson` |
 | [`dataset`](#dataset) | `get`, `add`, `delete`, `undelete`, `upload-url`, `download-url`, `revoke-url` |
+| [`ddms`](#ddms) | `list`, `get`, `add`, `delete` |
 | [`file`](#file) | `get`, `add`, `delete`, `upload-url`, `download-url`, `revoke-url` |
 | [`group`](#group) | `list`, `add`, `delete`, `member list`, `member add`, `member delete`, `member count` |
 | [`index`](#index) | `reindex`, `reindex-records`, `reindex-partition`, `delete`, `provision` |
@@ -33,6 +35,8 @@ their options; `record add` is in [USAGE.md](USAGE.md#writing-records), and the 
 | [`pressuretest`](#pressuretest) | `get`, `add`, `delete`, `version list`, `version get`, `data get`, `version data` |
 | [`record`](#record) | `search`, `aggregate`, `list`, `get`, `headers`, `delete`, `purge`, `version list`, `version get`, `version purge`, `replay`, `replay-status` |
 | [`schema`](#schema) | `list`, `get`, `add`, `update` |
+| [`subscription`](#subscription) | `find`, `get`, `add`, `update-secret`, `delete` |
+| [`topic`](#topic) | `list` |
 | [`trajectory`](#trajectory) | `get`, `add`, `delete`, `version list`, `version get`, `data get`, `version data` |
 | [`unit`](#unit) | `list`, `get`, `search`, `by-symbol`, `by-measurement`, `by-system`, `preferred`, `maps`, `conversion scale`, `conversion abcd`, `catalog get`, `catalog search`, `catalog map-states`, `catalog last-modified` |
 | [`unit-system`](#unit-system) | `list`, `get` |
@@ -40,6 +44,81 @@ their options; `record add` is in [USAGE.md](USAGE.md#writing-records), and the 
 | [`wellbore`](#wellbore) | `get`, `add`, `delete`, `version list`, `version get` |
 | [`welllog`](#welllog) | `get`, `add`, `delete`, `version list`, `version get`, `data get`, `version data`, `data stats`, `version stats` |
 | [`workflow`](#workflow) | `list`, `get`, `add`, `delete`, `run list`, `run get`, `run trigger`, `run update`, `run latest` |
+
+## action
+
+### `osducs action add`
+
+Register an action from a JSON file.
+
+`POST /action` — register
+
+| Option | Required | Description |
+|---|---|---|
+| `-f`, `--file` | yes | JSON file with the action — name, url with {placeholders} filled from a record, and a filter of the records it is offered for. |
+
+```bash
+osducs action add --file action.json
+```
+
+### `osducs action delete`
+
+Delete an action registration.
+
+`DELETE /action/{id}` — register
+
+| Option | Required | Description |
+|---|---|---|
+| `-id`, `--id` | yes | Action registration id. |
+| `--yes` |  | Go ahead without asking. The command says what it is about to do and asks first, and refuses when there is no terminal to ask at. |
+
+> Says what it is about to do and asks before going ahead: *Delete the action registration `<id>`. Records no longer offer it.* `--yes` skips the question.
+
+```bash
+osducs action delete --id "open-in-petrel"
+```
+
+### `osducs action get`
+
+Get an action registration by id.
+
+`GET /action/{id}` — register
+
+| Option | Required | Description |
+|---|---|---|
+| `-id`, `--id` | yes | Action registration id. |
+
+```bash
+osducs action get --id "open-in-petrel"
+```
+
+### `osducs action match`
+
+The registered actions offered for a record, with their urls filled from it.
+
+`POST /action:retrieve` — register
+
+| Option | Required | Description |
+|---|---|---|
+| `-f`, `--file` | yes | JSON file with the record, or the fields of it the actions are filtered and filled by. |
+
+```bash
+osducs action match --file record.json
+```
+
+### `osducs action test`
+
+Check how an action would fill its url from a sample record, without registering it.
+
+`POST /action:test` — register
+
+| Option | Required | Description |
+|---|---|---|
+| `-f`, `--file` | yes | JSON file with the action and a testPayload, the record to fill its url from. |
+
+```bash
+osducs action test --file action-test.json
+```
 
 ## crs
 
@@ -186,6 +265,67 @@ Get instructions for writing a new dataset's bytes.
 |---|---|---|
 | `--kind-subtype` | yes | Dataset sub-type, e.g. dataset--File.Generic. |
 | `--expiry` |  | How long the instructions stay valid, e.g. 5M or 2H. |
+
+## ddms
+
+### `osducs ddms add`
+
+Register a DDMS from a JSON file holding its OpenAPI 3 description.
+
+`POST /ddms` — register
+
+| Option | Required | Description |
+|---|---|---|
+| `-f`, `--file` | yes | JSON file with the registration — id, name, contactEmail and interfaces. |
+
+```bash
+osducs ddms add --file ddms.json
+```
+
+### `osducs ddms delete`
+
+Delete a DDMS registration.
+
+`DELETE /ddms/{id}` — register
+
+| Option | Required | Description |
+|---|---|---|
+| `-id`, `--id` | yes | DDMS registration id. |
+| `--yes` |  | Go ahead without asking. The command says what it is about to do and asks first, and refuses when there is no terminal to ask at. |
+
+> Says what it is about to do and asks before going ahead: *Delete the DDMS registration `<id>`. The platform no longer lists the DDMS; the DDMS itself is not touched.* `--yes` skips the question.
+
+```bash
+osducs ddms delete --id "wellbore-ddms"
+```
+
+### `osducs ddms get`
+
+Get a DDMS registration by id.
+
+`GET /ddms/{id}` — register
+
+| Option | Required | Description |
+|---|---|---|
+| `-id`, `--id` | yes | DDMS registration id. |
+
+```bash
+osducs ddms get --id "wellbore-ddms"
+```
+
+### `osducs ddms list`
+
+List the DDMS registrations of a type.
+
+`GET /ddms` — register
+
+| Option | Required | Description |
+|---|---|---|
+| `--type` | yes | Type of entity the DDMS serves, e.g. wellbores. |
+
+```bash
+osducs ddms list --type wellbores
+```
 
 ## file
 
@@ -1189,6 +1329,94 @@ Create or replace a schema from a JSON file.
 | Option | Required | Description |
 |---|---|---|
 | `-f`, `--file` | yes | JSON file containing the schema request (schemaInfo and schema). |
+
+## subscription
+
+### `osducs subscription add`
+
+Create a notification subscription from a JSON file, secret included.
+
+`POST /subscription` — register
+
+| Option | Required | Description |
+|---|---|---|
+| `-f`, `--file` | yes | JSON file with the subscription: name, topic, pushEndpoint, and a secret such as {"secretType": "HMAC", "value": "..."}. |
+
+```bash
+osducs subscription add --file subscription.json
+```
+
+### `osducs subscription delete`
+
+Delete a notification subscription.
+
+`DELETE /subscription/{id}` — register
+
+| Option | Required | Description |
+|---|---|---|
+| `-id`, `--id` | yes | Subscription id. |
+| `--yes` |  | Go ahead without asking. The command says what it is about to do and asks first, and refuses when there is no terminal to ask at. |
+
+> Says what it is about to do and asks before going ahead: *Delete the subscription `<id>`. Its push endpoint stops receiving the topic's messages.* `--yes` skips the question.
+
+```bash
+osducs subscription delete --id "ZGV2LWRlZmF1bHQtcmVjb3Jkc2NoYW5nZWQtdjI"
+```
+
+### `osducs subscription find`
+
+Find the subscriptions for a notification id.
+
+`GET /subscription` — register
+
+| Option | Required | Description |
+|---|---|---|
+| `--notification-id` | yes | Notification id, as `subscription get` shows it. |
+
+```bash
+osducs subscription find --notification-id "de-7a8bfc61-ac3f-4d5d-bd2a-9e0a24c7d1d1"
+```
+
+### `osducs subscription get`
+
+Get a notification subscription by id.
+
+`GET /subscription/{id}` — register
+
+| Option | Required | Description |
+|---|---|---|
+| `-id`, `--id` | yes | Subscription id. |
+
+```bash
+osducs subscription get --id "ZGV2LWRlZmF1bHQtcmVjb3Jkc2NoYW5nZWQtdjI"
+```
+
+### `osducs subscription update-secret`
+
+Replace the secret a subscription's push endpoint checks messages with.
+
+`PUT /subscription/{id}/secret` — register
+
+| Option | Required | Description |
+|---|---|---|
+| `-id`, `--id` | yes | Subscription id. |
+| `-f`, `--file` | yes | JSON file with the new secret, such as {"secretType": "HMAC", "value": "..."}. |
+
+```bash
+osducs subscription update-secret --id "ZGV2LWRlZmF1bHQtcmVjb3Jkc2NoYW5nZWQtdjI" --file secret.json
+```
+
+## topic
+
+### `osducs topic list`
+
+List the topics a notification subscription can be made for.
+
+`GET /topics` — register
+
+```bash
+osducs topic list 
+```
 
 ## trajectory
 

@@ -74,6 +74,9 @@ public static class StatusCommand
         ("legal", async (context, cancellationToken) =>
             await OsduJson.ToJsonAsync(
                 await context.Client.Legal.Info.GetAsync(cancellationToken: cancellationToken))),
+        ("register", async (context, cancellationToken) =>
+            await OsduJson.ToJsonAsync(
+                await context.Client.Register.Info.GetAsync(cancellationToken: cancellationToken))),
         ("schema", async (context, cancellationToken) =>
             await OsduJson.ToJsonAsync(
                 await context.Client.SchemaService.Info.GetAsync(cancellationToken: cancellationToken))),

@@ -25,6 +25,10 @@ public static class GeneratedCommands
         tree.Describe("file", "Work with files — upload and download bytes, and the metadata that describes them.");
         tree.Describe("index", "Operate on the search index — re-index a kind, records or the whole data partition, and delete a kind's index.");
         tree.Describe("legaltag", "Work with LegalTags — the compliance metadata attached to every record.");
+        tree.Describe("subscription", "Work with notification subscriptions — the push endpoints that receive a topic's messages.");
+        tree.Describe("topic", "The topics a notification subscription can be made for.");
+        tree.Describe("ddms", "Work with DDMS registrations — the domain data management services the platform knows of.");
+        tree.Describe("action", "Work with action registrations — links offered for records that match a filter.");
         tree.Describe("schema", "Work with schemas — the definitions behind every record kind.");
         tree.Describe("record", "Work with records — the kind-agnostic unit of OSDU data. Search lives here.");
         tree.Describe("unit", "Work with units of measure — look them up and derive conversions between them.");
@@ -67,6 +71,10 @@ public static class GeneratedCommands
         tree.Node("file");
         tree.Node("index");
         tree.Node("legaltag");
+        tree.Node("subscription");
+        tree.Node("topic");
+        tree.Node("ddms");
+        tree.Node("action");
         tree.Node("schema");
         tree.Node("record");
         tree.Node("unit");
@@ -109,6 +117,7 @@ public static class GeneratedCommands
         FileCommands.Attach(tree);
         IndexerCommands.Attach(tree);
         LegalCommands.Attach(tree);
+        RegisterCommands.Attach(tree);
         SchemaServiceCommands.Attach(tree);
         SearchCommands.Attach(tree);
         StorageCommands.Attach(tree);

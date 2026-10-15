@@ -1,0 +1,275 @@
+# CLI manifest for the OSDU Register service.
+#
+# Register is where notification subscriptions, DDMS registrations and actions are kept:
+# operators' business, which the CLI had no commands for. Subscriptions are the common case — a
+# push endpoint receiving a topic's messages, with a secret the endpoint uses to check them —
+# and `topic list` says which topics there are to subscribe to.
+#
+# Bodies are read from files: a subscription carries its secret, which does not belong on a
+# command line or in a shell's history.
+
+service: register
+spec: register
+client: Register
+description: Register service — notification subscriptions, DDMS registrations and actions.
+
+groups:
+  subscription: >-
+    Work with notification subscriptions — the push endpoints that receive a topic's messages.
+  topic: The topics a notification subscription can be made for.
+  ddms: Work with DDMS registrations — the domain data management services the platform knows of.
+  action: Work with action registrations — links offered for records that match a filter.
+
+commands:
+  - command: subscription find
+    summary: Find the subscriptions for a notification id.
+    op: { method: get, path: /subscription }
+    params:
+      notificationId: { flag: --notification-id, required: true, help: "Notification id, as `subscription get` shows it." }
+    examples:
+      - args: --notification-id "de-7a8bfc61-ac3f-4d5d-bd2a-9e0a24c7d1d1"
+        skip: Notification ids belong to the instance that issued them.
+    output:
+      columns:
+        Id: id
+        Name: name
+        Topic: topic
+        Endpoint: pushEndpoint
+
+  - command: subscription get
+    summary: Get a notification subscription by id.
+    op: { method: get, path: "/subscription/{id}" }
+    params:
+      id: { flag: --id, short: -id, required: true, help: Subscription id. }
+    examples:
+      - args: --id "ZGV2LWRlZmF1bHQtcmVjb3Jkc2NoYW5nZWQtdjI"
+        skip: Subscription ids belong to the instance that issued them.
+    output:
+      columns:
+        Id: id
+        Name: name
+        Topic: topic
+        Endpoint: pushEndpoint
+        NotificationId: notificationId
+        CreatedBy: createdBy
+
+  - command: subscription add
+    summary: Create a notification subscription from a JSON file, secret included.
+    op: { method: post, path: /subscription }
+    body:
+      flag: --file
+      short: -f
+      help: >-
+        JSON file with the subscription: name, topic, pushEndpoint, and a secret such as
+        {"secretType": "HMAC", "value": "..."}.
+    examples:
+      - args: --file subscription.json
+        skip: Creates a subscription, and needs a push endpoint to verify it.
+    output:
+      columns:
+        Id: id
+        Name: name
+        Topic: topic
+        NotificationId: notificationId
+
+  - command: subscription update-secret
+    summary: Replace the secret a subscription's push endpoint checks messages with.
+    op: { method: put, path: "/subscription/{id}/secret" }
+    params:
+      id: { flag: --id, short: -id, required: true, help: Subscription id. }
+    body:
+      flag: --file
+      short: -f
+      help: 'JSON file with the new secret, such as {"secretType": "HMAC", "value": "..."}.'
+      # The spec declares the body as a oneOf of the two secret types, which Kiota wraps in a
+      # composed type of the request builder's own rather than a model under .Models.
+      model: Equinor.OsduCsharpClient.Register.Subscription.Item.Secret.SecretRequestBuilder.SecretPutRequestBody
+    examples:
+      - args: --id "ZGV2LWRlZmF1bHQtcmVjb3Jkc2NoYW5nZWQtdjI" --file secret.json
+        skip: Changes a subscription's secret.
+    output:
+      message: Secret updated
+
+  - command: subscription delete
+    summary: Delete a notification subscription.
+    op: { method: delete, path: "/subscription/{id}" }
+    params:
+      id: { flag: --id, short: -id, required: true, help: Subscription id. }
+    confirm:
+      message: >-
+        Delete the subscription {id}. Its push endpoint stops receiving the topic's messages.
+    examples:
+      - args: --id "ZGV2LWRlZmF1bHQtcmVjb3Jkc2NoYW5nZWQtdjI"
+        skip: Deletes a subscription.
+    output:
+      message: Subscription deleted
+
+  - command: topic list
+    summary: List the topics a notification subscription can be made for.
+    op: { method: get, path: /topics }
+    examples:
+      - ""
+    output:
+      columns:
+        Name: name
+        State: state
+        Description: description
+
+  - command: ddms list
+    summary: List the DDMS registrations of a type.
+    op: { method: get, path: /ddms }
+    params:
+      type: { flag: --type, required: true, help: "Type of entity the DDMS serves, e.g. wellbores." }
+    examples:
+      - --type wellbores
+    output:
+      columns:
+        Id: id
+        Name: name
+        Contact: contactEmail
+        Description: description
+
+  - command: ddms get
+    summary: Get a DDMS registration by id.
+    op: { method: get, path: "/ddms/{id}" }
+    params:
+      id: { flag: --id, short: -id, required: true, help: DDMS registration id. }
+    examples:
+      - args: --id "wellbore-ddms"
+        skip: Registration ids belong to the instance they were registered on.
+    output: raw
+
+  - command: ddms add
+    summary: Register a DDMS from a JSON file holding its OpenAPI 3 description.
+    op: { method: post, path: /ddms }
+    body:
+      flag: --file
+      short: -f
+      help: JSON file with the registration — id, name, contactEmail and interfaces.
+    examples:
+      - args: --file ddms.json
+        skip: Registers a DDMS.
+    output:
+      columns:
+        Id: id
+        Name: name
+
+  - command: ddms delete
+    summary: Delete a DDMS registration.
+    op: { method: delete, path: "/ddms/{id}" }
+    params:
+      id: { flag: --id, short: -id, required: true, help: DDMS registration id. }
+    confirm:
+      message: >-
+        Delete the DDMS registration {id}. The platform no longer lists the DDMS; the DDMS
+        itself is not touched.
+    examples:
+      - args: --id "wellbore-ddms"
+        skip: Deletes a registration.
+    output:
+      message: DDMS registration deleted
+
+  - command: action get
+    summary: Get an action registration by id.
+    op: { method: get, path: "/action/{id}" }
+    params:
+      id: { flag: --id, short: -id, required: true, help: Action registration id. }
+    examples:
+      - args: --id "open-in-petrel"
+        skip: Registration ids belong to the instance they were registered on.
+    output: raw
+
+  - command: action add
+    summary: Register an action from a JSON file.
+    op: { method: post, path: /action }
+    body:
+      flag: --file
+      short: -f
+      help: >-
+        JSON file with the action — name, url with {placeholders} filled from a record, and a
+        filter of the records it is offered for.
+    examples:
+      - args: --file action.json
+        skip: Registers an action.
+    output:
+      columns:
+        Id: id
+        Name: name
+        Url: url
+
+  - command: action test
+    summary: Check how an action would fill its url from a sample record, without registering it.
+    op: { method: post, path: "/action:test" }
+    builder: ActionTest
+    body:
+      flag: --file
+      short: -f
+      help: JSON file with the action and a testPayload, the record to fill its url from.
+    examples:
+      - args: --file action-test.json
+        skip: Needs an action and a sample record of your own.
+    output:
+      columns:
+        Url: url
+        Errors: errors
+
+  - command: action match
+    summary: The registered actions offered for a record, with their urls filled from it.
+    op: { method: post, path: "/action:retrieve" }
+    builder: ActionRetrieve
+    body:
+      flag: --file
+      short: -f
+      # Any JSON: the spec's JsonNode, which Kiota takes as an untyped node.
+      model: Microsoft.Kiota.Abstractions.Serialization.UntypedNode
+      help: JSON file with the record, or the fields of it the actions are filtered and filled by.
+    examples:
+      - args: --file record.json
+        skip: Needs a record of your own.
+    output:
+      columns:
+        Id: id
+        Name: name
+        Url: url
+
+  - command: action delete
+    summary: Delete an action registration.
+    op: { method: delete, path: "/action/{id}" }
+    params:
+      id: { flag: --id, short: -id, required: true, help: Action registration id. }
+    confirm:
+      message: Delete the action registration {id}. Records no longer offer it.
+    examples:
+      - args: --id "open-in-petrel"
+        skip: Deletes a registration.
+    output:
+      message: Action registration deleted
+
+exclude:
+  - op: { method: get, path: /subscriptions }
+    reason: >-
+      Every subscription, but only in the core-plus build: ADME answers 404 (dev, 2026-10-15).
+      `subscription find` looks them up by notification id.
+  - op: { method: get, path: "/ddms/{id}/{type}/{localid}" }
+    reason: Redirects to the record in the DDMS; a browser's job, not a command's.
+  - op: { method: get, path: "/test-gc/gsa-challenge/{path}" }
+    reason: Google Cloud test endpoint for the push handshake, not part of the service's API.
+  - op: { method: post, path: "/test-gc/gsa-challenge/{path}" }
+    reason: Google Cloud test endpoint for the push handshake, not part of the service's API.
+  - op: { method: get, path: "/test-gc/challenge/{path}" }
+    reason: Google Cloud test endpoint for the push handshake, not part of the service's API.
+  - op: { method: post, path: "/test-gc/challenge/{path}" }
+    reason: Google Cloud test endpoint for the push handshake, not part of the service's API.
+  - op: { method: get, path: /test-gc/state }
+    reason: Google Cloud test endpoint for the push handshake, not part of the service's API.
+  - op: { method: get, path: /ah/readiness_check }
+    reason: Infrastructure probe, covered by `osducs status`.
+  - op: { method: get, path: /ah/liveness_check }
+    reason: Infrastructure probe, covered by `osducs status`.
+
+handwritten:
+  - command: status
+    op: { method: get, path: /info }
+    reason: >
+      Reported by `osducs status`, which probes every service's /info in one command rather
+      than giving each service its own. See cli-manifest/storage.yaml for the rationale.
