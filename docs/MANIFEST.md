@@ -7,7 +7,7 @@ C# under `src/OsduCli/Commands/Generated/`.
 
 This page lists every key, level by level. For why the format is the way it is, see
 [DESIGN.md](DESIGN.md#the-manifest-is-the-point); for the rules commands follow, see
-[COMMAND-GRAMMAR.md](../COMMAND-GRAMMAR.md).
+[COMMAND-GRAMMAR.md](COMMAND-GRAMMAR.md).
 
 Every level is checked. A key the generator does not know is an error that names the keys that
 are allowed, so a typo cannot silently switch a rule off. A test fails if a key the generator
@@ -50,7 +50,7 @@ exclude:
 | `description` | no | Doc comment on the generated class. Not shown to users. |
 | `groups` | see text | Help text for each group a command sits under, keyed by its path: `record`, `record version`. Every group needs exactly one description, which may come from any manifest that puts commands under it, so a manifest adding commands to a group another manifest already describes does not repeat it. Two manifests describing the same group differently is an error, and so is describing a group no command sits under. |
 | `scope` | no | Path patterns (`fnmatch` style, such as `/ddms/v3/*`) limiting which operations the manifest must account for. Operations outside the scope are reported, not enforced; `generate_cli.py --strict-scope` fails on them. See [Scope](DESIGN.md#scope-for-incremental-adoption). |
-| `section` | no | Heading under which this manifest's top-level nouns appear in `osducs --help`. Without it they are listed under "Core resources". See [`section`](../COMMAND-GRAMMAR.md#section). |
+| `section` | no | Heading under which this manifest's top-level nouns appear in `osducs --help`. Without it they are listed under "Core resources". See [`section`](COMMAND-GRAMMAR.md#section). |
 | `commands` | no | The operations that become generated commands. See [Command entries](#command-entries). |
 | `handwritten` | no | Operations that deserve a command the manifest cannot express. See [`handwritten`](#handwritten). |
 | `exclude` | no | Operations deliberately left out, each with a reason. See [`exclude`](#exclude). |
@@ -75,8 +75,8 @@ Each item under `commands:`.
 | `body` | no | The request body, read from a file or assembled from options. See [`body`](#body). |
 | `output` | no | How the response is shown. See [`output`](#output). |
 | `examples` | no | Example invocations. See [`examples`](#examples). |
-| `require-one-of` | no | Two or more param names of which at least one must be given, checked before anything is sent. See [`require-one-of`](../COMMAND-GRAMMAR.md#require-one-of). |
-| `mutually-exclusive` | no | Params or body fields that cannot be combined: one group as `[a, b]`, or several as `[[a, b], [c, d]]`. See [`mutually-exclusive`](../COMMAND-GRAMMAR.md#mutually-exclusive). |
+| `require-one-of` | no | Two or more param names of which at least one must be given, checked before anything is sent. See [`require-one-of`](COMMAND-GRAMMAR.md#require-one-of). |
+| `mutually-exclusive` | no | Params or body fields that cannot be combined: one group as `[a, b]`, or several as `[[a, b], [c, d]]`. See [`mutually-exclusive`](COMMAND-GRAMMAR.md#mutually-exclusive). |
 | `forbidden-hint` | no | An extra line printed under a 403, for example pointing to a command most users can run instead. The roles the operation needs are added without this key: the generator reads them from the spec's "Allowed roles" or "Required roles" text. |
 | `paging` | no | A cursor endpoint to send the same request to when one page of results is not enough. Adds `--all`. See [`paging`](#paging). |
 | `confirm` | no | What the command says and asks before it does something that cannot be undone, or that reaches across a whole data partition. Adds `--yes`. See [`confirm`](#confirm). |
@@ -104,7 +104,7 @@ The option's type always comes from the spec: an integer is `int`, or `long` for
 and a boolean becomes a flag that takes no value. A boolean the spec defaults to `true` takes
 `true` or `false` instead, since leaving it out has to mean something different from `false`.
 A parameter the spec limits to an `enum` accepts only those values, in any casing, and sends the
-spec's own spelling. See [Enum casing](../COMMAND-GRAMMAR.md#enum-casing).
+spec's own spelling. See [Enum casing](COMMAND-GRAMMAR.md#enum-casing).
 
 ### `body`
 
@@ -126,7 +126,7 @@ A request body takes one of two forms.
 | Key | Required | What it does |
 |---|---|---|
 | `fields` | yes, for this form | Body properties and their options. See [Body `fields`](#body-fields). |
-| `fixed` | no | Properties sent with a fixed value on every call, which no option can change. See [`fixed` body values](../COMMAND-GRAMMAR.md#fixed-body-values). |
+| `fixed` | no | Properties sent with a fixed value on every call, which no option can change. See [`fixed` body values](COMMAND-GRAMMAR.md#fixed-body-values). |
 
 A body has either `flag` or `fields`, never both. The file-form keys `short`, `required`, `help`,
 `wrap-single` and `collection` are refused alongside `fields`. Options build a single JSON
@@ -141,7 +141,7 @@ Both forms take this:
 ### Body `fields`
 
 A map from body property to option. A dotted name reaches into a nested object: `sort.order` sets
-`order` inside `sort`. See [Nested body fields](../COMMAND-GRAMMAR.md#nested-body-fields).
+`order` inside `sort`. See [Nested body fields](COMMAND-GRAMMAR.md#nested-body-fields).
 
 | Key | Required | What it does |
 |---|---|---|
@@ -150,7 +150,7 @@ A map from body property to option. A dotted name reaches into a nested object: 
 | `required` | no | Whether the option must be given. Defaults to `false`; unlike params, it is not taken from the spec. |
 | `help` | no | Help text. There is no default. |
 | `type` | no | The option's C# type. Defaults to `string`; the manifests also use `string[]`, `int`, `bool`, `double` and `double[]`. An array type accepts several values after one flag. |
-| `parts` | no | Paths to spread one option's comma-separated numbers across, such as a bounding box's four coordinates. Needs `type: double[]`, and exactly one value per path. See [`parts`](../COMMAND-GRAMMAR.md#parts). |
+| `parts` | no | Paths to spread one option's comma-separated numbers across, such as a bounding box's four coordinates. Needs `type: double[]`, and exactly one value per path. See [`parts`](COMMAND-GRAMMAR.md#parts). |
 | `allowed` | no | The values the option takes, for a field whose spec names them only in prose: `[reindex, replay]`. Refused at parse time like the spec's own enum, in any casing, and listed in help. Cannot be given when the spec has an enum, or with `comma-separated`. |
 | `comma-separated` | no | `true` splits each value on commas as well as accepting the flag repeated, so `-f a,b -f c` is three values. Needs `type: string[]`, and cannot be combined with `parts` or with allowed values from the spec. Without it a comma is part of the value, which is right for values that may contain one. |
 
@@ -169,8 +169,8 @@ mapping:
 |---|---|---|
 | `root` | no | A top-level property to unwrap first, such as `results`. Applies to `--output json` too, which prints the unwrapped value. Without `columns`, table mode also prints it as JSON. |
 | `columns` | no | Table columns, as a map from header to a dotted path within each row: `{ Id: id, Kind: kind }`. The path `.` means the row itself, for a response that is an array of plain values; property paths are refused there because they would print blank rows. A value that is not a plain value is printed as compact JSON. `--output json` ignores `columns`. |
-| `columns-from` | no | A body field whose values become the columns when the user gives it, so fields asked for with `record search --returned-fields` are shown. Must name one of the command's body fields. See [`columns-from`](../COMMAND-GRAMMAR.md#columns-from). |
-| `total-from` | no | A top-level number printed above the table as "N matching records", in table mode only. A count of exactly 10,000 is shown as "10,000+" with a pointer to `--track-total-count`, Search's cap on counts. See [`total-from`](../COMMAND-GRAMMAR.md#total-from). |
+| `columns-from` | no | A body field whose values become the columns when the user gives it, so fields asked for with `record search --returned-fields` are shown. Must name one of the command's body fields. See [`columns-from`](COMMAND-GRAMMAR.md#columns-from). |
+| `total-from` | no | A top-level number printed above the table as "N matching records", in table mode only. A count of exactly 10,000 is shown as "10,000+" with a pointer to `--track-total-count`, Search's cap on counts. See [`total-from`](COMMAND-GRAMMAR.md#total-from). |
 | `cursor-from` | no | A top-level string holding the next page's cursor. When it is present, a note says `More results: repeat with --cursor <value>`, in both output modes, so the command should have a `--cursor` option. |
 | `message` | no | The line printed on success by a command whose operation returns no body. Defaults to "Done.". Refused on an operation that returns a body, where it would never be shown, even when empty. |
 

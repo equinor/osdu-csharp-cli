@@ -11,7 +11,7 @@ settled enough that the tool is now the point rather than the experiment: it is 
 is used against live instances, and the generator runs in CI.
 
 This page explains the approach. [DEVELOPMENT.md](DEVELOPMENT.md) covers working on it, and
-[COMMAND-GRAMMAR.md](../COMMAND-GRAMMAR.md) the rules commands follow.
+[COMMAND-GRAMMAR.md](COMMAND-GRAMMAR.md) the rules commands follow.
 
 ## Why generate
 
@@ -69,7 +69,7 @@ bury the editorial ones.
 **Naming and hierarchy.** `osducs record version get` does not follow from
 `GET /records/{id}/{version}`. Commands are named for the resource, not the OSDU service
 that hosts it — the Storage manifest builds `osducs record`, not `osducs storage`. See
-[COMMAND-GRAMMAR.md](../COMMAND-GRAMMAR.md).
+[COMMAND-GRAMMAR.md](COMMAND-GRAMMAR.md).
 
 **What a human wants to see.** The Python CLI encodes this as JMESPath
 (`"results || {Id:id,Version:version,Kind:kind}"`). Here it is data:
@@ -127,7 +127,7 @@ generator refuses to bind a command to any operation the spec marks deprecated.
 Every excluded operation carries a written reason, and the generator fails if an exclusion
 goes stale. The largest single category is the 12 GET/POST twins — endpoints exposed twice,
 once with query parameters and once with a body — where the GET is kept and the POST
-excluded; see [COMMAND-GRAMMAR.md](../COMMAND-GRAMMAR.md) §3.1.
+excluded; see [COMMAND-GRAMMAR.md](COMMAND-GRAMMAR.md) §3.1.
 
 Deliberately not covered: `wbdutil` (LAS/parquet — the only source of native dependencies in
 the Python CLI, and out of scope by decision) and `dataload` (orchestration).

@@ -93,7 +93,7 @@ public class CommandSuggestionTests
     [InlineData(new[] { "reocrd", "VERSION", "list" }, "reocrd", "osducs record version list")]
     public void ATypoIsCorrectedWhenNoReorderingMatches(string[] args, string word, string expected)
     {
-        // COMMAND-GRAMMAR.md listed typo suggestions as in place; System.CommandLine 2.0 gives
+        // docs/COMMAND-GRAMMAR.md listed typo suggestions as in place; System.CommandLine 2.0 gives
         // none, so `record serch` got "Unrecognized command" and nothing more.
         var unknown = Find(args)!;
 

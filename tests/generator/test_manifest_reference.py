@@ -2,7 +2,7 @@
 
 The reference is the only place a manifest author can learn the format without reading the
 generator. It fell behind before it existed: `fixed` arrived with a section in
-COMMAND-GRAMMAR.md, while `cursor-from`, `forbidden-hint` and five other keys were documented
+docs/COMMAND-GRAMMAR.md, while `cursor-from`, `forbidden-hint` and five other keys were documented
 nowhere. These tests hold the page to what the generator accepts, in both directions, and keep
 its example a manifest that actually builds.
 """

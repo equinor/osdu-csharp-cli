@@ -106,7 +106,7 @@ exclude:
   - op: { method: post, path: "/legaltags:batchRetrieve" }
     reason: >
       Batch form of `legaltag get`, keyed by a list of names in a body. Same GET/POST twin
-      problem as elsewhere — COMMAND-GRAMMAR.md §3.1.
+      problem as elsewhere — docs/COMMAND-GRAMMAR.md §3.1.
   - op: { method: post, path: "/legaltags:query" }
     reason: >
       Structured query over LegalTag attributes, with a nested body the manifest cannot
