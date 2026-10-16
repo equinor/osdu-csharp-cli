@@ -10,14 +10,11 @@
 # are ordinary paginated queries — offset, limit, column selection, row filters — and map
 # onto the manifest vocabulary with nothing new.
 #
-# Writing bulk data is still excluded, and that is a considered line rather than a to-do:
-#
-#   * `POST .../data` replaces a whole curve set in one call, and takes JSON or Parquet.
-#   * The `sessions` endpoints are a five-call transactional protocol — open a session, send
-#     chunks, patch it to commit or abandon it — which is a stateful workflow, not a command.
-#
-# Both are listed individually under `exclude:` rather than left out of `scope:`, so a new
-# bulk endpoint upstream fails the build as `missing` instead of passing as untriaged.
+# Writing bulk data is here too. `<noun> data add` sends one file as the whole bulk, or several
+# through an upload session, which it opens, fills and commits itself; `<noun> data session`
+# exposes the session's steps for doing them by hand, as the Python CLI did. Sending a file is
+# hand-written (Commands/WellboreBulkWrite.cs): its body is JSON or Parquet, read from disk as
+# it is. The rest of the session protocol is generated below.
 #
 # Also outside the scope: `/about` and `/version` (service identity, which R5 puts in
 # `osducs status`) and `/log-recognition/*` (catalog admin, not a record resource).
@@ -25,8 +22,7 @@
 # One parameter is knowingly not exposed: `DELETE` on the four bulk-carrying types accepts a
 # `purge` query flag, default false, which the spec documents with an empty description. The
 # delete commands here are all soft deletes. Inferring an irreversible flag's behaviour from
-# its name, with no confirmation guard in place (R6 is not implemented), is not a trade worth
-# making.
+# its name is not a trade worth making, the confirmation guard (R6) notwithstanding.
 #
 # Bulk reads return JSON here. The endpoints also offer `application/x-parquet` by content
 # negotiation, which would need binary output plumbing the CLI does not have yet.
@@ -52,10 +48,12 @@ groups:
   wellbore version: Inspect Wellbore record version history.
   welllog: Manage WellLog records.
   welllog version: Inspect WellLog record version history.
-  welllog data: Read WellLog bulk data.
+  welllog data: Read and write WellLog bulk data.
+  welllog data session: Send WellLog bulk data in chunks — open a session, send them, commit it.
   trajectory: Manage WellboreTrajectory records.
   trajectory version: Inspect WellboreTrajectory record version history.
-  trajectory data: Read WellboreTrajectory bulk data.
+  trajectory data: Read and write WellboreTrajectory bulk data.
+  trajectory data session: Send WellboreTrajectory bulk data in chunks — open a session, send them, commit it.
   markerset: Manage WellboreMarkerSet records.
   markerset version: Inspect WellboreMarkerSet record version history.
   intervalset: Manage WellboreIntervalSet records.
@@ -64,10 +62,12 @@ groups:
   logacquisition version: Inspect WellLogAcquisition record version history.
   ppfg: Manage PPFGDataset records.
   ppfg version: Inspect PPFGDataset record version history.
-  ppfg data: Read PPFGDataset bulk data.
+  ppfg data: Read and write PPFGDataset bulk data.
+  ppfg data session: Send PPFGDataset bulk data in chunks — open a session, send them, commit it.
   pressuretest: Manage WellPressureTestRawMeasurement records.
   pressuretest version: Inspect WellPressureTestRawMeasurement record version history.
-  pressuretest data: Read WellPressureTestRawMeasurement bulk data.
+  pressuretest data: Read and write WellPressureTestRawMeasurement bulk data.
+  pressuretest data session: Send WellPressureTestRawMeasurement bulk data in chunks — open a session, send them, commit it.
 
 commands:
 
@@ -619,56 +619,358 @@ commands:
       orient:    { flag: --orient, help: JSON shape of the response. }
     output: raw
 
-handwritten: []
 
-exclude:
-  - op: { method: post, path: "/ddms/v3/ppfgdataset/{record_id}/data" }
-    reason: Replaces a record's entire bulk payload in one call, JSON or Parquet. Excluded with the rest of bulk write.
-  - op: { method: get, path: "/ddms/v3/ppfgdataset/{record_id}/sessions" }
-    reason: Bulk upload session lifecycle — open, inspect, commit or abandon. A stateful workflow, not a single call.
-  - op: { method: post, path: "/ddms/v3/ppfgdataset/{record_id}/sessions" }
-    reason: Bulk upload session lifecycle — open, inspect, commit or abandon. A stateful workflow, not a single call.
-  - op: { method: get, path: "/ddms/v3/ppfgdataset/{record_id}/sessions/{session_id}" }
-    reason: Bulk upload session lifecycle — open, inspect, commit or abandon. A stateful workflow, not a single call.
-  - op: { method: patch, path: "/ddms/v3/ppfgdataset/{record_id}/sessions/{session_id}" }
-    reason: Bulk upload session lifecycle — open, inspect, commit or abandon. A stateful workflow, not a single call.
-  - op: { method: post, path: "/ddms/v3/ppfgdataset/{record_id}/sessions/{session_id}/data" }
-    reason: Chunked bulk upload; a step inside the session protocol, not a command.
-  - op: { method: post, path: "/ddms/v3/wellboretrajectories/{record_id}/data" }
-    reason: Replaces a record's entire bulk payload in one call, JSON or Parquet. Excluded with the rest of bulk write.
-  - op: { method: get, path: "/ddms/v3/wellboretrajectories/{record_id}/sessions" }
-    reason: Bulk upload session lifecycle — open, inspect, commit or abandon. A stateful workflow, not a single call.
-  - op: { method: post, path: "/ddms/v3/wellboretrajectories/{record_id}/sessions" }
-    reason: Bulk upload session lifecycle — open, inspect, commit or abandon. A stateful workflow, not a single call.
-  - op: { method: get, path: "/ddms/v3/wellboretrajectories/{record_id}/sessions/{session_id}" }
-    reason: Bulk upload session lifecycle — open, inspect, commit or abandon. A stateful workflow, not a single call.
-  - op: { method: patch, path: "/ddms/v3/wellboretrajectories/{record_id}/sessions/{session_id}" }
-    reason: Bulk upload session lifecycle — open, inspect, commit or abandon. A stateful workflow, not a single call.
-  - op: { method: post, path: "/ddms/v3/wellboretrajectories/{record_id}/sessions/{session_id}/data" }
-    reason: Chunked bulk upload; a step inside the session protocol, not a command.
-  - op: { method: post, path: "/ddms/v3/welllogs/{record_id}/data" }
-    reason: Replaces a record's entire bulk payload in one call, JSON or Parquet. Excluded with the rest of bulk write.
-  - op: { method: get, path: "/ddms/v3/welllogs/{record_id}/sessions" }
-    reason: Bulk upload session lifecycle — open, inspect, commit or abandon. A stateful workflow, not a single call.
-  - op: { method: post, path: "/ddms/v3/welllogs/{record_id}/sessions" }
-    reason: Bulk upload session lifecycle — open, inspect, commit or abandon. A stateful workflow, not a single call.
-  - op: { method: get, path: "/ddms/v3/welllogs/{record_id}/sessions/{session_id}" }
-    reason: Bulk upload session lifecycle — open, inspect, commit or abandon. A stateful workflow, not a single call.
-  - op: { method: patch, path: "/ddms/v3/welllogs/{record_id}/sessions/{session_id}" }
-    reason: Bulk upload session lifecycle — open, inspect, commit or abandon. A stateful workflow, not a single call.
-  - op: { method: post, path: "/ddms/v3/welllogs/{record_id}/sessions/{session_id}/data" }
-    reason: Chunked bulk upload; a step inside the session protocol, not a command.
-  - op: { method: post, path: "/ddms/v3/welllogs/{record_id}/versions/{version}/data/statistics" }
-    reason: Writes computed statistics back; paired with the bulk write path.
-  - op: { method: post, path: "/ddms/v3/wellpressuretestrawmeasurement/{record_id}/data" }
-    reason: Replaces a record's entire bulk payload in one call, JSON or Parquet. Excluded with the rest of bulk write.
-  - op: { method: get, path: "/ddms/v3/wellpressuretestrawmeasurement/{record_id}/sessions" }
-    reason: Bulk upload session lifecycle — open, inspect, commit or abandon. A stateful workflow, not a single call.
-  - op: { method: post, path: "/ddms/v3/wellpressuretestrawmeasurement/{record_id}/sessions" }
-    reason: Bulk upload session lifecycle — open, inspect, commit or abandon. A stateful workflow, not a single call.
-  - op: { method: get, path: "/ddms/v3/wellpressuretestrawmeasurement/{record_id}/sessions/{session_id}" }
-    reason: Bulk upload session lifecycle — open, inspect, commit or abandon. A stateful workflow, not a single call.
-  - op: { method: patch, path: "/ddms/v3/wellpressuretestrawmeasurement/{record_id}/sessions/{session_id}" }
-    reason: Bulk upload session lifecycle — open, inspect, commit or abandon. A stateful workflow, not a single call.
-  - op: { method: post, path: "/ddms/v3/wellpressuretestrawmeasurement/{record_id}/sessions/{session_id}/data" }
-    reason: Chunked bulk upload; a step inside the session protocol, not a command.
+  - command: welllog data session list
+    summary: List the bulk data upload sessions of a WellLog record.
+    op: { method: get, path: "/ddms/v3/welllogs/{record_id}/sessions" }
+    params:
+      record_id: { flag: --id, short: -id, required: true, help: WellLog record id. }
+    examples:
+      - args: --id "opendes:work-product-component--WellLog:1000"
+        skip: Record ids are scoped to a data partition.
+    output:
+      columns:
+        Session: id
+        State: state
+        Mode: mode
+        FromVersion: fromVersion
+        Expiry: expiry
+
+  - command: welllog data session get
+    summary: Get a bulk data upload session of a WellLog record.
+    op: { method: get, path: "/ddms/v3/welllogs/{record_id}/sessions/{session_id}" }
+    params:
+      record_id:  { flag: --id, short: -id, required: true, help: WellLog record id. }
+      session_id: { flag: --session, short: -s, required: true, help: "Session id, as session open printed it." }
+    examples:
+      - args: --id "opendes:work-product-component--WellLog:1000" --session "4b2e1c3a-0000-0000-0000-000000000000"
+        skip: Record and session ids belong to the instance that made them.
+    output:
+      columns:
+        Session: id
+        State: state
+        Mode: mode
+        FromVersion: fromVersion
+        Expiry: expiry
+
+  - command: welllog data session open
+    summary: Open a session to send a WellLog's bulk data in chunks, then commit it with session update.
+    op: { method: post, path: "/ddms/v3/welllogs/{record_id}/sessions" }
+    params:
+      record_id: { flag: --id, short: -id, required: true, help: WellLog record id. }
+    body:
+      fields:
+        mode:
+          flag: --mode
+          required: true
+          help: >-
+            overwrite to replace the bulk with what the session sends, or update to merge it into
+            the version the session starts from.
+        fromVersion: { flag: --from-version, type: long, help: "Version to start from with --mode update. The latest when omitted." }
+        timeToLive:  { flag: --ttl, type: int, help: "Minutes the session stays open before it is dropped, at most 1440 (the default)." }
+    examples:
+      - args: --id "opendes:work-product-component--WellLog:1000" --mode overwrite
+        skip: Opens a session on a record, which needs one of your own.
+    output:
+      columns:
+        Session: id
+        State: state
+        Mode: mode
+        FromVersion: fromVersion
+        Expiry: expiry
+
+  - command: welllog data session update
+    summary: Commit a session, making what it sent a new version of the WellLog, or abandon it.
+    op: { method: patch, path: "/ddms/v3/welllogs/{record_id}/sessions/{session_id}" }
+    params:
+      record_id:  { flag: --id, short: -id, required: true, help: WellLog record id. }
+      session_id: { flag: --session, short: -s, required: true, help: "Session id, as session open printed it." }
+    body:
+      fields:
+        state: { flag: --state, required: true, help: "commit to make what the session sent a new version, or abandon to drop it." }
+    examples:
+      - args: --id "opendes:work-product-component--WellLog:1000" --session "4b2e1c3a-0000-0000-0000-000000000000" --state commit
+        skip: Commits a session, which needs one of your own.
+    output:
+      columns:
+        Session: id
+        State: state
+        Version: version
+
+  - command: trajectory data session list
+    summary: List the bulk data upload sessions of a WellboreTrajectory record.
+    op: { method: get, path: "/ddms/v3/wellboretrajectories/{record_id}/sessions" }
+    params:
+      record_id: { flag: --id, short: -id, required: true, help: WellboreTrajectory record id. }
+    examples:
+      - args: --id "opendes:work-product-component--WellboreTrajectory:1000"
+        skip: Record ids are scoped to a data partition.
+    output:
+      columns:
+        Session: id
+        State: state
+        Mode: mode
+        FromVersion: fromVersion
+        Expiry: expiry
+
+  - command: trajectory data session get
+    summary: Get a bulk data upload session of a WellboreTrajectory record.
+    op: { method: get, path: "/ddms/v3/wellboretrajectories/{record_id}/sessions/{session_id}" }
+    params:
+      record_id:  { flag: --id, short: -id, required: true, help: WellboreTrajectory record id. }
+      session_id: { flag: --session, short: -s, required: true, help: "Session id, as session open printed it." }
+    examples:
+      - args: --id "opendes:work-product-component--WellboreTrajectory:1000" --session "4b2e1c3a-0000-0000-0000-000000000000"
+        skip: Record and session ids belong to the instance that made them.
+    output:
+      columns:
+        Session: id
+        State: state
+        Mode: mode
+        FromVersion: fromVersion
+        Expiry: expiry
+
+  - command: trajectory data session open
+    summary: Open a session to send a WellboreTrajectory's bulk data in chunks, then commit it with session update.
+    op: { method: post, path: "/ddms/v3/wellboretrajectories/{record_id}/sessions" }
+    params:
+      record_id: { flag: --id, short: -id, required: true, help: WellboreTrajectory record id. }
+    body:
+      fields:
+        mode:
+          flag: --mode
+          required: true
+          help: >-
+            overwrite to replace the bulk with what the session sends, or update to merge it into
+            the version the session starts from.
+        fromVersion: { flag: --from-version, type: long, help: "Version to start from with --mode update. The latest when omitted." }
+        timeToLive:  { flag: --ttl, type: int, help: "Minutes the session stays open before it is dropped, at most 1440 (the default)." }
+    examples:
+      - args: --id "opendes:work-product-component--WellboreTrajectory:1000" --mode overwrite
+        skip: Opens a session on a record, which needs one of your own.
+    output:
+      columns:
+        Session: id
+        State: state
+        Mode: mode
+        FromVersion: fromVersion
+        Expiry: expiry
+
+  - command: trajectory data session update
+    summary: Commit a session, making what it sent a new version of the WellboreTrajectory, or abandon it.
+    op: { method: patch, path: "/ddms/v3/wellboretrajectories/{record_id}/sessions/{session_id}" }
+    params:
+      record_id:  { flag: --id, short: -id, required: true, help: WellboreTrajectory record id. }
+      session_id: { flag: --session, short: -s, required: true, help: "Session id, as session open printed it." }
+    body:
+      fields:
+        state: { flag: --state, required: true, help: "commit to make what the session sent a new version, or abandon to drop it." }
+    examples:
+      - args: --id "opendes:work-product-component--WellboreTrajectory:1000" --session "4b2e1c3a-0000-0000-0000-000000000000" --state commit
+        skip: Commits a session, which needs one of your own.
+    output:
+      columns:
+        Session: id
+        State: state
+        Version: version
+
+  - command: ppfg data session list
+    summary: List the bulk data upload sessions of a PPFGDataset record.
+    op: { method: get, path: "/ddms/v3/ppfgdataset/{record_id}/sessions" }
+    params:
+      record_id: { flag: --id, short: -id, required: true, help: PPFGDataset record id. }
+    examples:
+      - args: --id "opendes:work-product-component--PPFGDataset:1000"
+        skip: Record ids are scoped to a data partition.
+    output:
+      columns:
+        Session: id
+        State: state
+        Mode: mode
+        FromVersion: fromVersion
+        Expiry: expiry
+
+  - command: ppfg data session get
+    summary: Get a bulk data upload session of a PPFGDataset record.
+    op: { method: get, path: "/ddms/v3/ppfgdataset/{record_id}/sessions/{session_id}" }
+    params:
+      record_id:  { flag: --id, short: -id, required: true, help: PPFGDataset record id. }
+      session_id: { flag: --session, short: -s, required: true, help: "Session id, as session open printed it." }
+    examples:
+      - args: --id "opendes:work-product-component--PPFGDataset:1000" --session "4b2e1c3a-0000-0000-0000-000000000000"
+        skip: Record and session ids belong to the instance that made them.
+    output:
+      columns:
+        Session: id
+        State: state
+        Mode: mode
+        FromVersion: fromVersion
+        Expiry: expiry
+
+  - command: ppfg data session open
+    summary: Open a session to send a PPFGDataset's bulk data in chunks, then commit it with session update.
+    op: { method: post, path: "/ddms/v3/ppfgdataset/{record_id}/sessions" }
+    params:
+      record_id: { flag: --id, short: -id, required: true, help: PPFGDataset record id. }
+    body:
+      fields:
+        mode:
+          flag: --mode
+          required: true
+          help: >-
+            overwrite to replace the bulk with what the session sends, or update to merge it into
+            the version the session starts from.
+        fromVersion: { flag: --from-version, type: long, help: "Version to start from with --mode update. The latest when omitted." }
+        timeToLive:  { flag: --ttl, type: int, help: "Minutes the session stays open before it is dropped, at most 1440 (the default)." }
+    examples:
+      - args: --id "opendes:work-product-component--PPFGDataset:1000" --mode overwrite
+        skip: Opens a session on a record, which needs one of your own.
+    output:
+      columns:
+        Session: id
+        State: state
+        Mode: mode
+        FromVersion: fromVersion
+        Expiry: expiry
+
+  - command: ppfg data session update
+    summary: Commit a session, making what it sent a new version of the PPFGDataset, or abandon it.
+    op: { method: patch, path: "/ddms/v3/ppfgdataset/{record_id}/sessions/{session_id}" }
+    params:
+      record_id:  { flag: --id, short: -id, required: true, help: PPFGDataset record id. }
+      session_id: { flag: --session, short: -s, required: true, help: "Session id, as session open printed it." }
+    body:
+      fields:
+        state: { flag: --state, required: true, help: "commit to make what the session sent a new version, or abandon to drop it." }
+    examples:
+      - args: --id "opendes:work-product-component--PPFGDataset:1000" --session "4b2e1c3a-0000-0000-0000-000000000000" --state commit
+        skip: Commits a session, which needs one of your own.
+    output:
+      columns:
+        Session: id
+        State: state
+        Version: version
+
+  - command: pressuretest data session list
+    summary: List the bulk data upload sessions of a WellPressureTestRawMeasurement record.
+    op: { method: get, path: "/ddms/v3/wellpressuretestrawmeasurement/{record_id}/sessions" }
+    params:
+      record_id: { flag: --id, short: -id, required: true, help: WellPressureTestRawMeasurement record id. }
+    examples:
+      - args: --id "opendes:work-product-component--WellPressureTestRawMeasurement:1000"
+        skip: Record ids are scoped to a data partition.
+    output:
+      columns:
+        Session: id
+        State: state
+        Mode: mode
+        FromVersion: fromVersion
+        Expiry: expiry
+
+  - command: pressuretest data session get
+    summary: Get a bulk data upload session of a WellPressureTestRawMeasurement record.
+    op: { method: get, path: "/ddms/v3/wellpressuretestrawmeasurement/{record_id}/sessions/{session_id}" }
+    params:
+      record_id:  { flag: --id, short: -id, required: true, help: WellPressureTestRawMeasurement record id. }
+      session_id: { flag: --session, short: -s, required: true, help: "Session id, as session open printed it." }
+    examples:
+      - args: --id "opendes:work-product-component--WellPressureTestRawMeasurement:1000" --session "4b2e1c3a-0000-0000-0000-000000000000"
+        skip: Record and session ids belong to the instance that made them.
+    output:
+      columns:
+        Session: id
+        State: state
+        Mode: mode
+        FromVersion: fromVersion
+        Expiry: expiry
+
+  - command: pressuretest data session open
+    summary: Open a session to send a WellPressureTestRawMeasurement's bulk data in chunks, then commit it with session update.
+    op: { method: post, path: "/ddms/v3/wellpressuretestrawmeasurement/{record_id}/sessions" }
+    params:
+      record_id: { flag: --id, short: -id, required: true, help: WellPressureTestRawMeasurement record id. }
+    body:
+      fields:
+        mode:
+          flag: --mode
+          required: true
+          help: >-
+            overwrite to replace the bulk with what the session sends, or update to merge it into
+            the version the session starts from.
+        fromVersion: { flag: --from-version, type: long, help: "Version to start from with --mode update. The latest when omitted." }
+        timeToLive:  { flag: --ttl, type: int, help: "Minutes the session stays open before it is dropped, at most 1440 (the default)." }
+    examples:
+      - args: --id "opendes:work-product-component--WellPressureTestRawMeasurement:1000" --mode overwrite
+        skip: Opens a session on a record, which needs one of your own.
+    output:
+      columns:
+        Session: id
+        State: state
+        Mode: mode
+        FromVersion: fromVersion
+        Expiry: expiry
+
+  - command: pressuretest data session update
+    summary: Commit a session, making what it sent a new version of the WellPressureTestRawMeasurement, or abandon it.
+    op: { method: patch, path: "/ddms/v3/wellpressuretestrawmeasurement/{record_id}/sessions/{session_id}" }
+    params:
+      record_id:  { flag: --id, short: -id, required: true, help: WellPressureTestRawMeasurement record id. }
+      session_id: { flag: --session, short: -s, required: true, help: "Session id, as session open printed it." }
+    body:
+      fields:
+        state: { flag: --state, required: true, help: "commit to make what the session sent a new version, or abandon to drop it." }
+    examples:
+      - args: --id "opendes:work-product-component--WellPressureTestRawMeasurement:1000" --session "4b2e1c3a-0000-0000-0000-000000000000" --state commit
+        skip: Commits a session, which needs one of your own.
+    output:
+      columns:
+        Session: id
+        State: state
+        Version: version
+
+  - command: welllog version update-stats
+    summary: Recompute the curve statistics of a WellLog version from its bulk data.
+    op: { method: post, path: "/ddms/v3/welllogs/{record_id}/versions/{version}/data/statistics" }
+    params:
+      record_id: { flag: --id, short: -id, required: true, help: WellLog record id. }
+      version:   { flag: --version, short: -v, required: true, help: WellLog record version. }
+    examples:
+      - args: --id "opendes:work-product-component--WellLog:1000" --version 1
+        skip: Recomputes statistics on a record, which needs one of your own.
+    output: raw
+
+handwritten:
+  - command: welllog data add
+    op: { method: post, path: "/ddms/v3/welllogs/{record_id}/data" }
+    reason: >
+      Sends a JSON or Parquet file as it is, and several through an upload session it opens,
+      fills and commits, abandoning it on failure. Commands/WellboreBulkWrite.cs.
+  - command: welllog data session send
+    op: { method: post, path: "/ddms/v3/welllogs/{record_id}/sessions/{session_id}/data" }
+    reason: Sends a JSON or Parquet file as a chunk, as it is. Commands/WellboreBulkWrite.cs.
+  - command: trajectory data add
+    op: { method: post, path: "/ddms/v3/wellboretrajectories/{record_id}/data" }
+    reason: >
+      Sends a JSON or Parquet file as it is, and several through an upload session it opens,
+      fills and commits, abandoning it on failure. Commands/WellboreBulkWrite.cs.
+  - command: trajectory data session send
+    op: { method: post, path: "/ddms/v3/wellboretrajectories/{record_id}/sessions/{session_id}/data" }
+    reason: Sends a JSON or Parquet file as a chunk, as it is. Commands/WellboreBulkWrite.cs.
+  - command: ppfg data add
+    op: { method: post, path: "/ddms/v3/ppfgdataset/{record_id}/data" }
+    reason: >
+      Sends a JSON or Parquet file as it is, and several through an upload session it opens,
+      fills and commits, abandoning it on failure. Commands/WellboreBulkWrite.cs.
+  - command: ppfg data session send
+    op: { method: post, path: "/ddms/v3/ppfgdataset/{record_id}/sessions/{session_id}/data" }
+    reason: Sends a JSON or Parquet file as a chunk, as it is. Commands/WellboreBulkWrite.cs.
+  - command: pressuretest data add
+    op: { method: post, path: "/ddms/v3/wellpressuretestrawmeasurement/{record_id}/data" }
+    reason: >
+      Sends a JSON or Parquet file as it is, and several through an upload session it opens,
+      fills and commits, abandoning it on failure. Commands/WellboreBulkWrite.cs.
+  - command: pressuretest data session send
+    op: { method: post, path: "/ddms/v3/wellpressuretestrawmeasurement/{record_id}/sessions/{session_id}/data" }
+    reason: Sends a JSON or Parquet file as a chunk, as it is. Commands/WellboreBulkWrite.cs.
+
+exclude: []

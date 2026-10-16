@@ -52,16 +52,20 @@ public static class GeneratedCommands
         tree.Describe("well version", "Inspect Well record version history.");
         tree.Describe("wellbore version", "Inspect Wellbore record version history.");
         tree.Describe("welllog version", "Inspect WellLog record version history.");
-        tree.Describe("welllog data", "Read WellLog bulk data.");
+        tree.Describe("welllog data", "Read and write WellLog bulk data.");
         tree.Describe("trajectory version", "Inspect WellboreTrajectory record version history.");
-        tree.Describe("trajectory data", "Read WellboreTrajectory bulk data.");
+        tree.Describe("trajectory data", "Read and write WellboreTrajectory bulk data.");
         tree.Describe("markerset version", "Inspect WellboreMarkerSet record version history.");
         tree.Describe("intervalset version", "Inspect WellboreIntervalSet record version history.");
         tree.Describe("logacquisition version", "Inspect WellLogAcquisition record version history.");
         tree.Describe("ppfg version", "Inspect PPFGDataset record version history.");
-        tree.Describe("ppfg data", "Read PPFGDataset bulk data.");
+        tree.Describe("ppfg data", "Read and write PPFGDataset bulk data.");
         tree.Describe("pressuretest version", "Inspect WellPressureTestRawMeasurement record version history.");
-        tree.Describe("pressuretest data", "Read WellPressureTestRawMeasurement bulk data.");
+        tree.Describe("pressuretest data", "Read and write WellPressureTestRawMeasurement bulk data.");
+        tree.Describe("welllog data session", "Send WellLog bulk data in chunks — open a session, send them, commit it.");
+        tree.Describe("trajectory data session", "Send WellboreTrajectory bulk data in chunks — open a session, send them, commit it.");
+        tree.Describe("ppfg data session", "Send PPFGDataset bulk data in chunks — open a session, send them, commit it.");
+        tree.Describe("pressuretest data session", "Send WellPressureTestRawMeasurement bulk data in chunks — open a session, send them, commit it.");
         tree.Describe("workflow run", "Inspect and manage individual workflow executions.");
 
         tree.Node("crs");
@@ -108,6 +112,10 @@ public static class GeneratedCommands
         tree.Node("ppfg data");
         tree.Node("pressuretest version");
         tree.Node("pressuretest data");
+        tree.Node("welllog data session");
+        tree.Node("trajectory data session");
+        tree.Node("ppfg data session");
+        tree.Node("pressuretest data session");
         tree.Node("workflow run");
 
         CrsCatalogCommands.Attach(tree);

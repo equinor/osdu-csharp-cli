@@ -412,6 +412,10 @@ def csharp_type(schema: dict) -> str:
         return "float?" if fmt == "float" else "double?"
     if kind == "boolean":
         return "bool?"
+    # Kiota types a uuid as a Guid, path indexers included: Wellbore DDMS's session_id was
+    # emitted as a string and did not compile. As an option it is refused when malformed.
+    if kind == "string" and fmt == "uuid":
+        return "Guid?"
     return "string"
 
 
@@ -545,7 +549,7 @@ class BodyField:
 
     @property
     def is_value_type(self) -> bool:
-        return self.cs_type in {"int", "bool", "double"}
+        return self.cs_type in {"int", "long", "bool", "double"}
 
     @property
     def is_collection(self) -> bool:
@@ -1142,7 +1146,11 @@ def build_command(entry: dict, operation: dict, where: str, models_root: str,
             )
         raw_schema = spec_param.get("schema") or {}
         schema = normalise_schema(raw_schema, spec)
-        wrapped = bool(raw_schema.get("anyOf") or raw_schema.get("oneOf"))
+        # Kiota loses a query parameter's format behind the nullable wrapper, but not a path
+        # parameter's: its indexer keeps `Int64`. `welllog version stats --version` was an
+        # `int` that could not hold a real version, a sixteen-digit number, while the indexer
+        # it feeds takes a long.
+        wrapped = bool(raw_schema.get("anyOf") or raw_schema.get("oneOf")) and location == "query"
         # A $ref survives the nullable wrapper, so look for it on either.
         shared = shared_enum_type(models_root, raw_schema) or shared_enum_type(
             models_root, next((b for b in (raw_schema.get("anyOf")

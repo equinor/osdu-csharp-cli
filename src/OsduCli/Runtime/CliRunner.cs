@@ -195,9 +195,9 @@ public static class CliRunner
     /// knows `record list` needs an admin role, but not that `record search` answers the same
     /// question for everyone else.
     /// </param>
-    /// <param name="hideBodies">
-    /// Leave request and response bodies out of <c>--debug</c>, for a command that sends or
-    /// receives a secret. See <see cref="CliContext.Create"/>.
+    /// <param name="hideBodiesBecause">
+    /// Why request and response bodies are left out of <c>--debug</c>, for a command whose bodies
+    /// must not be logged; null logs them. See <see cref="CliContext.Create"/>.
     /// </param>
     public static async Task<int> RunAsync(
         ParseResult parseResult,
@@ -205,11 +205,11 @@ public static class CliRunner
         CancellationToken cancellationToken,
         string? requiredRoles = null,
         string? forbiddenHint = null,
-        bool hideBodies = false)
+        string? hideBodiesBecause = null)
     {
         try
         {
-            using var context = CliContext.Create(parseResult, hideBodies);
+            using var context = CliContext.Create(parseResult, hideBodiesBecause);
             return await body(context, cancellationToken);
         }
         // Before the --debug catch below, deliberately. That one matches any exception, so

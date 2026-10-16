@@ -6,7 +6,7 @@ open is whether that approach produces a CLI people actually want to use, and wh
 be packaged for a managed Windows laptop — which is where the Python one struggles.
 
 You are being asked to use it for twenty minutes and say what is wrong with it. Rough edges
-are expected and useful; **155 of its commands were generated from a spec and most have never
+are expected and useful; **172 of its commands were generated from a spec and most have never
 been run by a human.**
 
 It does not replace `osducli`. The binary is called `osducs` precisely so both can sit on your
@@ -152,7 +152,7 @@ about. If you want to exercise them, tell us and we will find a scratch partitio
 Most useful, in order:
 
 1. **A command that ran but told you nothing useful** — empty columns, the wrong fields, a
-   table where you wanted the detail. Output columns for 155 commands were chosen by reading
+   table where you wanted the detail. Output columns for 172 commands were chosen by reading
    spec field names, and many have never met a real response. Each is a one-line fix.
 2. **Help that did not answer your question.** If you could not work out what a flag wanted,
    that is a defect.

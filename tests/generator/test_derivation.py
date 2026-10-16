@@ -44,6 +44,8 @@ class TestTypeMapping:
         ({"type": "number", "format": "float"}, "float?"),
         ({"type": "number"}, "double?"),
         ({"type": "array", "items": {"type": "string"}}, "string[]"),
+        # Wellbore DDMS's session_id: Kiota's indexer takes a Guid.
+        ({"type": "string", "format": "uuid"}, "Guid?"),
     ])
     def test_schema_maps_to_the_type_kiota_uses(self, schema, expected):
         assert csharp_type(schema) == expected

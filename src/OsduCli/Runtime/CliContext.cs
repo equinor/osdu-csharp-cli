@@ -62,11 +62,12 @@ public sealed class CliContext : IDisposable
     /// deserialise a request body before touching a client.
     /// </summary>
     /// <param name="parseResult">The parsed command line.</param>
-    /// <param name="hideBodies">
-    /// Leave request and response bodies out of <c>--debug</c>'s log, for a command whose bodies
-    /// carry a secret: the client logs them as they are.
+    /// <param name="hideBodiesBecause">
+    /// Why request and response bodies are left out of <c>--debug</c>'s log, or null to log them.
+    /// The client logs a body as it is, after reading the whole of it into memory: a secret goes
+    /// to the log, and a file of curves into memory, however large.
     /// </param>
-    public static CliContext Create(ParseResult parseResult, bool hideBodies = false)
+    public static CliContext Create(ParseResult parseResult, string? hideBodiesBecause = null)
     {
         ApiClientBuilder.RegisterDefaultSerializer<JsonSerializationWriterFactory>();
         ApiClientBuilder.RegisterDefaultDeserializer<JsonParseNodeFactory>();
@@ -88,7 +89,7 @@ public sealed class CliContext : IDisposable
         // --debug turns on the client's own request/response logging. Exploratory testing
         // against a live service is mostly a question of "what did we actually send", and
         // without this the answer is a status code and nothing else.
-        var loggerFactory = Logging(parseResult.GetValue(GlobalOptions.Debug), hideBodies);
+        var loggerFactory = Logging(parseResult.GetValue(GlobalOptions.Debug), hideBodiesBecause);
 
         if (signIn.Method == SignInMethod.ClientCredentials)
         {
@@ -178,14 +179,15 @@ public sealed class CliContext : IDisposable
 
     /// <summary>
     /// The client's logging for <c>--debug</c>, or none without it: every request and response,
-    /// and their bodies unless <paramref name="hideBodies"/>, which says that it left them out.
+    /// and their bodies unless there is a reason not to, which it then says.
     /// </summary>
-    internal static ILoggerFactory? Logging(bool debug, bool hideBodies, TextWriter? note = null)
+    internal static ILoggerFactory? Logging(bool debug, string? hideBodiesBecause, TextWriter? note = null)
     {
         if (!debug)
             return null;
+        var hideBodies = hideBodiesBecause is not null;
         if (hideBodies)
-            (note ?? Console.Error).WriteLine("--debug leaves out request and response bodies here: they carry a secret.");
+            (note ?? Console.Error).WriteLine($"--debug leaves out request and response bodies here: {hideBodiesBecause}.");
         return LoggerFactory.Create(builder =>
         {
             builder.AddFilter("Equinor.OsduCsharpClient", LogLevel.Debug)

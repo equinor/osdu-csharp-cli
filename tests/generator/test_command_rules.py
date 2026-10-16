@@ -396,6 +396,31 @@ class TestConfirm:
         self.build(self.entry({"message": "m"}, examples=[{"args": "--kind k", "skip": "Deletes an index."}]))
 
 
+class TestWrappedParameters:
+    """FastAPI spells an optional parameter `anyOf: [{...}, {"type": "null"}]`, which Kiota reads differently."""
+
+    WRAPPED = {"anyOf": [{"type": "integer", "format": "int64"}, {"type": "null"}]}
+
+    @staticmethod
+    def entry(location):
+        return {"command": "welllog version stats", "op": {"method": "get", "path": "/things/{version}"},
+                "params": {"version": {"flag": "--version", "required": location == "path"}}, "output": "raw"}
+
+    def build(self, location):
+        operation = {"parameters": [{"name": "version", "in": location, "required": location == "path",
+                                     "schema": self.WRAPPED}],
+                     "responses": OPERATION["responses"]}
+        return build(self.entry(location), operation)
+
+    def test_a_path_parameter_keeps_its_format(self):
+        # The indexer it feeds is a long: a version is a sixteen-digit number.
+        assert self.build("path").params[0].cs_type == "long?"
+
+    def test_a_query_parameter_does_not(self):
+        # Kiota falls back to the coarse mapping there, and matching the spec would not compile.
+        assert self.build("query").params[0].cs_type == "int?"
+
+
 class TestAllowed:
     """`allowed:` gives a body field the values its spec names only in prose."""
 

@@ -31,18 +31,18 @@ their options; `record add` is in [USAGE.md](USAGE.md#writing-records), and the 
 | [`markerset`](#markerset) | `get`, `add`, `delete`, `version list`, `version get` |
 | [`measurement`](#measurement) | `list`, `get`, `search`, `maps` |
 | [`member`](#member) | `group list`, `delete` |
-| [`ppfg`](#ppfg) | `get`, `add`, `delete`, `version list`, `version get`, `data get`, `version data` |
-| [`pressuretest`](#pressuretest) | `get`, `add`, `delete`, `version list`, `version get`, `data get`, `version data` |
+| [`ppfg`](#ppfg) | `get`, `add`, `delete`, `version list`, `version get`, `data get`, `version data`, `data session list`, `data session get`, `data session open`, `data session update` |
+| [`pressuretest`](#pressuretest) | `get`, `add`, `delete`, `version list`, `version get`, `data get`, `version data`, `data session list`, `data session get`, `data session open`, `data session update` |
 | [`record`](#record) | `search`, `aggregate`, `list`, `get`, `headers`, `delete`, `purge`, `version list`, `version get`, `version purge`, `replay`, `replay-status` |
 | [`schema`](#schema) | `list`, `get`, `add`, `update` |
 | [`subscription`](#subscription) | `find`, `get`, `add`, `update-secret`, `delete` |
 | [`topic`](#topic) | `list` |
-| [`trajectory`](#trajectory) | `get`, `add`, `delete`, `version list`, `version get`, `data get`, `version data` |
+| [`trajectory`](#trajectory) | `get`, `add`, `delete`, `version list`, `version get`, `data get`, `version data`, `data session list`, `data session get`, `data session open`, `data session update` |
 | [`unit`](#unit) | `list`, `get`, `search`, `by-symbol`, `by-measurement`, `by-system`, `preferred`, `maps`, `conversion scale`, `conversion abcd`, `catalog get`, `catalog search`, `catalog map-states`, `catalog last-modified` |
 | [`unit-system`](#unit-system) | `list`, `get` |
 | [`well`](#well) | `get`, `add`, `delete`, `version list`, `version get` |
 | [`wellbore`](#wellbore) | `get`, `add`, `delete`, `version list`, `version get` |
-| [`welllog`](#welllog) | `get`, `add`, `delete`, `version list`, `version get`, `data get`, `version data`, `data stats`, `version stats` |
+| [`welllog`](#welllog) | `get`, `add`, `delete`, `version list`, `version get`, `data get`, `version data`, `data stats`, `version stats`, `data session list`, `data session get`, `data session open`, `data session update`, `version update-stats` |
 | [`workflow`](#workflow) | `list`, `get`, `add`, `delete`, `run list`, `run get`, `run trigger`, `run update`, `run latest` |
 
 ## action
@@ -907,6 +907,68 @@ Read the bulk data of a PPFGDataset record.
 | `--describe` |  | Return row and column counts instead of the data. |
 | `--orient` |  | JSON shape of the response. |
 
+### `osducs ppfg data session get`
+
+Get a bulk data upload session of a PPFGDataset record.
+
+`GET /ddms/v3/ppfgdataset/{record_id}/sessions/{session_id}` — wellbore_ddms
+
+| Option | Required | Description |
+|---|---|---|
+| `-id`, `--id` | yes | PPFGDataset record id. |
+| `-s`, `--session` | yes | Session id, as session open printed it. |
+
+```bash
+osducs ppfg data session get --id "opendes:work-product-component--PPFGDataset:1000" --session "4b2e1c3a-0000-0000-0000-000000000000"
+```
+
+### `osducs ppfg data session list`
+
+List the bulk data upload sessions of a PPFGDataset record.
+
+`GET /ddms/v3/ppfgdataset/{record_id}/sessions` — wellbore_ddms
+
+| Option | Required | Description |
+|---|---|---|
+| `-id`, `--id` | yes | PPFGDataset record id. |
+
+```bash
+osducs ppfg data session list --id "opendes:work-product-component--PPFGDataset:1000"
+```
+
+### `osducs ppfg data session open`
+
+Open a session to send a PPFGDataset's bulk data in chunks, then commit it with session update.
+
+`POST /ddms/v3/ppfgdataset/{record_id}/sessions` — wellbore_ddms
+
+| Option | Required | Description |
+|---|---|---|
+| `-id`, `--id` | yes | PPFGDataset record id. |
+| `--mode` | yes | overwrite to replace the bulk with what the session sends, or update to merge it into the version the session starts from. |
+| `--from-version` |  | Version to start from with --mode update. The latest when omitted. |
+| `--ttl` |  | Minutes the session stays open before it is dropped, at most 1440 (the default). |
+
+```bash
+osducs ppfg data session open --id "opendes:work-product-component--PPFGDataset:1000" --mode overwrite
+```
+
+### `osducs ppfg data session update`
+
+Commit a session, making what it sent a new version of the PPFGDataset, or abandon it.
+
+`PATCH /ddms/v3/ppfgdataset/{record_id}/sessions/{session_id}` — wellbore_ddms
+
+| Option | Required | Description |
+|---|---|---|
+| `-id`, `--id` | yes | PPFGDataset record id. |
+| `-s`, `--session` | yes | Session id, as session open printed it. |
+| `--state` | yes | commit to make what the session sent a new version, or abandon to drop it. |
+
+```bash
+osducs ppfg data session update --id "opendes:work-product-component--PPFGDataset:1000" --session "4b2e1c3a-0000-0000-0000-000000000000" --state commit
+```
+
 ### `osducs ppfg delete`
 
 Soft-delete a PPFGDataset record by id.
@@ -995,6 +1057,68 @@ Read the bulk data of a WellPressureTestRawMeasurement record.
 | `--filter` |  | Row filter as column:operator:value, e.g. MD:gte:1000. Operators: lt, lte, gt, gte, eq, neq. |
 | `--describe` |  | Return row and column counts instead of the data. |
 | `--orient` |  | JSON shape of the response. |
+
+### `osducs pressuretest data session get`
+
+Get a bulk data upload session of a WellPressureTestRawMeasurement record.
+
+`GET /ddms/v3/wellpressuretestrawmeasurement/{record_id}/sessions/{session_id}` — wellbore_ddms
+
+| Option | Required | Description |
+|---|---|---|
+| `-id`, `--id` | yes | WellPressureTestRawMeasurement record id. |
+| `-s`, `--session` | yes | Session id, as session open printed it. |
+
+```bash
+osducs pressuretest data session get --id "opendes:work-product-component--WellPressureTestRawMeasurement:1000" --session "4b2e1c3a-0000-0000-0000-000000000000"
+```
+
+### `osducs pressuretest data session list`
+
+List the bulk data upload sessions of a WellPressureTestRawMeasurement record.
+
+`GET /ddms/v3/wellpressuretestrawmeasurement/{record_id}/sessions` — wellbore_ddms
+
+| Option | Required | Description |
+|---|---|---|
+| `-id`, `--id` | yes | WellPressureTestRawMeasurement record id. |
+
+```bash
+osducs pressuretest data session list --id "opendes:work-product-component--WellPressureTestRawMeasurement:1000"
+```
+
+### `osducs pressuretest data session open`
+
+Open a session to send a WellPressureTestRawMeasurement's bulk data in chunks, then commit it with session update.
+
+`POST /ddms/v3/wellpressuretestrawmeasurement/{record_id}/sessions` — wellbore_ddms
+
+| Option | Required | Description |
+|---|---|---|
+| `-id`, `--id` | yes | WellPressureTestRawMeasurement record id. |
+| `--mode` | yes | overwrite to replace the bulk with what the session sends, or update to merge it into the version the session starts from. |
+| `--from-version` |  | Version to start from with --mode update. The latest when omitted. |
+| `--ttl` |  | Minutes the session stays open before it is dropped, at most 1440 (the default). |
+
+```bash
+osducs pressuretest data session open --id "opendes:work-product-component--WellPressureTestRawMeasurement:1000" --mode overwrite
+```
+
+### `osducs pressuretest data session update`
+
+Commit a session, making what it sent a new version of the WellPressureTestRawMeasurement, or abandon it.
+
+`PATCH /ddms/v3/wellpressuretestrawmeasurement/{record_id}/sessions/{session_id}` — wellbore_ddms
+
+| Option | Required | Description |
+|---|---|---|
+| `-id`, `--id` | yes | WellPressureTestRawMeasurement record id. |
+| `-s`, `--session` | yes | Session id, as session open printed it. |
+| `--state` | yes | commit to make what the session sent a new version, or abandon to drop it. |
+
+```bash
+osducs pressuretest data session update --id "opendes:work-product-component--WellPressureTestRawMeasurement:1000" --session "4b2e1c3a-0000-0000-0000-000000000000" --state commit
+```
 
 ### `osducs pressuretest delete`
 
@@ -1446,6 +1570,68 @@ Read the bulk data of a WellboreTrajectory record.
 | `--describe` |  | Return row and column counts instead of the data. |
 | `--orient` |  | JSON shape of the response. |
 
+### `osducs trajectory data session get`
+
+Get a bulk data upload session of a WellboreTrajectory record.
+
+`GET /ddms/v3/wellboretrajectories/{record_id}/sessions/{session_id}` — wellbore_ddms
+
+| Option | Required | Description |
+|---|---|---|
+| `-id`, `--id` | yes | WellboreTrajectory record id. |
+| `-s`, `--session` | yes | Session id, as session open printed it. |
+
+```bash
+osducs trajectory data session get --id "opendes:work-product-component--WellboreTrajectory:1000" --session "4b2e1c3a-0000-0000-0000-000000000000"
+```
+
+### `osducs trajectory data session list`
+
+List the bulk data upload sessions of a WellboreTrajectory record.
+
+`GET /ddms/v3/wellboretrajectories/{record_id}/sessions` — wellbore_ddms
+
+| Option | Required | Description |
+|---|---|---|
+| `-id`, `--id` | yes | WellboreTrajectory record id. |
+
+```bash
+osducs trajectory data session list --id "opendes:work-product-component--WellboreTrajectory:1000"
+```
+
+### `osducs trajectory data session open`
+
+Open a session to send a WellboreTrajectory's bulk data in chunks, then commit it with session update.
+
+`POST /ddms/v3/wellboretrajectories/{record_id}/sessions` — wellbore_ddms
+
+| Option | Required | Description |
+|---|---|---|
+| `-id`, `--id` | yes | WellboreTrajectory record id. |
+| `--mode` | yes | overwrite to replace the bulk with what the session sends, or update to merge it into the version the session starts from. |
+| `--from-version` |  | Version to start from with --mode update. The latest when omitted. |
+| `--ttl` |  | Minutes the session stays open before it is dropped, at most 1440 (the default). |
+
+```bash
+osducs trajectory data session open --id "opendes:work-product-component--WellboreTrajectory:1000" --mode overwrite
+```
+
+### `osducs trajectory data session update`
+
+Commit a session, making what it sent a new version of the WellboreTrajectory, or abandon it.
+
+`PATCH /ddms/v3/wellboretrajectories/{record_id}/sessions/{session_id}` — wellbore_ddms
+
+| Option | Required | Description |
+|---|---|---|
+| `-id`, `--id` | yes | WellboreTrajectory record id. |
+| `-s`, `--session` | yes | Session id, as session open printed it. |
+| `--state` | yes | commit to make what the session sent a new version, or abandon to drop it. |
+
+```bash
+osducs trajectory data session update --id "opendes:work-product-component--WellboreTrajectory:1000" --session "4b2e1c3a-0000-0000-0000-000000000000" --state commit
+```
+
 ### `osducs trajectory delete`
 
 Soft-delete a WellboreTrajectory record by id.
@@ -1827,6 +2013,68 @@ Read the bulk data of a WellLog record.
 | `--describe` |  | Return row and column counts instead of the data. |
 | `--orient` |  | JSON shape of the response. |
 
+### `osducs welllog data session get`
+
+Get a bulk data upload session of a WellLog record.
+
+`GET /ddms/v3/welllogs/{record_id}/sessions/{session_id}` — wellbore_ddms
+
+| Option | Required | Description |
+|---|---|---|
+| `-id`, `--id` | yes | WellLog record id. |
+| `-s`, `--session` | yes | Session id, as session open printed it. |
+
+```bash
+osducs welllog data session get --id "opendes:work-product-component--WellLog:1000" --session "4b2e1c3a-0000-0000-0000-000000000000"
+```
+
+### `osducs welllog data session list`
+
+List the bulk data upload sessions of a WellLog record.
+
+`GET /ddms/v3/welllogs/{record_id}/sessions` — wellbore_ddms
+
+| Option | Required | Description |
+|---|---|---|
+| `-id`, `--id` | yes | WellLog record id. |
+
+```bash
+osducs welllog data session list --id "opendes:work-product-component--WellLog:1000"
+```
+
+### `osducs welllog data session open`
+
+Open a session to send a WellLog's bulk data in chunks, then commit it with session update.
+
+`POST /ddms/v3/welllogs/{record_id}/sessions` — wellbore_ddms
+
+| Option | Required | Description |
+|---|---|---|
+| `-id`, `--id` | yes | WellLog record id. |
+| `--mode` | yes | overwrite to replace the bulk with what the session sends, or update to merge it into the version the session starts from. |
+| `--from-version` |  | Version to start from with --mode update. The latest when omitted. |
+| `--ttl` |  | Minutes the session stays open before it is dropped, at most 1440 (the default). |
+
+```bash
+osducs welllog data session open --id "opendes:work-product-component--WellLog:1000" --mode overwrite
+```
+
+### `osducs welllog data session update`
+
+Commit a session, making what it sent a new version of the WellLog, or abandon it.
+
+`PATCH /ddms/v3/welllogs/{record_id}/sessions/{session_id}` — wellbore_ddms
+
+| Option | Required | Description |
+|---|---|---|
+| `-id`, `--id` | yes | WellLog record id. |
+| `-s`, `--session` | yes | Session id, as session open printed it. |
+| `--state` | yes | commit to make what the session sent a new version, or abandon to drop it. |
+
+```bash
+osducs welllog data session update --id "opendes:work-product-component--WellLog:1000" --session "4b2e1c3a-0000-0000-0000-000000000000" --state commit
+```
+
 ### `osducs welllog data stats`
 
 Summary statistics for the curves of a WellLog record.
@@ -1910,6 +2158,21 @@ Summary statistics for the curves of a specific WellLog version.
 | `-id`, `--id` | yes | WellLog record id. |
 | `-v`, `--version` | yes | WellLog record version. |
 | `--curves` |  | Comma-separated columns, e.g. MD,GR. Omit for all. |
+
+### `osducs welllog version update-stats`
+
+Recompute the curve statistics of a WellLog version from its bulk data.
+
+`POST /ddms/v3/welllogs/{record_id}/versions/{version}/data/statistics` — wellbore_ddms
+
+| Option | Required | Description |
+|---|---|---|
+| `-id`, `--id` | yes | WellLog record id. |
+| `-v`, `--version` | yes | WellLog record version. |
+
+```bash
+osducs welllog version update-stats --id "opendes:work-product-component--WellLog:1000" --version 1
+```
 
 ## workflow
 

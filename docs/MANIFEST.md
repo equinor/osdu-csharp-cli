@@ -149,7 +149,7 @@ A map from body property to option. A dotted name reaches into a nested object: 
 | `short` | no | A short alias, checked the same way. |
 | `required` | no | Whether the option must be given. Defaults to `false`; unlike params, it is not taken from the spec. |
 | `help` | no | Help text. There is no default. |
-| `type` | no | The option's C# type. Defaults to `string`; the manifests also use `string[]`, `int`, `bool`, `double` and `double[]`. An array type accepts several values after one flag. |
+| `type` | no | The option's C# type. Defaults to `string`; the manifests also use `string[]`, `int`, `long`, `bool`, `double` and `double[]`. A record version needs `long`: it is sixteen digits. An array type accepts several values after one flag. |
 | `parts` | no | Paths to spread one option's comma-separated numbers across, such as a bounding box's four coordinates. Needs `type: double[]`, and exactly one value per path. See [`parts`](COMMAND-GRAMMAR.md#parts). |
 | `allowed` | no | The values the option takes, for a field whose spec names them only in prose: `[reindex, replay]`. Refused at parse time like the spec's own enum, in any casing, and listed in help. Cannot be given when the spec has an enum, or with `comma-separated`. |
 | `comma-separated` | no | `true` splits each value on commas as well as accepting the flag repeated, so `-f a,b -f c` is three values. Needs `type: string[]`, and cannot be combined with `parts` or with allowed values from the spec. Without it a comma is part of the value, which is right for values that may contain one. |

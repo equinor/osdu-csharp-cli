@@ -141,13 +141,13 @@ public class SubscriptionSecretsTests
         // The client logs bodies as they are, so a secret read from a file went to the log.
         var note = new StringWriter();
 
-        using var hidden = CliContext.Logging(debug: true, hideBodies: true, note)!;
-        using var shown = CliContext.Logging(debug: true, hideBodies: false, new StringWriter())!;
+        using var hidden = CliContext.Logging(debug: true, SubscriptionSecrets.SecretBodies, note)!;
+        using var shown = CliContext.Logging(debug: true, null, new StringWriter())!;
 
         Assert.False(hidden.CreateLogger(CliContext.BodyLog).IsEnabled(LogLevel.Debug));
         Assert.True(hidden.CreateLogger("Equinor.OsduCsharpClient").IsEnabled(LogLevel.Debug));
         Assert.True(shown.CreateLogger(CliContext.BodyLog).IsEnabled(LogLevel.Debug));
         Assert.Contains("leaves out request and response bodies", note.ToString());
-        Assert.Null(CliContext.Logging(debug: false, hideBodies: true));
+        Assert.Null(CliContext.Logging(debug: false, SubscriptionSecrets.SecretBodies));
     }
 }
