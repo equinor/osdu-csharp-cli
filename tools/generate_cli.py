@@ -549,7 +549,7 @@ class BodyField:
 
     @property
     def is_value_type(self) -> bool:
-        return self.cs_type in {"int", "bool", "double"}
+        return self.cs_type in {"int", "long", "bool", "double"}
 
     @property
     def is_collection(self) -> bool:

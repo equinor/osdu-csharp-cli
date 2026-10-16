@@ -43,19 +43,37 @@ public sealed class WellboreBulkWriteTests : IDisposable
         public List<(HttpMethod Method, string Path, string? ContentType, byte[] Body)> Requests { get; } = [];
         private int _chunks;
 
+        /// <summary>How a commit is answered: refused with this status, or not at all when it throws.</summary>
+        public Func<HttpStatusCode>? Commit { get; init; }
+        public bool AbandonFails { get; init; }
+        /// <summary>The state a session read reports, for a commit that got no answer.</summary>
+        public string SessionState { get; init; } = "open";
+
         protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
         {
             var body = request.Content is null ? [] : await request.Content.ReadAsByteArrayAsync(cancellationToken);
             var path = request.RequestUri!.AbsolutePath;
             Requests.Add((request.Method, path, request.Content?.Headers.ContentType?.MediaType, body));
+            var commit = Encoding.UTF8.GetString(body).Contains("commit");
 
             var (status, answer) = (request.Method.Method, path) switch
             {
                 ("POST", var p) when p.EndsWith("/sessions") => (HttpStatusCode.OK, $$"""{"id":"{{Session}}","state":"open"}"""),
                 ("POST", var p) when p.EndsWith($"/sessions/{Session}/data") => Chunk(),
-                ("PATCH", _) => (HttpStatusCode.OK, $$"""{"id":"{{Session}}","state":"{{(Encoding.UTF8.GetString(body).Contains("commit") ? "committed" : "abandoned")}}","version":2}"""),
+                ("PATCH", _) when commit && Commit is not null => (Commit(), """{"detail":"Bulk data is inconsistent."}"""),
+                ("PATCH", _) when !commit && AbandonFails => (HttpStatusCode.Conflict, """{"detail":"Session is not open."}"""),
+                ("PATCH", _) => (HttpStatusCode.OK, $$"""{"id":"{{Session}}","state":"{{(commit ? "committed" : "abandoned")}}","version":2}"""),
+                ("GET", var p) when p.EndsWith($"/sessions/{Session}") => (HttpStatusCode.OK, $$"""{"id":"{{Session}}","state":"{{SessionState}}","version":3}"""),
                 _ => (HttpStatusCode.OK, """{"recordIds":["dev:work-product-component--WellLog:1"]}"""),
             };
+            if (status == HttpStatusCode.BadGateway)
+            {
+                return new HttpResponseMessage(status)
+                {
+                    Content = new StringContent("<html><head><title>502 Bad Gateway</title></head><body>nginx</body></html>",
+                        Encoding.UTF8, "text/html"),
+                };
+            }
             return new HttpResponseMessage(status) { Content = new StringContent(answer, Encoding.UTF8, "application/json") };
 
             (HttpStatusCode, string) Chunk()
@@ -148,7 +166,7 @@ public sealed class WellboreBulkWriteTests : IDisposable
         var parts = new[] { Write("a.parquet", ParquetFile), Write("b.json", SplitJson) }.Select(WellboreBulkWrite.Chunk).ToList();
 
         var answer = await WellboreBulkWrite.WriteSessionAsync(Adapter(ddms), WellLog, Record, parts, update, null,
-            TestContext.Current.CancellationToken);
+            new StringWriter(), TestContext.Current.CancellationToken);
 
         Assert.Equal(["POST /sessions", "POST /data", "POST /data", "PATCH /session"],
             ddms.Requests.Select(request => $"{request.Method} /{request.Path.Split('/')[^1].Replace(Session.ToString(), "session")}"));
@@ -165,16 +183,17 @@ public sealed class WellboreBulkWriteTests : IDisposable
     {
         // A half-sent upload never becomes a version.
         var ddms = new Ddms(chunkStatus: chunk => chunk == 2 ? HttpStatusCode.UnprocessableEntity : HttpStatusCode.OK);
-        var progress = new StringWriter();
+        var notes = new StringWriter();
         var parts = new[] { Write("a.json", SplitJson), Write("b.json", SplitJson), Write("c.json", SplitJson) }
             .Select(WellboreBulkWrite.Chunk).ToList();
 
+        // Without progress, as in a script: what became of the session is still said.
         await Assert.ThrowsAnyAsync<ApiException>(() => WellboreBulkWrite.WriteSessionAsync(Adapter(ddms), WellLog, Record,
-            parts, false, progress, TestContext.Current.CancellationToken));
+            parts, false, null, notes, TestContext.Current.CancellationToken));
 
         Assert.Equal(4, ddms.Requests.Count);
         Assert.Equal("abandon", JsonNode.Parse(ddms.Requests[^1].Body)!["state"]!.GetValue<string>());
-        Assert.Contains("Abandoned session", progress.ToString());
+        Assert.Contains($"Abandoned session {Session}", notes.ToString());
     }
 
     [Fact]
@@ -205,6 +224,79 @@ public sealed class WellboreBulkWriteTests : IDisposable
     }
 
     [Fact]
+    public async Task AGatewaysErrorPageIsReportedByItsTitle()
+    {
+        // A gateway in front of the service answers with a page, not `detail`.
+        TextBodyParseNodeFactory.Register();
+        var ddms = new Ddms(chunkStatus: _ => HttpStatusCode.BadGateway);
+
+        var exception = await Assert.ThrowsAnyAsync<ApiException>(() => WellboreBulkWrite.SendChunkAsync(Adapter(ddms),
+            WellLog, Record, Session, WellboreBulkWrite.Chunk(Write("a.json", SplitJson)), TestContext.Current.CancellationToken));
+
+        Assert.Equal(502, exception.ResponseStatusCode);
+        Assert.Equal("502 Bad Gateway", exception.Message);
+    }
+
+    private List<WellboreBulkWrite.Part> TwoParts() =>
+        new[] { Write("a.json", SplitJson), Write("b.json", SplitJson) }.Select(WellboreBulkWrite.Chunk).ToList();
+
+    [Fact]
+    public async Task ARefusedCommitAbandonsTheSession()
+    {
+        // The service answered: nothing was committed, so the session is let go.
+        var ddms = new Ddms { Commit = () => HttpStatusCode.BadRequest };
+        var notes = new StringWriter();
+
+        var exception = await Assert.ThrowsAnyAsync<ApiException>(() => WellboreBulkWrite.WriteSessionAsync(Adapter(ddms),
+            WellLog, Record, TwoParts(), false, null, notes, TestContext.Current.CancellationToken));
+
+        Assert.Equal("Bulk data is inconsistent.", exception.Message);
+        Assert.Equal("abandon", JsonNode.Parse(ddms.Requests[^1].Body)!["state"]!.GetValue<string>());
+        Assert.Contains("Abandoned session", notes.ToString());
+    }
+
+    [Fact]
+    public async Task ACommitWithNoAnswerThatWentThroughIsASuccess()
+    {
+        // The version exists; abandoning, or reporting a failure, would both be wrong.
+        var ddms = new Ddms { Commit = () => throw new HttpRequestException("Connection reset"), SessionState = "committed" };
+        var notes = new StringWriter();
+
+        var answer = await WellboreBulkWrite.WriteSessionAsync(Adapter(ddms), WellLog, Record, TwoParts(), false, null, notes,
+            TestContext.Current.CancellationToken);
+
+        Assert.Equal("committed", JsonNode.Parse(answer!)!["state"]!.GetValue<string>());
+        Assert.DoesNotContain(ddms.Requests, request => Encoding.UTF8.GetString(request.Body).Contains("abandon"));
+        Assert.Contains("the new version was written", notes.ToString());
+    }
+
+    [Fact]
+    public async Task ACommitWithNoAnswerIsLeftToCheckNotAbandoned()
+    {
+        var ddms = new Ddms { Commit = () => throw new HttpRequestException("Connection reset"), SessionState = "committing" };
+        var notes = new StringWriter();
+
+        await Assert.ThrowsAnyAsync<HttpRequestException>(() => WellboreBulkWrite.WriteSessionAsync(Adapter(ddms), WellLog,
+            Record, TwoParts(), false, null, notes, TestContext.Current.CancellationToken));
+
+        Assert.DoesNotContain(ddms.Requests, request => Encoding.UTF8.GetString(request.Body).Contains("abandon"));
+        Assert.Contains($"the session is committing. Check it with `osducs welllog data session get --id {Record} --session {Session}`",
+            notes.ToString());
+    }
+
+    [Fact]
+    public async Task AnAbandonThatFailsIsSaidWithoutPromisingWhatItCannot()
+    {
+        var ddms = new Ddms(chunkStatus: _ => HttpStatusCode.BadRequest) { AbandonFails = true };
+        var notes = new StringWriter();
+
+        await Assert.ThrowsAnyAsync<ApiException>(() => WellboreBulkWrite.WriteSessionAsync(Adapter(ddms), WellLog, Record,
+            TwoParts(), false, null, notes, TestContext.Current.CancellationToken));
+
+        Assert.Contains($"Session {Session} could not be abandoned. Nothing from it is written unless it is committed", notes.ToString());
+    }
+
+    [Fact]
     public async Task AnInterruptionAbandonsTheSessionToo()
     {
         // With a token of its own: the command's is cancelled, and would cancel the abandon.
@@ -213,7 +305,7 @@ public sealed class WellboreBulkWriteTests : IDisposable
         var parts = new[] { Write("a.json", SplitJson), Write("b.json", SplitJson) }.Select(WellboreBulkWrite.Chunk).ToList();
 
         await Assert.ThrowsAnyAsync<OperationCanceledException>(() => WellboreBulkWrite.WriteSessionAsync(Adapter(ddms),
-            WellLog, Record, parts, false, null, interrupted.Token));
+            WellLog, Record, parts, false, null, new StringWriter(), interrupted.Token));
 
         Assert.Equal(HttpMethod.Patch, ddms.Requests[^1].Method);
         Assert.Equal("abandon", JsonNode.Parse(ddms.Requests[^1].Body)!["state"]!.GetValue<string>());
@@ -254,6 +346,31 @@ public sealed class WellboreBulkWriteTests : IDisposable
         var errors = Root().Parse([.. command.Split(' '), "--id", Record, "--version", "1792150494962265"]).Errors;
 
         Assert.Empty(errors);
+    }
+
+    [Theory]
+    [InlineData("welllog")]
+    [InlineData("trajectory")]
+    [InlineData("ppfg")]
+    [InlineData("pressuretest")]
+    public void ASessionCanStartFromARealVersion(string noun) =>
+        Assert.Empty(Root().Parse([noun, "data", "session", "open", "--id", Record, "--mode", "update",
+            "--from-version", "1792150494962265"]).Errors);
+
+    [Fact]
+    public async Task AVersionToStartFromSurvivesTheRequestModel()
+    {
+        // The generated command puts the option in JSON and reads it into the client's model.
+        var model = await Microsoft.Kiota.Abstractions.Serialization.KiotaJsonSerializer
+            .DeserializeAsync<Equinor.OsduCsharpClient.WellboreDdms.Models.CreateDataSessionRequest>(
+                """{"mode":"update","fromVersion":1792150494962265}""",
+                Equinor.OsduCsharpClient.WellboreDdms.Models.CreateDataSessionRequest.CreateFromDiscriminatorValue,
+                TestContext.Current.CancellationToken);
+
+        var json = await Microsoft.Kiota.Abstractions.Serialization.KiotaJsonSerializer.SerializeAsStringAsync(model!, true,
+            TestContext.Current.CancellationToken);
+
+        Assert.Equal(1792150494962265, JsonNode.Parse(json)!["fromVersion"]!.GetValue<long>());
     }
 
     [Fact]

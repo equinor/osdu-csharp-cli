@@ -57,13 +57,17 @@ public static class WellboreBulkWrite
     internal sealed class DdmsError : ApiException, IParsable
     {
         private UntypedNode? _detail;
+        private string? _message;
 
-        public override string Message => Reason(_detail) ?? string.Empty;
+        // `message` is where an error page from a gateway in front of the service ends up: the
+        // text body reader puts the page's title there.
+        public override string Message => Reason(_detail) ?? _message ?? string.Empty;
 
         public IDictionary<string, Action<IParseNode>> GetFieldDeserializers() =>
             new Dictionary<string, Action<IParseNode>>
             {
                 ["detail"] = node => _detail = node.GetObjectValue(UntypedNode.CreateFromDiscriminatorValue),
+                ["message"] = node => _message = node.GetStringValue(),
             };
 
         public void Serialize(ISerializationWriter writer)
@@ -135,11 +139,13 @@ public static class WellboreBulkWrite
             var chunks = paths.Select(Chunk).ToList();
             var adapter = context.Client.GetRequestAdapter("wellbore_ddms");
             var recordId = parseResult.GetValue(id)!;
+            // Progress only at a terminal; what became of a session is said either way.
             var progress = Console.IsErrorRedirected ? null : Console.Error;
 
             var json = chunks.Count == 1 && !parseResult.GetValue(update)
                 ? await WriteAsync(adapter, entity, recordId, chunks[0], token)
-                : await WriteSessionAsync(adapter, entity, recordId, chunks, parseResult.GetValue(update), progress, token);
+                : await WriteSessionAsync(adapter, entity, recordId, chunks, parseResult.GetValue(update), progress,
+                    Console.Error, token);
             return context.Output.Write(json, OutputSpec.Raw);
         }, cancellationToken, Roles));
 
@@ -226,8 +232,17 @@ public static class WellboreBulkWrite
     /// Opens a session, sends <paramref name="parts"/> in order, and commits it: one new version.
     /// Abandons it on any failure, so a partial upload is never committed.
     /// </summary>
+    /// <remarks>
+    /// <para>What became of the session is written to <paramref name="notes"/> whether or not
+    /// progress is shown: a script's log needs the session id of an upload that went wrong more
+    /// than a terminal does.</para>
+    ///
+    /// <para>A commit that gets no answer is not a failed upload. The version may exist, so the
+    /// session is not abandoned; its state is asked for instead, and a committed session is the
+    /// success it is.</para>
+    /// </remarks>
     internal static async Task<string?> WriteSessionAsync(IRequestAdapter adapter, Entity entity, string recordId,
-        IReadOnlyList<Part> parts, bool update, TextWriter? progress, CancellationToken cancellationToken)
+        IReadOnlyList<Part> parts, bool update, TextWriter? progress, TextWriter notes, CancellationToken cancellationToken)
     {
         var opened = await SendJsonAsync(adapter, Request(adapter, Method.POST, "/sessions", entity, recordId),
             new JsonObject { ["mode"] = update ? "update" : "overwrite" }, cancellationToken);
@@ -241,26 +256,71 @@ public static class WellboreBulkWrite
                 progress?.WriteLine($"Sending {index + 1} of {parts.Count}: {parts[index].Path} ({SignedUrlTransfer.Size(parts[index].Length)})");
                 await SendChunkAsync(adapter, entity, recordId, session, parts[index], cancellationToken);
             }
-            return await SendJsonAsync(adapter, Request(adapter, Method.PATCH, "/sessions/{session_id}", entity, recordId, session),
-                new JsonObject { ["state"] = "commit" }, cancellationToken);
         }
         catch (Exception exception) when (exception is not OutOfMemoryException)
         {
-            // Not the command's token, which an interruption has cancelled. Best effort: the
-            // failure that got here is what the user needs to see, and the service drops a
-            // session left open when its time to live runs out.
-            using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(10));
-            try
-            {
-                await SendJsonAsync(adapter, Request(adapter, Method.PATCH, "/sessions/{session_id}", entity, recordId, session),
-                    new JsonObject { ["state"] = "abandon" }, timeout.Token);
-                progress?.WriteLine($"Abandoned session {session}: nothing was written.");
-            }
-            catch (Exception abandonFailure) when (abandonFailure is not OutOfMemoryException)
-            {
-                progress?.WriteLine($"Session {session} could not be abandoned; it is dropped when its time to live runs out.");
-            }
+            await AbandonAsync(adapter, entity, recordId, session, notes);
             throw;
+        }
+
+        try
+        {
+            return await SendJsonAsync(adapter, Request(adapter, Method.PATCH, "/sessions/{session_id}", entity, recordId, session),
+                new JsonObject { ["state"] = "commit" }, cancellationToken);
+        }
+        catch (ApiException)
+        {
+            // Answered and refused, by the check the service runs on committing: nothing new.
+            await AbandonAsync(adapter, entity, recordId, session, notes);
+            throw;
+        }
+        catch (Exception exception) when (exception is not OutOfMemoryException)
+        {
+            var (state, json) = await StateAsync(adapter, entity, recordId, session);
+            if (state == "committed")
+            {
+                notes.WriteLine($"The commit of session {session} got no answer, but the session is committed: the new version was written.");
+                return json;
+            }
+            notes.WriteLine(
+                $"The commit of session {session} got no answer, and the session is {state ?? "in a state that could not be read"}. "
+                + $"Check it with `osducs {entity.Noun} data session get --id {recordId} --session {session}` before writing again.");
+            throw;
+        }
+    }
+
+    /// <summary>Abandons a session, saying how it went; never throws, so the failure that led here is reported.</summary>
+    private static async Task AbandonAsync(IRequestAdapter adapter, Entity entity, string recordId, Guid session, TextWriter notes)
+    {
+        // Not the command's token, which an interruption has cancelled.
+        using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(10));
+        try
+        {
+            await SendJsonAsync(adapter, Request(adapter, Method.PATCH, "/sessions/{session_id}", entity, recordId, session),
+                new JsonObject { ["state"] = "abandon" }, timeout.Token);
+            notes.WriteLine($"Abandoned session {session}: nothing was written.");
+        }
+        catch (Exception exception) when (exception is not OutOfMemoryException)
+        {
+            notes.WriteLine($"Session {session} could not be abandoned. Nothing from it is written unless it is committed, "
+                            + "and the service drops it when its time to live runs out.");
+        }
+    }
+
+    /// <summary>A session's state, and the session as JSON, or nulls when it cannot be read.</summary>
+    private static async Task<(string? State, string? Json)> StateAsync(IRequestAdapter adapter, Entity entity,
+        string recordId, Guid session)
+    {
+        using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(10));
+        try
+        {
+            var json = await ReadAsync(adapter, Request(adapter, Method.GET, "/sessions/{session_id}", entity, recordId, session),
+                timeout.Token);
+            return (JsonNode.Parse(json ?? "null")?["state"]?.GetValue<string>(), json);
+        }
+        catch (Exception exception) when (exception is not OutOfMemoryException)
+        {
+            return (null, null);
         }
     }
 

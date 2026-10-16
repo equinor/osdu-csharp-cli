@@ -666,7 +666,7 @@ commands:
           help: >-
             overwrite to replace the bulk with what the session sends, or update to merge it into
             the version the session starts from.
-        fromVersion: { flag: --from-version, type: int, help: "Version to start from with --mode update. The latest when omitted." }
+        fromVersion: { flag: --from-version, type: long, help: "Version to start from with --mode update. The latest when omitted." }
         timeToLive:  { flag: --ttl, type: int, help: "Minutes the session stays open before it is dropped, at most 1440 (the default)." }
     examples:
       - args: --id "opendes:work-product-component--WellLog:1000" --mode overwrite
@@ -743,7 +743,7 @@ commands:
           help: >-
             overwrite to replace the bulk with what the session sends, or update to merge it into
             the version the session starts from.
-        fromVersion: { flag: --from-version, type: int, help: "Version to start from with --mode update. The latest when omitted." }
+        fromVersion: { flag: --from-version, type: long, help: "Version to start from with --mode update. The latest when omitted." }
         timeToLive:  { flag: --ttl, type: int, help: "Minutes the session stays open before it is dropped, at most 1440 (the default)." }
     examples:
       - args: --id "opendes:work-product-component--WellboreTrajectory:1000" --mode overwrite
@@ -820,7 +820,7 @@ commands:
           help: >-
             overwrite to replace the bulk with what the session sends, or update to merge it into
             the version the session starts from.
-        fromVersion: { flag: --from-version, type: int, help: "Version to start from with --mode update. The latest when omitted." }
+        fromVersion: { flag: --from-version, type: long, help: "Version to start from with --mode update. The latest when omitted." }
         timeToLive:  { flag: --ttl, type: int, help: "Minutes the session stays open before it is dropped, at most 1440 (the default)." }
     examples:
       - args: --id "opendes:work-product-component--PPFGDataset:1000" --mode overwrite
@@ -897,7 +897,7 @@ commands:
           help: >-
             overwrite to replace the bulk with what the session sends, or update to merge it into
             the version the session starts from.
-        fromVersion: { flag: --from-version, type: int, help: "Version to start from with --mode update. The latest when omitted." }
+        fromVersion: { flag: --from-version, type: long, help: "Version to start from with --mode update. The latest when omitted." }
         timeToLive:  { flag: --ttl, type: int, help: "Minutes the session stays open before it is dropped, at most 1440 (the default)." }
     examples:
       - args: --id "opendes:work-product-component--WellPressureTestRawMeasurement:1000" --mode overwrite

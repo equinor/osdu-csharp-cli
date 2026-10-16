@@ -2304,7 +2304,7 @@ public static partial class WellboreDdmsCommands
             Required = true,
         };
         modeBodyOption.AcceptAnyCasingFromAmong("overwrite", "update");
-        var fromversionBodyOption = new Option<int?>("--from-version")
+        var fromversionBodyOption = new Option<long?>("--from-version")
         {
             Description = "Version to start from with --mode update. The latest when omitted.",
         };
@@ -2472,7 +2472,7 @@ public static partial class WellboreDdmsCommands
             Required = true,
         };
         modeBodyOption.AcceptAnyCasingFromAmong("overwrite", "update");
-        var fromversionBodyOption = new Option<int?>("--from-version")
+        var fromversionBodyOption = new Option<long?>("--from-version")
         {
             Description = "Version to start from with --mode update. The latest when omitted.",
         };
@@ -2640,7 +2640,7 @@ public static partial class WellboreDdmsCommands
             Required = true,
         };
         modeBodyOption.AcceptAnyCasingFromAmong("overwrite", "update");
-        var fromversionBodyOption = new Option<int?>("--from-version")
+        var fromversionBodyOption = new Option<long?>("--from-version")
         {
             Description = "Version to start from with --mode update. The latest when omitted.",
         };
@@ -2808,7 +2808,7 @@ public static partial class WellboreDdmsCommands
             Required = true,
         };
         modeBodyOption.AcceptAnyCasingFromAmong("overwrite", "update");
-        var fromversionBodyOption = new Option<int?>("--from-version")
+        var fromversionBodyOption = new Option<long?>("--from-version")
         {
             Description = "Version to start from with --mode update. The latest when omitted.",
         };
