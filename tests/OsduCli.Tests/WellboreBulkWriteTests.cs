@@ -165,8 +165,10 @@ public sealed class WellboreBulkWriteTests : IDisposable
         var ddms = new Ddms();
         var parts = new[] { Write("a.parquet", ParquetFile), Write("b.json", SplitJson) }.Select(WellboreBulkWrite.Chunk).ToList();
 
+        // Without progress, as in a script: the outcome is still said.
+        var notes = new StringWriter();
         var answer = await WellboreBulkWrite.WriteSessionAsync(Adapter(ddms), WellLog, Record, parts, update, null,
-            new StringWriter(), TestContext.Current.CancellationToken);
+            notes, TestContext.Current.CancellationToken);
 
         Assert.Equal(["POST /sessions", "POST /data", "POST /data", "PATCH /session"],
             ddms.Requests.Select(request => $"{request.Method} /{request.Path.Split('/')[^1].Replace(Session.ToString(), "session")}"));
@@ -176,6 +178,7 @@ public sealed class WellboreBulkWriteTests : IDisposable
         Assert.Equal($"/api/os-wellbore-ddms/ddms/v3/welllogs/{Record}/sessions/{Session}/data", Uri.UnescapeDataString(ddms.Requests[1].Path));
         Assert.Equal("commit", JsonNode.Parse(ddms.Requests[3].Body)!["state"]!.GetValue<string>());
         Assert.Equal("committed", JsonNode.Parse(answer!)!["state"]!.GetValue<string>());
+        Assert.Equal($"Committed session {Session} as version 2." + Environment.NewLine, notes.ToString());
     }
 
     [Fact]

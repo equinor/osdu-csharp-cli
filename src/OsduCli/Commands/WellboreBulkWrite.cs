@@ -271,8 +271,11 @@ public static class WellboreBulkWrite
 
         try
         {
-            return await SendJsonAsync(adapter, Request(adapter, Method.PATCH, "/sessions/{session_id}", entity, recordId, session),
+            var committed = await SendJsonAsync(adapter, Request(adapter, Method.PATCH, "/sessions/{session_id}", entity, recordId, session),
                 new JsonObject { ["state"] = "commit" }, cancellationToken);
+            var version = JsonNode.Parse(committed ?? "null")?["version"];
+            notes.WriteLine($"Committed session {session}" + (version is null ? "." : $" as version {version}."));
+            return committed;
         }
         catch (ApiException)
         {
