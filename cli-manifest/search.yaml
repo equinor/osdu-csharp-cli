@@ -4,7 +4,7 @@
 # are records, and `osducs record search` sits beside `osducs record list` so the two ways of
 # finding a record are next to each other in help. The Python CLI splits them across
 # `osdu search query` and `osdu storage list`, which puts the alternatives in different
-# parts of the tree. See COMMAND-GRAMMAR.md.
+# parts of the tree. See docs/COMMAND-GRAMMAR.md.
 
 service: search
 spec: search

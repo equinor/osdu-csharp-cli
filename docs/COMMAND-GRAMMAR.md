@@ -55,7 +55,7 @@ manifest's `handwritten:` block, pointing here.
 interactive confirm. Withholding capability to prevent accidents is a UX failure, not a
 safety feature.
 
-> **Built:** a manifest's `confirm:` key (see [MANIFEST.md](docs/MANIFEST.md#confirm)). Before
+> **Built:** a manifest's `confirm:` key (see [MANIFEST.md](MANIFEST.md#confirm)). Before
 > anything is sent the command says what it is about to do, and in which data partition on
 > which server, then asks; `--yes` skips the question but not the statement, and with no
 > terminal to ask at the command refuses. The `index` commands were the first to use it;
@@ -219,7 +219,7 @@ command (§3.2).
 > **Built:** `osducs record search` covers both without a `--cursor` option or a
 > `close-cursor` command. A `--limit` above 1000, or `--all`, sends the same request to
 > `/query_with_cursor` and follows the cursor to the end, releasing it when the command stops
-> early. The manifest's `paging:` key expresses it; see [MANIFEST.md](docs/MANIFEST.md#paging).
+> early. The manifest's `paging:` key expresses it; see [MANIFEST.md](MANIFEST.md#paging).
 
 ### index — Indexer (8 ops)
 

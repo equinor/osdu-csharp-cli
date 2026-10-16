@@ -5,7 +5,7 @@
 # conversions (apply one to actual coordinates). A user asking "how do I reproject this?"
 # should not have to know that OSDU splits those across two deployments.
 #
-# This is why R2 in COMMAND-GRAMMAR.md is "noun + verb resolves to exactly one operation"
+# This is why R2 in docs/COMMAND-GRAMMAR.md is "noun + verb resolves to exactly one operation"
 # rather than "one noun, one service".
 
 service: crs_catalog
@@ -52,7 +52,7 @@ exclude:
   - op: { method: post, path: /v3/coordinate-reference-system }
     reason: >
       Batch form of `crs get`, taking several ids in a body — the spec names the pair
-      getCoordinateReferenceSystem and getCoordinateReferenceSystems. COMMAND-GRAMMAR.md §3.1.
+      getCoordinateReferenceSystem and getCoordinateReferenceSystems. docs/COMMAND-GRAMMAR.md §3.1.
   - op: { method: post, path: /v3/coordinate-transformation }
     reason: Batch form of `crs transform`, same GET/POST twin pattern as above.
 

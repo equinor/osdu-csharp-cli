@@ -246,12 +246,12 @@ commands:
 exclude:
   # Eight GET/POST twins — by far the densest cluster of them in OSDU. In every case the
   # POST takes the same selectors the GET takes as query parameters, wrapped in a body, so
-  # that callers can send many at once. COMMAND-GRAMMAR.md §3.1 keeps the GET.
+  # that callers can send many at once. docs/COMMAND-GRAMMAR.md §3.1 keeps the GET.
   - op: { method: post, path: /v3/unit }
     reason: >
       Body form of `unit get`: it takes a unit essence in the body and returns the single
       matching unit, rather than listing units the way GET /v3/unit does. GET/POST twin,
-      see COMMAND-GRAMMAR.md §3.1.
+      see docs/COMMAND-GRAMMAR.md §3.1.
   - op: { method: post, path: /v3/unit/measurement }
     reason: Body form of `unit by-measurement`; GET/POST twin.
   - op: { method: post, path: /v3/unit/measurement/preferred }
