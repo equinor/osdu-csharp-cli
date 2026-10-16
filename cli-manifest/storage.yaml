@@ -5,7 +5,7 @@
 # a human wants to see in the output. Everything else is generated.
 #
 # The command group is `record`, not `storage`: commands are named for the resource the
-# user is acting on, not the OSDU service that happens to host it. See COMMAND-GRAMMAR.md.
+# user is acting on, not the OSDU service that happens to host it. See docs/COMMAND-GRAMMAR.md.
 #
 # Every operation in the spec must appear here in exactly one of `commands`, `handwritten`
 # or `exclude`. tools/generate_cli.py fails the build otherwise, so a new upstream endpoint

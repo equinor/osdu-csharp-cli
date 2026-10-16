@@ -138,7 +138,7 @@ Testing it for the first time? [docs/PEER-TEST.md](docs/PEER-TEST.md) is a 20-mi
 | [docs/DESIGN.md](docs/DESIGN.md) | why commands are generated from the specs, and what the manifests decide |
 | [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md) | for maintainers: how the code fits together, upgrading the client, releasing |
 | [docs/MANIFEST.md](docs/MANIFEST.md) | every key a manifest can use, for adding or changing commands |
-| [COMMAND-GRAMMAR.md](COMMAND-GRAMMAR.md) | why commands are named as they are |
+| [COMMAND-GRAMMAR.md](docs/COMMAND-GRAMMAR.md) | why commands are named as they are |
 
 ## How it is built
 

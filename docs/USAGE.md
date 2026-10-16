@@ -132,7 +132,7 @@ Only these values are used: server, data partition, authority, client id, scopes
 authentication mode and client secret. The per-service `*_url` entries in a profile are
 **ignored** — this CLI derives each base path from the service's own OpenAPI spec, and
 honouring the profile would double the version segment. See
-[COMMAND-GRAMMAR.md](../COMMAND-GRAMMAR.md).
+[COMMAND-GRAMMAR.md](COMMAND-GRAMMAR.md).
 
 ## Signing in as a particular account
 

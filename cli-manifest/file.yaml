@@ -3,7 +3,7 @@
 # File and Dataset overlap at the platform level: both hand out signed URLs and both track
 # metadata records. The split used here is the one the services themselves make — File deals
 # with a single file's bytes and its metadata record, Dataset deals with registries and
-# multi-dataset instructions. COMMAND-GRAMMAR.md §3.4 records that this needs confirming
+# multi-dataset instructions. docs/COMMAND-GRAMMAR.md §3.4 records that this needs confirming
 # against Equinor's actual ingestion path before either grows further.
 
 service: file

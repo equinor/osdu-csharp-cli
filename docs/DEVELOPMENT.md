@@ -22,7 +22,7 @@ cli-manifest/*.yaml                                              what the CLI ex
   coverage check sees the same operations the client has methods for. Fetched into a gitignored
   `openapi_specs/`. See [Where the specs come from](#where-the-specs-come-from).
 - **Manifests.** One per service. Every key is listed in [MANIFEST.md](MANIFEST.md), and the
-  reasoning behind the rules is in [COMMAND-GRAMMAR.md](../COMMAND-GRAMMAR.md).
+  reasoning behind the rules is in [COMMAND-GRAMMAR.md](COMMAND-GRAMMAR.md).
 - **Generated code.** Committed, so building needs no Python. CI regenerates it on every pull
   request and fails if the result differs from what is committed.
 

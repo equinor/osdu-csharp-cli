@@ -2,7 +2,7 @@
 #
 # Dataset is the generic registry: it tracks dataset records of any kind and issues the
 # storage and retrieval instructions that tell a client where the bytes live. See file.yaml
-# for the boundary between the two, and COMMAND-GRAMMAR.md §3.4 for the open question.
+# for the boundary between the two, and docs/COMMAND-GRAMMAR.md §3.4 for the open question.
 
 service: dataset
 spec: dataset
@@ -90,7 +90,7 @@ exclude:
     reason: >
       Batch form of `dataset get`, taking a list of ids in a body rather than one in a query
       string — the spec even names them getDatasetRegistry and getDatasetRegistry_1. One of
-      the 12 GET/POST twins in COMMAND-GRAMMAR.md §3.1; the GET is the CLI-shaped one.
+      the 12 GET/POST twins in docs/COMMAND-GRAMMAR.md §3.1; the GET is the CLI-shaped one.
   - op: { method: post, path: /retrievalInstructions }
     reason: >
       Batch form of `dataset download-url`, same GET/POST twin pattern as above.

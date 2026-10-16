@@ -7,7 +7,7 @@
 # has no command at all despite the endpoint existing.
 #
 # Naming commands after the service would force those two into one `entitlements` group and
-# lose the symmetry. See COMMAND-GRAMMAR.md and Runtime/CommandTree.cs.
+# lose the symmetry. See docs/COMMAND-GRAMMAR.md and Runtime/CommandTree.cs.
 
 service: entitlements
 spec: entitlements
@@ -171,7 +171,7 @@ handwritten:
     reason: >
       Every group in the data partition, paged by a cursor. `--all` sends `group list` to this
       endpoint, with options of its own, which one manifest entry cannot express
-      (COMMAND-GRAMMAR.md §3.2). Commands/GroupListAll.cs, through the Customize hook.
+      (docs/COMMAND-GRAMMAR.md §3.2). Commands/GroupListAll.cs, through the Customize hook.
 
   - command: status
     op: { method: get, path: /info }

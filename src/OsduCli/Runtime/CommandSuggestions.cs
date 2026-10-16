@@ -21,7 +21,7 @@ namespace Equinor.OsduCli.Runtime;
 /// that one a typo away. The help shown afterwards is for the command the bad word followed,
 /// not wherever the parser happened to stop.</para>
 ///
-/// <para>The typo step restores something COMMAND-GRAMMAR.md listed as already in place.
+/// <para>The typo step restores something docs/COMMAND-GRAMMAR.md listed as already in place.
 /// System.CommandLine's earlier betas suggested corrections; 2.0 does not, so
 /// <c>osducs record serch</c> had been answered with "Unrecognized command" and nothing
 /// more.</para>

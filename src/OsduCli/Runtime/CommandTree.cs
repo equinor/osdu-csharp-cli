@@ -7,7 +7,7 @@ namespace Equinor.OsduCli.Runtime;
 /// </summary>
 /// <remarks>
 /// Commands are named for the resource, not the service that hosts it
-/// (see COMMAND-GRAMMAR.md), and those two things do not line up one-to-one:
+/// (see docs/COMMAND-GRAMMAR.md), and those two things do not line up one-to-one:
 ///
 /// <list type="bullet">
 /// <item>One service can own several nouns — Entitlements supplies both <c>osducs group</c>

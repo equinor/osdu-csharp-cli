@@ -7,7 +7,7 @@ same information at the terminal, and is the authority if the two ever disagree.
 
 Commands are named for the **resource**, not the service that hosts it, so verbs live under
 the thing they act on: searching records is `osducs record search`. See
-[COMMAND-GRAMMAR.md](../COMMAND-GRAMMAR.md) for why.
+[COMMAND-GRAMMAR.md](COMMAND-GRAMMAR.md) for why.
 
 Hand-written commands — `osducs status`, `osducs record add`, `osducs file upload`,
 `osducs file download`, `osducs completion` — are not listed here, since no manifest describes
