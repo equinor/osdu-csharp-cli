@@ -38,6 +38,12 @@ public static class WellboreBulkWrite
     ];
 
     private const string Roles = "users.datalake.editors or users.datalake.admins";
+
+    /// <summary>
+    /// Why these commands keep their bodies out of <c>--debug</c>: the client reads a body whole
+    /// to log it, so a curve file of gigabytes went into memory before it was sent.
+    /// </summary>
+    internal const string FileBodies = "they are whole files, read into memory to be logged";
     internal const string Parquet = "application/x-parquet";
     internal const string Json = "application/json";
 
@@ -147,7 +153,7 @@ public static class WellboreBulkWrite
                 : await WriteSessionAsync(adapter, entity, recordId, chunks, parseResult.GetValue(update), progress,
                     Console.Error, token);
             return context.Output.Write(json, OutputSpec.Raw);
-        }, cancellationToken, Roles));
+        }, cancellationToken, Roles, hideBodiesBecause: FileBodies));
 
         return command;
     }
@@ -173,7 +179,7 @@ public static class WellboreBulkWrite
                 parseResult.GetValue(id)!, parseResult.GetValue(session), Chunk(parseResult.GetValue(file)!), token);
             return context.Output.Write(json, OutputSpec.Table(null,
                 ("Rows", "rowCount"), ("Columns", "columnCount"), ("IndexStart", "indexStart"), ("IndexEnd", "indexEnd")));
-        }, cancellationToken, Roles));
+        }, cancellationToken, Roles, hideBodiesBecause: FileBodies));
 
         return command;
     }

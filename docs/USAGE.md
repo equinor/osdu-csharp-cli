@@ -506,6 +506,8 @@ osducs welllog data session list --id <id>
 ```
 
 `welllog version update-stats` recomputes a version's curve statistics from its bulk data.
+`--debug` leaves request and response bodies out for `data add` and `session send`: logging one
+would mean reading the whole file into memory first.
 
 ## Operations
 

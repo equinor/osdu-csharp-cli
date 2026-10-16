@@ -30,6 +30,9 @@ public static class SubscriptionSecrets
 {
     private const string Roles = "users.datalake.ops, users.datalake.admins or users.datalake.editors";
 
+    /// <summary>Why these commands keep their bodies out of <c>--debug</c>.</summary>
+    internal const string SecretBodies = "they carry a secret";
+
     private static readonly Dictionary<string, ParsableFactory<IParsable>> Errors =
         new() { ["XXX"] = AppError.CreateFromDiscriminatorValue };
 
@@ -49,7 +52,7 @@ public static class SubscriptionSecrets
             var json = Subscription(await CliContext.ReadBodyFileAsync(parseResult.GetValue(file)!, token));
             var request = context.Client.Register.Subscription.ToPostRequestInformation(new Subscription());
             return context.Output.Write(await SendAsync(context.Client.GetRequestAdapter("register"), request, json, token), Created);
-        }, cancellationToken, Roles, hideBodies: true));
+        }, cancellationToken, Roles, hideBodiesBecause: SecretBodies));
 
         var update = Find(subscription, "update-secret");
         var id = Option<string>(update, "--id");
@@ -62,7 +65,7 @@ public static class SubscriptionSecrets
                 .ToPutRequestInformation(new SecretPutRequestBody { HmacSecret = new HmacSecret() });
             await SendAsync(context.Client.GetRequestAdapter("register"), request, json, token);
             return context.Output.WriteMessage("Secret updated");
-        }, cancellationToken, Roles, hideBodies: true));
+        }, cancellationToken, Roles, hideBodiesBecause: SecretBodies));
 
         var find = Find(subscription, "find");
         var notificationId = Option<string>(find, "--notification-id");
@@ -71,7 +74,7 @@ public static class SubscriptionSecrets
             var request = context.Client.Register.Subscription.ToGetRequestInformation(
                 configuration => configuration.QueryParameters.NotificationId = parseResult.GetValue(notificationId));
             return context.Output.Write(await SendAsync(context.Client.GetRequestAdapter("register"), request, null, token), Found);
-        }, cancellationToken, Roles, hideBodies: true));
+        }, cancellationToken, Roles, hideBodiesBecause: SecretBodies));
     }
 
     /// <summary>
