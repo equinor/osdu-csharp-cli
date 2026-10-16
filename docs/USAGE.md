@@ -20,7 +20,7 @@ crs-catalog     ok      0.29.2-SNAPSHOT  2026-08-05T09:49:35.371Z
 crs-conversion  ok      0.29.2-SNAPSHOT  2026-08-05T09:49:28.770Z
 storage         ok      0.29.4-SNAPSHOT  2026-08-05T19:04:12.267Z
 wellbore-ddms   ok      0.29
-...            (13 services in all)
+...            (14 services in all)
 ```
 
 That first line is deliberate: with a default profile in play, which environment you are
@@ -498,6 +498,24 @@ osducs record version purge --id "dev:master-data--Well:1000" --limit 5       # 
 osducs group list --all                                                        # every group in the data partition
 osducs group list --all --type data                                            # data groups only; also user, service
 ```
+
+Notification subscriptions are kept by Register. A subscription sends a topic's messages to a push
+endpoint, with a secret the endpoint checks them by; its file holds `name`, `topic`,
+`pushEndpoint` and the `secret`, which is why it is read from a file rather than options.
+
+```bash
+osducs topic list                                                   # what can be subscribed to
+osducs subscription add --file subscription.json                    # prints the id and notification id
+osducs subscription get --id <id>
+osducs subscription update-secret --id <id> --file secret.json
+osducs subscription delete --id <id>
+```
+
+ADME has no way to list every subscription: `subscription find --notification-id` looks them up
+by the notification id a subscription is created with.
+
+The subscription and secret files are sent as they are written, and `--debug` leaves the bodies
+of `subscription add`, `update-secret` and `find` out of its log, since they carry the secret.
 
 `record replay` takes `--operation reindex`, which sends the records to the Indexer, or `replay`,
 which publishes them as record changes to every consumer. It prints a replay id to follow with

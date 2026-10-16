@@ -65,8 +65,8 @@ safety feature.
 
 ## 2. The tree
 
-> **Status: built.** Every tree in this section is implemented — 140 generated commands
-> across 13 services plus the hand-written `osducs status`. Where the delivered shape differs
+> **Status: built.** Every tree in this section is implemented — 155 generated commands
+> across 14 services plus the hand-written `osducs status`. Where the delivered shape differs
 > from the sketch below, the delivered shape is authoritative; run `osdu <noun> --help` to
 > see it. Two changes were made during implementation:
 >
@@ -236,6 +236,32 @@ operator's, left out while the CLI was taken to be for data users; the operation
 uses it. `delete`, `reindex-partition` and `provision` ask first (R6), and `reindex` does with
 `--force-clean`, which deletes the kind's index before rebuilding it. `/info` is reported by
 `osducs status`; the readiness and liveness probes are excluded.
+
+### subscription, topic, ddms, action — Register (25 ops)
+
+```
+osducs subscription find --notification-id N           GET    /subscription
+osducs subscription get  --id ID                       GET    /subscription/{id}
+osducs subscription add  --file F                      POST   /subscription
+osducs subscription update-secret --id ID --file F     PUT    /subscription/{id}/secret
+osducs subscription delete --id ID --yes               DELETE /subscription/{id}
+osducs topic list                                      GET    /topics
+osducs ddms list   --type T                            GET    /ddms
+osducs ddms get    --id ID                             GET    /ddms/{id}
+osducs ddms add    --file F                            POST   /ddms
+osducs ddms delete --id ID --yes                       DELETE /ddms/{id}
+osducs action get    --id ID                           GET    /action/{id}
+osducs action add    --file F                          POST   /action
+osducs action test   --file F                          POST   /action:test
+osducs action match  --file F                          POST   /action:retrieve
+osducs action delete --id ID --yes                     DELETE /action/{id}
+```
+
+Register's nouns are what it keeps: subscriptions, the topics they are for, DDMS
+registrations and actions. Bodies come from files, since a subscription carries its secret.
+`GET /subscriptions`, every subscription, exists only in the core-plus build and answers 404 on
+ADME, so it is excluded; so are the redirect to a DDMS record and the `/test-gc` endpoints.
+`/info` is reported by `osducs status`.
 
 ### file — File (6 ops)
 

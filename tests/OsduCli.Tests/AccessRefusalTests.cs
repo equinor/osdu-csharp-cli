@@ -44,6 +44,55 @@ public class AccessRefusalTests : ConfigTestDirectories
     }
 
     [Fact]
+    public void AnUnreachableServiceIsDescribedByWhatStoppedIt()
+    {
+        // As dev answered once: three exceptions deep, and only the last says what happened.
+        var exception = new HttpRequestException("The SSL connection could not be established, see inner exception.",
+            new IOException("Unable to read data from the transport connection: Operation timed out.",
+                new System.Net.Sockets.SocketException(60)));
+
+        Assert.StartsWith("The SSL connection could not be established, see inner exception: ", CliRunner.Reason(exception));
+        Assert.EndsWith(new System.Net.Sockets.SocketException(60).Message, CliRunner.Reason(exception));
+    }
+
+    [Fact]
+    public async Task AnUnreachableServiceIsOneLine()
+    {
+        var said = await Run(new HttpRequestException("No such host is known."));
+
+        Assert.Equal("error: could not reach the service. No such host is known." + Environment.NewLine, said);
+    }
+
+    [Fact]
+    public async Task ATimeoutIsNotACancellation()
+    {
+        var said = await Run(new TaskCanceledException("The request was canceled.", new TimeoutException()));
+
+        Assert.Equal("error: the service did not answer in time." + Environment.NewLine, said);
+    }
+
+    private async Task<string> Run(Exception failure)
+    {
+        var profile = WritePythonProfile("ops", "https://osdu.example.com",
+            "authentication_mode = msal_non_interactive", "client_secret = not-used");
+        var root = new RootCommand("osducs");
+        GlobalOptions.AddTo(root);
+        var error = new StringWriter();
+        var original = Console.Error;
+        Console.SetError(error);
+        try
+        {
+            await CliRunner.RunAsync(root.Parse(["-c", profile]), (_, _) => throw failure,
+                TestContext.Current.CancellationToken);
+        }
+        finally
+        {
+            Console.SetError(original);
+        }
+        return error.ToString();
+    }
+
+    [Fact]
     public async Task ARejectedTokenDoesNot()
     {
         var said = await Refused(401, "401 - Unauthorized: Access is denied due to invalid credentials.");
