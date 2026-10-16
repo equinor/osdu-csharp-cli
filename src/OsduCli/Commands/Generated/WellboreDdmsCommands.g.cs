@@ -778,7 +778,7 @@ public static partial class WellboreDdmsCommands
             Description = "WellLog record id.",
             Required = true,
         };
-        var versionOption = new Option<int>("--version", "-v")
+        var versionOption = new Option<long>("--version", "-v")
         {
             Description = "WellLog record version.",
             Required = true,
@@ -2907,7 +2907,7 @@ public static partial class WellboreDdmsCommands
             Description = "WellLog record id.",
             Required = true,
         };
-        var versionOption = new Option<int>("--version", "-v")
+        var versionOption = new Option<long>("--version", "-v")
         {
             Description = "WellLog record version.",
             Required = true,

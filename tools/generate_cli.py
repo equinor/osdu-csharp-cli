@@ -1146,7 +1146,11 @@ def build_command(entry: dict, operation: dict, where: str, models_root: str,
             )
         raw_schema = spec_param.get("schema") or {}
         schema = normalise_schema(raw_schema, spec)
-        wrapped = bool(raw_schema.get("anyOf") or raw_schema.get("oneOf"))
+        # Kiota loses a query parameter's format behind the nullable wrapper, but not a path
+        # parameter's: its indexer keeps `Int64`. `welllog version stats --version` was an
+        # `int` that could not hold a real version, a sixteen-digit number, while the indexer
+        # it feeds takes a long.
+        wrapped = bool(raw_schema.get("anyOf") or raw_schema.get("oneOf")) and location == "query"
         # A $ref survives the nullable wrapper, so look for it on either.
         shared = shared_enum_type(models_root, raw_schema) or shared_enum_type(
             models_root, next((b for b in (raw_schema.get("anyOf")

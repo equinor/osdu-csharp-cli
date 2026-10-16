@@ -65,7 +65,9 @@ public sealed class WellboreBulkWriteTests : IDisposable
                 var chunkAnswer = chunkStatus?.Invoke(_chunks) ?? HttpStatusCode.OK;
                 return chunkAnswer == HttpStatusCode.OK
                     ? (chunkAnswer, """{"rowCount":2,"columnCount":2,"columns":["MD","GR"],"indexStart":"0","indexEnd":"1","indexType":"int"}""")
-                    : (chunkAnswer, """{"detail":[{"loc":["body"],"msg":"bad chunk","type":"value_error"}]}""");
+                    : chunkAnswer == HttpStatusCode.BadRequest
+                        ? (chunkAnswer, """{"detail":"Column(s) do(es) not match any CurveID of the WellLog record."}""")
+                        : (chunkAnswer, """{"detail":[{"loc":["body","data"],"msg":"bad chunk","type":"value_error"},{"loc":["body"],"msg":"and another","type":"value_error"}]}""");
             }
         }
     }
@@ -176,6 +178,33 @@ public sealed class WellboreBulkWriteTests : IDisposable
     }
 
     [Fact]
+    public async Task ARefusalSaysWhyInTheServicesWords()
+    {
+        // `detail` is a sentence for most refusals; the client mapped only the list form, so
+        // "400 from the service." was all anyone saw.
+        var ddms = new Ddms(chunkStatus: _ => HttpStatusCode.BadRequest);
+
+        var exception = await Assert.ThrowsAnyAsync<ApiException>(() => WellboreBulkWrite.SendChunkAsync(Adapter(ddms),
+            WellLog, Record, Session, WellboreBulkWrite.Chunk(Write("a.json", SplitJson)), TestContext.Current.CancellationToken));
+
+        Assert.Equal(400, exception.ResponseStatusCode);
+        Assert.Equal("Column(s) do(es) not match any CurveID of the WellLog record.", exception.Message);
+        Assert.Equal(exception.Message, CliRunner.Describe(exception));
+    }
+
+    [Fact]
+    public async Task AValidationFailureNamesWhereAndWhat()
+    {
+        var ddms = new Ddms(chunkStatus: _ => HttpStatusCode.UnprocessableEntity);
+
+        var exception = await Assert.ThrowsAnyAsync<ApiException>(() => WellboreBulkWrite.SendChunkAsync(Adapter(ddms),
+            WellLog, Record, Session, WellboreBulkWrite.Chunk(Write("a.json", SplitJson)), TestContext.Current.CancellationToken));
+
+        // Where in the request, without the leading "body" that every entry has.
+        Assert.Equal("data: bad chunk; and another", exception.Message);
+    }
+
+    [Fact]
     public async Task AnInterruptionAbandonsTheSessionToo()
     {
         // With a token of its own: the command's is cancelled, and would cancel the abandon.
@@ -213,6 +242,18 @@ public sealed class WellboreBulkWriteTests : IDisposable
 
         Assert.Contains(data.Subcommands, c => c.Name == "add");
         Assert.Equal(["get", "list", "open", "send", "update"], session.Subcommands.Select(c => c.Name).Order());
+    }
+
+    [Theory]
+    [InlineData("welllog version stats")]
+    [InlineData("welllog version update-stats")]
+    public void ARealVersionNumberIsAccepted(string command)
+    {
+        // A version is the record's write time in microseconds, sixteen digits: it did not fit
+        // the int that `version stats` parsed it into.
+        var errors = Root().Parse([.. command.Split(' '), "--id", Record, "--version", "1792150494962265"]).Errors;
+
+        Assert.Empty(errors);
     }
 
     [Fact]
