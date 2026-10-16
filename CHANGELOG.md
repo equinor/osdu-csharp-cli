@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.19.0](https://github.com/equinor/osdu-csharp-cli/compare/v0.18.0...v0.19.0) (2026-10-16)
+
+
+### Features
+
+* **wellbore:** write well log, trajectory, PPFG and pressure test bulk data ([#75](https://github.com/equinor/osdu-csharp-cli/issues/75)) ([d8a38ee](https://github.com/equinor/osdu-csharp-cli/commit/d8a38ee5b135f382c33c6f84707914d71f012cbe))
+
 ## [0.18.0](https://github.com/equinor/osdu-csharp-cli/compare/v0.17.0...v0.18.0) (2026-10-16)
 
 
