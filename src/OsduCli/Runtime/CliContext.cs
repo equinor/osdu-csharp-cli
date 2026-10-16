@@ -61,7 +61,12 @@ public sealed class CliContext : IDisposable
     /// client; we register up front so <see cref="OsduJson"/> works even for commands that
     /// deserialise a request body before touching a client.
     /// </summary>
-    public static CliContext Create(ParseResult parseResult)
+    /// <param name="parseResult">The parsed command line.</param>
+    /// <param name="hideBodies">
+    /// Leave request and response bodies out of <c>--debug</c>'s log, for a command whose bodies
+    /// carry a secret: the client logs them as they are.
+    /// </param>
+    public static CliContext Create(ParseResult parseResult, bool hideBodies = false)
     {
         ApiClientBuilder.RegisterDefaultSerializer<JsonSerializationWriterFactory>();
         ApiClientBuilder.RegisterDefaultDeserializer<JsonParseNodeFactory>();
@@ -83,11 +88,7 @@ public sealed class CliContext : IDisposable
         // --debug turns on the client's own request/response logging. Exploratory testing
         // against a live service is mostly a question of "what did we actually send", and
         // without this the answer is a status code and nothing else.
-        var loggerFactory = parseResult.GetValue(GlobalOptions.Debug)
-            ? LoggerFactory.Create(builder => builder
-                .AddFilter("Equinor.OsduCsharpClient", LogLevel.Debug)
-                .AddConsole(options => options.LogToStandardErrorThreshold = LogLevel.Trace))
-            : null;
+        var loggerFactory = Logging(parseResult.GetValue(GlobalOptions.Debug), hideBodies);
 
         if (signIn.Method == SignInMethod.ClientCredentials)
         {
@@ -174,6 +175,28 @@ public sealed class CliContext : IDisposable
 
         return new MsalClientCredentialsTokenProvider(config, signIn.Secret.Value, loggerFactory);
     }
+
+    /// <summary>
+    /// The client's logging for <c>--debug</c>, or none without it: every request and response,
+    /// and their bodies unless <paramref name="hideBodies"/>, which says that it left them out.
+    /// </summary>
+    internal static ILoggerFactory? Logging(bool debug, bool hideBodies, TextWriter? note = null)
+    {
+        if (!debug)
+            return null;
+        if (hideBodies)
+            (note ?? Console.Error).WriteLine("--debug leaves out request and response bodies here: they carry a secret.");
+        return LoggerFactory.Create(builder =>
+        {
+            builder.AddFilter("Equinor.OsduCsharpClient", LogLevel.Debug)
+                .AddConsole(options => options.LogToStandardErrorThreshold = LogLevel.Trace);
+            if (hideBodies)
+                builder.AddFilter(BodyLog, LogLevel.None);
+        });
+    }
+
+    /// <summary>The client's logger for request and response bodies, which it does not redact.</summary>
+    internal const string BodyLog = "Equinor.OsduCsharpClient.Body";
 
     /// <summary>Reads and returns the contents of a JSON file passed via a command option.</summary>
     public static async Task<string> ReadBodyFileAsync(string path, CancellationToken cancellationToken)
