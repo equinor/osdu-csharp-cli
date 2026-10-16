@@ -412,6 +412,10 @@ def csharp_type(schema: dict) -> str:
         return "float?" if fmt == "float" else "double?"
     if kind == "boolean":
         return "bool?"
+    # Kiota types a uuid as a Guid, path indexers included: Wellbore DDMS's session_id was
+    # emitted as a string and did not compile. As an option it is refused when malformed.
+    if kind == "string" and fmt == "uuid":
+        return "Guid?"
     return "string"
 
 

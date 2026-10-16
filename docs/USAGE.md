@@ -477,6 +477,36 @@ Neither command sends the OSDU token to storage, since the signed URL authorises
 neither prints that URL. `file upload-url` and `file download-url` still hand it out for other
 tools.
 
+## Wellbore bulk data
+
+Well logs, trajectories, PPFG datasets and pressure tests carry bulk data: curves, read and written
+by `<noun> data` with `welllog`, `trajectory`, `ppfg` or `pressuretest` as the noun.
+
+```bash
+osducs welllog data get --id <id> --curves MD,GR --limit 10                    # read, as JSON
+osducs welllog data add --id <id> --file curves.parquet                        # the whole bulk, as a new version
+osducs welllog data add --id <id> --file part-1.parquet --file part-2.parquet  # in chunks, still one new version
+osducs welllog data add --id <id> --file gamma.json --update                   # merged into the latest version
+```
+
+A file is Parquet or JSON — a data frame saved with `orient="split"` — and which one is read
+from the file itself, not its name. One file replaces the bulk data. Several are sent as the
+chunks of one upload session, which the service recommends past ten million values or three
+thousand columns, and `--update` merges into the latest version instead of replacing it. Either
+way the session is committed only once every chunk has gone; a failure or Ctrl+C abandons it, so
+a half-sent upload never becomes a version.
+
+The session's steps can also be run by hand, as the Python CLI did:
+
+```bash
+osducs welllog data session open --id <id> --mode overwrite     # prints the session id
+osducs welllog data session send --id <id> --session <session> --file part-1.parquet
+osducs welllog data session update --id <id> --session <session> --state commit
+osducs welllog data session list --id <id>
+```
+
+`welllog version update-stats` recomputes a version's curve statistics from its bulk data.
+
 ## Operations
 
 The `index` commands re-index from Storage, and delete a kind's index; `record replay` sends

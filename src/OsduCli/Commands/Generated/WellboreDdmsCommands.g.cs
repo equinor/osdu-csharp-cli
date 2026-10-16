@@ -8,6 +8,7 @@
 // it cannot belongs in a partial class under Commands/Handwritten/ via the Customize hook.
 
 using System.CommandLine;
+using System.Text.Json.Nodes;
 using Microsoft.Kiota.Abstractions.Serialization;
 using Equinor.OsduCli.Runtime;
 using Equinor.OsduCsharpClient.WellboreDdms.Models;
@@ -75,6 +76,23 @@ public static partial class WellboreDdmsCommands
         tree.Node("pressuretest version").Subcommands.Add(BuildPressuretestVersionGet());
         tree.Node("pressuretest data").Subcommands.Add(BuildPressuretestDataGet());
         tree.Node("pressuretest version").Subcommands.Add(BuildPressuretestVersionData());
+        tree.Node("welllog data session").Subcommands.Add(BuildWelllogDataSessionList());
+        tree.Node("welllog data session").Subcommands.Add(BuildWelllogDataSessionGet());
+        tree.Node("welllog data session").Subcommands.Add(BuildWelllogDataSessionOpen());
+        tree.Node("welllog data session").Subcommands.Add(BuildWelllogDataSessionUpdate());
+        tree.Node("trajectory data session").Subcommands.Add(BuildTrajectoryDataSessionList());
+        tree.Node("trajectory data session").Subcommands.Add(BuildTrajectoryDataSessionGet());
+        tree.Node("trajectory data session").Subcommands.Add(BuildTrajectoryDataSessionOpen());
+        tree.Node("trajectory data session").Subcommands.Add(BuildTrajectoryDataSessionUpdate());
+        tree.Node("ppfg data session").Subcommands.Add(BuildPpfgDataSessionList());
+        tree.Node("ppfg data session").Subcommands.Add(BuildPpfgDataSessionGet());
+        tree.Node("ppfg data session").Subcommands.Add(BuildPpfgDataSessionOpen());
+        tree.Node("ppfg data session").Subcommands.Add(BuildPpfgDataSessionUpdate());
+        tree.Node("pressuretest data session").Subcommands.Add(BuildPressuretestDataSessionList());
+        tree.Node("pressuretest data session").Subcommands.Add(BuildPressuretestDataSessionGet());
+        tree.Node("pressuretest data session").Subcommands.Add(BuildPressuretestDataSessionOpen());
+        tree.Node("pressuretest data session").Subcommands.Add(BuildPressuretestDataSessionUpdate());
+        tree.Node("welllog version").Subcommands.Add(BuildWelllogVersionUpdateStats());
 
         Customize(tree);
     }
@@ -2204,6 +2222,713 @@ public static partial class WellboreDdmsCommands
                 await OsduJson.ToJsonAsync(result),
                 OutputSpec.Raw);
         }, cancellationToken, "users.datalake.viewers, users.datalake.editors or users.datalake.admins"));
+
+        return command;
+    }
+
+    /// <summary>List the bulk data upload sessions of a WellLog record.</summary>
+    /// <remarks>GET /ddms/v3/welllogs/{record_id}/sessions on the WellboreDdms service.</remarks>
+    private static Command BuildWelllogDataSessionList()
+    {
+        var recordIdOption = new Option<string>("--id", "-id")
+        {
+            Description = "WellLog record id.",
+            Required = true,
+        };
+
+        var command = new Command("list", "List the bulk data upload sessions of a WellLog record.");
+        command.Options.Add(recordIdOption);
+
+        command.SetAction((parseResult, cancellationToken) =>
+            CliRunner.RunAsync(parseResult, async (context, cancellationToken) =>
+        {
+            var recordId = parseResult.GetValue(recordIdOption)!;
+
+            var result = await context.Client.WellboreDdms.Ddms.V3.Welllogs[recordId].Sessions.GetAsync(cancellationToken: cancellationToken);
+
+            return context.Output.Write(
+                await OsduJson.ToJsonAsync(result),
+                OutputSpec.Table(null, ("Session", "id"), ("State", "state"), ("Mode", "mode"), ("FromVersion", "fromVersion"), ("Expiry", "expiry")));
+        }, cancellationToken));
+
+        return command;
+    }
+
+    /// <summary>Get a bulk data upload session of a WellLog record.</summary>
+    /// <remarks>GET /ddms/v3/welllogs/{record_id}/sessions/{session_id} on the WellboreDdms service.</remarks>
+    private static Command BuildWelllogDataSessionGet()
+    {
+        var recordIdOption = new Option<string>("--id", "-id")
+        {
+            Description = "WellLog record id.",
+            Required = true,
+        };
+        var sessionIdOption = new Option<Guid>("--session", "-s")
+        {
+            Description = "Session id, as session open printed it.",
+            Required = true,
+        };
+
+        var command = new Command("get", "Get a bulk data upload session of a WellLog record.");
+        command.Options.Add(recordIdOption);
+        command.Options.Add(sessionIdOption);
+
+        command.SetAction((parseResult, cancellationToken) =>
+            CliRunner.RunAsync(parseResult, async (context, cancellationToken) =>
+        {
+            var recordId = parseResult.GetValue(recordIdOption)!;
+            var sessionId = parseResult.GetValue(sessionIdOption);
+
+            var result = await context.Client.WellboreDdms.Ddms.V3.Welllogs[recordId].Sessions[sessionId].GetAsync(cancellationToken: cancellationToken);
+
+            return context.Output.Write(
+                await OsduJson.ToJsonAsync(result),
+                OutputSpec.Table(null, ("Session", "id"), ("State", "state"), ("Mode", "mode"), ("FromVersion", "fromVersion"), ("Expiry", "expiry")));
+        }, cancellationToken));
+
+        return command;
+    }
+
+    /// <summary>Open a session to send a WellLog's bulk data in chunks, then commit it with session update.</summary>
+    /// <remarks>POST /ddms/v3/welllogs/{record_id}/sessions on the WellboreDdms service.</remarks>
+    private static Command BuildWelllogDataSessionOpen()
+    {
+        var recordIdOption = new Option<string>("--id", "-id")
+        {
+            Description = "WellLog record id.",
+            Required = true,
+        };
+        var modeBodyOption = new Option<string>("--mode")
+        {
+            Description = "overwrite to replace the bulk with what the session sends, or update to merge it into the version the session starts from. One of: overwrite, update.",
+            Required = true,
+        };
+        modeBodyOption.AcceptAnyCasingFromAmong("overwrite", "update");
+        var fromversionBodyOption = new Option<int?>("--from-version")
+        {
+            Description = "Version to start from with --mode update. The latest when omitted.",
+        };
+        var timetoliveBodyOption = new Option<int?>("--ttl")
+        {
+            Description = "Minutes the session stays open before it is dropped, at most 1440 (the default).",
+        };
+
+        var command = new Command("open", "Open a session to send a WellLog's bulk data in chunks, then commit it with session update.");
+        command.Options.Add(recordIdOption);
+        command.Options.Add(modeBodyOption);
+        command.Options.Add(fromversionBodyOption);
+        command.Options.Add(timetoliveBodyOption);
+
+        command.SetAction((parseResult, cancellationToken) =>
+            CliRunner.RunAsync(parseResult, async (context, cancellationToken) =>
+        {
+            var recordId = parseResult.GetValue(recordIdOption)!;
+            var bodyNode = new JsonObject();
+            var modeValue = parseResult.GetValue(modeBodyOption)!;
+            bodyNode["mode"] = JsonValue.Create(modeValue);
+            var fromversionValue = parseResult.GetValue(fromversionBodyOption);
+            if (fromversionValue is not null)
+                bodyNode["fromVersion"] = JsonValue.Create(fromversionValue);
+            var timetoliveValue = parseResult.GetValue(timetoliveBodyOption);
+            if (timetoliveValue is not null)
+                bodyNode["timeToLive"] = JsonValue.Create(timetoliveValue);
+            var bodyJson = bodyNode.ToJsonString();
+            var body = await KiotaJsonSerializer.DeserializeAsync<CreateDataSessionRequest>(
+                bodyJson, CreateDataSessionRequest.CreateFromDiscriminatorValue, cancellationToken);
+
+            var result = await context.Client.WellboreDdms.Ddms.V3.Welllogs[recordId].Sessions.PostAsync(body, cancellationToken: cancellationToken);
+
+            return context.Output.Write(
+                await OsduJson.ToJsonAsync(result),
+                OutputSpec.Table(null, ("Session", "id"), ("State", "state"), ("Mode", "mode"), ("FromVersion", "fromVersion"), ("Expiry", "expiry")));
+        }, cancellationToken));
+
+        return command;
+    }
+
+    /// <summary>Commit a session, making what it sent a new version of the WellLog, or abandon it.</summary>
+    /// <remarks>PATCH /ddms/v3/welllogs/{record_id}/sessions/{session_id} on the WellboreDdms service.</remarks>
+    private static Command BuildWelllogDataSessionUpdate()
+    {
+        var recordIdOption = new Option<string>("--id", "-id")
+        {
+            Description = "WellLog record id.",
+            Required = true,
+        };
+        var sessionIdOption = new Option<Guid>("--session", "-s")
+        {
+            Description = "Session id, as session open printed it.",
+            Required = true,
+        };
+        var stateBodyOption = new Option<string>("--state")
+        {
+            Description = "commit to make what the session sent a new version, or abandon to drop it. One of: commit, abandon.",
+            Required = true,
+        };
+        stateBodyOption.AcceptAnyCasingFromAmong("commit", "abandon");
+
+        var command = new Command("update", "Commit a session, making what it sent a new version of the WellLog, or abandon it.");
+        command.Options.Add(recordIdOption);
+        command.Options.Add(sessionIdOption);
+        command.Options.Add(stateBodyOption);
+
+        command.SetAction((parseResult, cancellationToken) =>
+            CliRunner.RunAsync(parseResult, async (context, cancellationToken) =>
+        {
+            var recordId = parseResult.GetValue(recordIdOption)!;
+            var sessionId = parseResult.GetValue(sessionIdOption);
+            var bodyNode = new JsonObject();
+            var stateValue = parseResult.GetValue(stateBodyOption)!;
+            bodyNode["state"] = JsonValue.Create(stateValue);
+            var bodyJson = bodyNode.ToJsonString();
+            var body = await KiotaJsonSerializer.DeserializeAsync<UpdateSessionState>(
+                bodyJson, UpdateSessionState.CreateFromDiscriminatorValue, cancellationToken);
+
+            var result = await context.Client.WellboreDdms.Ddms.V3.Welllogs[recordId].Sessions[sessionId].PatchAsync(body, cancellationToken: cancellationToken);
+
+            return context.Output.Write(
+                await OsduJson.ToJsonAsync(result),
+                OutputSpec.Table(null, ("Session", "id"), ("State", "state"), ("Version", "version")));
+        }, cancellationToken));
+
+        return command;
+    }
+
+    /// <summary>List the bulk data upload sessions of a WellboreTrajectory record.</summary>
+    /// <remarks>GET /ddms/v3/wellboretrajectories/{record_id}/sessions on the WellboreDdms service.</remarks>
+    private static Command BuildTrajectoryDataSessionList()
+    {
+        var recordIdOption = new Option<string>("--id", "-id")
+        {
+            Description = "WellboreTrajectory record id.",
+            Required = true,
+        };
+
+        var command = new Command("list", "List the bulk data upload sessions of a WellboreTrajectory record.");
+        command.Options.Add(recordIdOption);
+
+        command.SetAction((parseResult, cancellationToken) =>
+            CliRunner.RunAsync(parseResult, async (context, cancellationToken) =>
+        {
+            var recordId = parseResult.GetValue(recordIdOption)!;
+
+            var result = await context.Client.WellboreDdms.Ddms.V3.Wellboretrajectories[recordId].Sessions.GetAsync(cancellationToken: cancellationToken);
+
+            return context.Output.Write(
+                await OsduJson.ToJsonAsync(result),
+                OutputSpec.Table(null, ("Session", "id"), ("State", "state"), ("Mode", "mode"), ("FromVersion", "fromVersion"), ("Expiry", "expiry")));
+        }, cancellationToken));
+
+        return command;
+    }
+
+    /// <summary>Get a bulk data upload session of a WellboreTrajectory record.</summary>
+    /// <remarks>GET /ddms/v3/wellboretrajectories/{record_id}/sessions/{session_id} on the WellboreDdms service.</remarks>
+    private static Command BuildTrajectoryDataSessionGet()
+    {
+        var recordIdOption = new Option<string>("--id", "-id")
+        {
+            Description = "WellboreTrajectory record id.",
+            Required = true,
+        };
+        var sessionIdOption = new Option<Guid>("--session", "-s")
+        {
+            Description = "Session id, as session open printed it.",
+            Required = true,
+        };
+
+        var command = new Command("get", "Get a bulk data upload session of a WellboreTrajectory record.");
+        command.Options.Add(recordIdOption);
+        command.Options.Add(sessionIdOption);
+
+        command.SetAction((parseResult, cancellationToken) =>
+            CliRunner.RunAsync(parseResult, async (context, cancellationToken) =>
+        {
+            var recordId = parseResult.GetValue(recordIdOption)!;
+            var sessionId = parseResult.GetValue(sessionIdOption);
+
+            var result = await context.Client.WellboreDdms.Ddms.V3.Wellboretrajectories[recordId].Sessions[sessionId].GetAsync(cancellationToken: cancellationToken);
+
+            return context.Output.Write(
+                await OsduJson.ToJsonAsync(result),
+                OutputSpec.Table(null, ("Session", "id"), ("State", "state"), ("Mode", "mode"), ("FromVersion", "fromVersion"), ("Expiry", "expiry")));
+        }, cancellationToken));
+
+        return command;
+    }
+
+    /// <summary>Open a session to send a WellboreTrajectory's bulk data in chunks, then commit it with session update.</summary>
+    /// <remarks>POST /ddms/v3/wellboretrajectories/{record_id}/sessions on the WellboreDdms service.</remarks>
+    private static Command BuildTrajectoryDataSessionOpen()
+    {
+        var recordIdOption = new Option<string>("--id", "-id")
+        {
+            Description = "WellboreTrajectory record id.",
+            Required = true,
+        };
+        var modeBodyOption = new Option<string>("--mode")
+        {
+            Description = "overwrite to replace the bulk with what the session sends, or update to merge it into the version the session starts from. One of: overwrite, update.",
+            Required = true,
+        };
+        modeBodyOption.AcceptAnyCasingFromAmong("overwrite", "update");
+        var fromversionBodyOption = new Option<int?>("--from-version")
+        {
+            Description = "Version to start from with --mode update. The latest when omitted.",
+        };
+        var timetoliveBodyOption = new Option<int?>("--ttl")
+        {
+            Description = "Minutes the session stays open before it is dropped, at most 1440 (the default).",
+        };
+
+        var command = new Command("open", "Open a session to send a WellboreTrajectory's bulk data in chunks, then commit it with session update.");
+        command.Options.Add(recordIdOption);
+        command.Options.Add(modeBodyOption);
+        command.Options.Add(fromversionBodyOption);
+        command.Options.Add(timetoliveBodyOption);
+
+        command.SetAction((parseResult, cancellationToken) =>
+            CliRunner.RunAsync(parseResult, async (context, cancellationToken) =>
+        {
+            var recordId = parseResult.GetValue(recordIdOption)!;
+            var bodyNode = new JsonObject();
+            var modeValue = parseResult.GetValue(modeBodyOption)!;
+            bodyNode["mode"] = JsonValue.Create(modeValue);
+            var fromversionValue = parseResult.GetValue(fromversionBodyOption);
+            if (fromversionValue is not null)
+                bodyNode["fromVersion"] = JsonValue.Create(fromversionValue);
+            var timetoliveValue = parseResult.GetValue(timetoliveBodyOption);
+            if (timetoliveValue is not null)
+                bodyNode["timeToLive"] = JsonValue.Create(timetoliveValue);
+            var bodyJson = bodyNode.ToJsonString();
+            var body = await KiotaJsonSerializer.DeserializeAsync<CreateDataSessionRequest>(
+                bodyJson, CreateDataSessionRequest.CreateFromDiscriminatorValue, cancellationToken);
+
+            var result = await context.Client.WellboreDdms.Ddms.V3.Wellboretrajectories[recordId].Sessions.PostAsync(body, cancellationToken: cancellationToken);
+
+            return context.Output.Write(
+                await OsduJson.ToJsonAsync(result),
+                OutputSpec.Table(null, ("Session", "id"), ("State", "state"), ("Mode", "mode"), ("FromVersion", "fromVersion"), ("Expiry", "expiry")));
+        }, cancellationToken));
+
+        return command;
+    }
+
+    /// <summary>Commit a session, making what it sent a new version of the WellboreTrajectory, or abandon it.</summary>
+    /// <remarks>PATCH /ddms/v3/wellboretrajectories/{record_id}/sessions/{session_id} on the WellboreDdms service.</remarks>
+    private static Command BuildTrajectoryDataSessionUpdate()
+    {
+        var recordIdOption = new Option<string>("--id", "-id")
+        {
+            Description = "WellboreTrajectory record id.",
+            Required = true,
+        };
+        var sessionIdOption = new Option<Guid>("--session", "-s")
+        {
+            Description = "Session id, as session open printed it.",
+            Required = true,
+        };
+        var stateBodyOption = new Option<string>("--state")
+        {
+            Description = "commit to make what the session sent a new version, or abandon to drop it. One of: commit, abandon.",
+            Required = true,
+        };
+        stateBodyOption.AcceptAnyCasingFromAmong("commit", "abandon");
+
+        var command = new Command("update", "Commit a session, making what it sent a new version of the WellboreTrajectory, or abandon it.");
+        command.Options.Add(recordIdOption);
+        command.Options.Add(sessionIdOption);
+        command.Options.Add(stateBodyOption);
+
+        command.SetAction((parseResult, cancellationToken) =>
+            CliRunner.RunAsync(parseResult, async (context, cancellationToken) =>
+        {
+            var recordId = parseResult.GetValue(recordIdOption)!;
+            var sessionId = parseResult.GetValue(sessionIdOption);
+            var bodyNode = new JsonObject();
+            var stateValue = parseResult.GetValue(stateBodyOption)!;
+            bodyNode["state"] = JsonValue.Create(stateValue);
+            var bodyJson = bodyNode.ToJsonString();
+            var body = await KiotaJsonSerializer.DeserializeAsync<UpdateSessionState>(
+                bodyJson, UpdateSessionState.CreateFromDiscriminatorValue, cancellationToken);
+
+            var result = await context.Client.WellboreDdms.Ddms.V3.Wellboretrajectories[recordId].Sessions[sessionId].PatchAsync(body, cancellationToken: cancellationToken);
+
+            return context.Output.Write(
+                await OsduJson.ToJsonAsync(result),
+                OutputSpec.Table(null, ("Session", "id"), ("State", "state"), ("Version", "version")));
+        }, cancellationToken));
+
+        return command;
+    }
+
+    /// <summary>List the bulk data upload sessions of a PPFGDataset record.</summary>
+    /// <remarks>GET /ddms/v3/ppfgdataset/{record_id}/sessions on the WellboreDdms service.</remarks>
+    private static Command BuildPpfgDataSessionList()
+    {
+        var recordIdOption = new Option<string>("--id", "-id")
+        {
+            Description = "PPFGDataset record id.",
+            Required = true,
+        };
+
+        var command = new Command("list", "List the bulk data upload sessions of a PPFGDataset record.");
+        command.Options.Add(recordIdOption);
+
+        command.SetAction((parseResult, cancellationToken) =>
+            CliRunner.RunAsync(parseResult, async (context, cancellationToken) =>
+        {
+            var recordId = parseResult.GetValue(recordIdOption)!;
+
+            var result = await context.Client.WellboreDdms.Ddms.V3.Ppfgdataset[recordId].Sessions.GetAsync(cancellationToken: cancellationToken);
+
+            return context.Output.Write(
+                await OsduJson.ToJsonAsync(result),
+                OutputSpec.Table(null, ("Session", "id"), ("State", "state"), ("Mode", "mode"), ("FromVersion", "fromVersion"), ("Expiry", "expiry")));
+        }, cancellationToken));
+
+        return command;
+    }
+
+    /// <summary>Get a bulk data upload session of a PPFGDataset record.</summary>
+    /// <remarks>GET /ddms/v3/ppfgdataset/{record_id}/sessions/{session_id} on the WellboreDdms service.</remarks>
+    private static Command BuildPpfgDataSessionGet()
+    {
+        var recordIdOption = new Option<string>("--id", "-id")
+        {
+            Description = "PPFGDataset record id.",
+            Required = true,
+        };
+        var sessionIdOption = new Option<Guid>("--session", "-s")
+        {
+            Description = "Session id, as session open printed it.",
+            Required = true,
+        };
+
+        var command = new Command("get", "Get a bulk data upload session of a PPFGDataset record.");
+        command.Options.Add(recordIdOption);
+        command.Options.Add(sessionIdOption);
+
+        command.SetAction((parseResult, cancellationToken) =>
+            CliRunner.RunAsync(parseResult, async (context, cancellationToken) =>
+        {
+            var recordId = parseResult.GetValue(recordIdOption)!;
+            var sessionId = parseResult.GetValue(sessionIdOption);
+
+            var result = await context.Client.WellboreDdms.Ddms.V3.Ppfgdataset[recordId].Sessions[sessionId].GetAsync(cancellationToken: cancellationToken);
+
+            return context.Output.Write(
+                await OsduJson.ToJsonAsync(result),
+                OutputSpec.Table(null, ("Session", "id"), ("State", "state"), ("Mode", "mode"), ("FromVersion", "fromVersion"), ("Expiry", "expiry")));
+        }, cancellationToken));
+
+        return command;
+    }
+
+    /// <summary>Open a session to send a PPFGDataset's bulk data in chunks, then commit it with session update.</summary>
+    /// <remarks>POST /ddms/v3/ppfgdataset/{record_id}/sessions on the WellboreDdms service.</remarks>
+    private static Command BuildPpfgDataSessionOpen()
+    {
+        var recordIdOption = new Option<string>("--id", "-id")
+        {
+            Description = "PPFGDataset record id.",
+            Required = true,
+        };
+        var modeBodyOption = new Option<string>("--mode")
+        {
+            Description = "overwrite to replace the bulk with what the session sends, or update to merge it into the version the session starts from. One of: overwrite, update.",
+            Required = true,
+        };
+        modeBodyOption.AcceptAnyCasingFromAmong("overwrite", "update");
+        var fromversionBodyOption = new Option<int?>("--from-version")
+        {
+            Description = "Version to start from with --mode update. The latest when omitted.",
+        };
+        var timetoliveBodyOption = new Option<int?>("--ttl")
+        {
+            Description = "Minutes the session stays open before it is dropped, at most 1440 (the default).",
+        };
+
+        var command = new Command("open", "Open a session to send a PPFGDataset's bulk data in chunks, then commit it with session update.");
+        command.Options.Add(recordIdOption);
+        command.Options.Add(modeBodyOption);
+        command.Options.Add(fromversionBodyOption);
+        command.Options.Add(timetoliveBodyOption);
+
+        command.SetAction((parseResult, cancellationToken) =>
+            CliRunner.RunAsync(parseResult, async (context, cancellationToken) =>
+        {
+            var recordId = parseResult.GetValue(recordIdOption)!;
+            var bodyNode = new JsonObject();
+            var modeValue = parseResult.GetValue(modeBodyOption)!;
+            bodyNode["mode"] = JsonValue.Create(modeValue);
+            var fromversionValue = parseResult.GetValue(fromversionBodyOption);
+            if (fromversionValue is not null)
+                bodyNode["fromVersion"] = JsonValue.Create(fromversionValue);
+            var timetoliveValue = parseResult.GetValue(timetoliveBodyOption);
+            if (timetoliveValue is not null)
+                bodyNode["timeToLive"] = JsonValue.Create(timetoliveValue);
+            var bodyJson = bodyNode.ToJsonString();
+            var body = await KiotaJsonSerializer.DeserializeAsync<CreateDataSessionRequest>(
+                bodyJson, CreateDataSessionRequest.CreateFromDiscriminatorValue, cancellationToken);
+
+            var result = await context.Client.WellboreDdms.Ddms.V3.Ppfgdataset[recordId].Sessions.PostAsync(body, cancellationToken: cancellationToken);
+
+            return context.Output.Write(
+                await OsduJson.ToJsonAsync(result),
+                OutputSpec.Table(null, ("Session", "id"), ("State", "state"), ("Mode", "mode"), ("FromVersion", "fromVersion"), ("Expiry", "expiry")));
+        }, cancellationToken));
+
+        return command;
+    }
+
+    /// <summary>Commit a session, making what it sent a new version of the PPFGDataset, or abandon it.</summary>
+    /// <remarks>PATCH /ddms/v3/ppfgdataset/{record_id}/sessions/{session_id} on the WellboreDdms service.</remarks>
+    private static Command BuildPpfgDataSessionUpdate()
+    {
+        var recordIdOption = new Option<string>("--id", "-id")
+        {
+            Description = "PPFGDataset record id.",
+            Required = true,
+        };
+        var sessionIdOption = new Option<Guid>("--session", "-s")
+        {
+            Description = "Session id, as session open printed it.",
+            Required = true,
+        };
+        var stateBodyOption = new Option<string>("--state")
+        {
+            Description = "commit to make what the session sent a new version, or abandon to drop it. One of: commit, abandon.",
+            Required = true,
+        };
+        stateBodyOption.AcceptAnyCasingFromAmong("commit", "abandon");
+
+        var command = new Command("update", "Commit a session, making what it sent a new version of the PPFGDataset, or abandon it.");
+        command.Options.Add(recordIdOption);
+        command.Options.Add(sessionIdOption);
+        command.Options.Add(stateBodyOption);
+
+        command.SetAction((parseResult, cancellationToken) =>
+            CliRunner.RunAsync(parseResult, async (context, cancellationToken) =>
+        {
+            var recordId = parseResult.GetValue(recordIdOption)!;
+            var sessionId = parseResult.GetValue(sessionIdOption);
+            var bodyNode = new JsonObject();
+            var stateValue = parseResult.GetValue(stateBodyOption)!;
+            bodyNode["state"] = JsonValue.Create(stateValue);
+            var bodyJson = bodyNode.ToJsonString();
+            var body = await KiotaJsonSerializer.DeserializeAsync<UpdateSessionState>(
+                bodyJson, UpdateSessionState.CreateFromDiscriminatorValue, cancellationToken);
+
+            var result = await context.Client.WellboreDdms.Ddms.V3.Ppfgdataset[recordId].Sessions[sessionId].PatchAsync(body, cancellationToken: cancellationToken);
+
+            return context.Output.Write(
+                await OsduJson.ToJsonAsync(result),
+                OutputSpec.Table(null, ("Session", "id"), ("State", "state"), ("Version", "version")));
+        }, cancellationToken));
+
+        return command;
+    }
+
+    /// <summary>List the bulk data upload sessions of a WellPressureTestRawMeasurement record.</summary>
+    /// <remarks>GET /ddms/v3/wellpressuretestrawmeasurement/{record_id}/sessions on the WellboreDdms service.</remarks>
+    private static Command BuildPressuretestDataSessionList()
+    {
+        var recordIdOption = new Option<string>("--id", "-id")
+        {
+            Description = "WellPressureTestRawMeasurement record id.",
+            Required = true,
+        };
+
+        var command = new Command("list", "List the bulk data upload sessions of a WellPressureTestRawMeasurement record.");
+        command.Options.Add(recordIdOption);
+
+        command.SetAction((parseResult, cancellationToken) =>
+            CliRunner.RunAsync(parseResult, async (context, cancellationToken) =>
+        {
+            var recordId = parseResult.GetValue(recordIdOption)!;
+
+            var result = await context.Client.WellboreDdms.Ddms.V3.Wellpressuretestrawmeasurement[recordId].Sessions.GetAsync(cancellationToken: cancellationToken);
+
+            return context.Output.Write(
+                await OsduJson.ToJsonAsync(result),
+                OutputSpec.Table(null, ("Session", "id"), ("State", "state"), ("Mode", "mode"), ("FromVersion", "fromVersion"), ("Expiry", "expiry")));
+        }, cancellationToken));
+
+        return command;
+    }
+
+    /// <summary>Get a bulk data upload session of a WellPressureTestRawMeasurement record.</summary>
+    /// <remarks>GET /ddms/v3/wellpressuretestrawmeasurement/{record_id}/sessions/{session_id} on the WellboreDdms service.</remarks>
+    private static Command BuildPressuretestDataSessionGet()
+    {
+        var recordIdOption = new Option<string>("--id", "-id")
+        {
+            Description = "WellPressureTestRawMeasurement record id.",
+            Required = true,
+        };
+        var sessionIdOption = new Option<Guid>("--session", "-s")
+        {
+            Description = "Session id, as session open printed it.",
+            Required = true,
+        };
+
+        var command = new Command("get", "Get a bulk data upload session of a WellPressureTestRawMeasurement record.");
+        command.Options.Add(recordIdOption);
+        command.Options.Add(sessionIdOption);
+
+        command.SetAction((parseResult, cancellationToken) =>
+            CliRunner.RunAsync(parseResult, async (context, cancellationToken) =>
+        {
+            var recordId = parseResult.GetValue(recordIdOption)!;
+            var sessionId = parseResult.GetValue(sessionIdOption);
+
+            var result = await context.Client.WellboreDdms.Ddms.V3.Wellpressuretestrawmeasurement[recordId].Sessions[sessionId].GetAsync(cancellationToken: cancellationToken);
+
+            return context.Output.Write(
+                await OsduJson.ToJsonAsync(result),
+                OutputSpec.Table(null, ("Session", "id"), ("State", "state"), ("Mode", "mode"), ("FromVersion", "fromVersion"), ("Expiry", "expiry")));
+        }, cancellationToken));
+
+        return command;
+    }
+
+    /// <summary>Open a session to send a WellPressureTestRawMeasurement's bulk data in chunks, then commit it with session update.</summary>
+    /// <remarks>POST /ddms/v3/wellpressuretestrawmeasurement/{record_id}/sessions on the WellboreDdms service.</remarks>
+    private static Command BuildPressuretestDataSessionOpen()
+    {
+        var recordIdOption = new Option<string>("--id", "-id")
+        {
+            Description = "WellPressureTestRawMeasurement record id.",
+            Required = true,
+        };
+        var modeBodyOption = new Option<string>("--mode")
+        {
+            Description = "overwrite to replace the bulk with what the session sends, or update to merge it into the version the session starts from. One of: overwrite, update.",
+            Required = true,
+        };
+        modeBodyOption.AcceptAnyCasingFromAmong("overwrite", "update");
+        var fromversionBodyOption = new Option<int?>("--from-version")
+        {
+            Description = "Version to start from with --mode update. The latest when omitted.",
+        };
+        var timetoliveBodyOption = new Option<int?>("--ttl")
+        {
+            Description = "Minutes the session stays open before it is dropped, at most 1440 (the default).",
+        };
+
+        var command = new Command("open", "Open a session to send a WellPressureTestRawMeasurement's bulk data in chunks, then commit it with session update.");
+        command.Options.Add(recordIdOption);
+        command.Options.Add(modeBodyOption);
+        command.Options.Add(fromversionBodyOption);
+        command.Options.Add(timetoliveBodyOption);
+
+        command.SetAction((parseResult, cancellationToken) =>
+            CliRunner.RunAsync(parseResult, async (context, cancellationToken) =>
+        {
+            var recordId = parseResult.GetValue(recordIdOption)!;
+            var bodyNode = new JsonObject();
+            var modeValue = parseResult.GetValue(modeBodyOption)!;
+            bodyNode["mode"] = JsonValue.Create(modeValue);
+            var fromversionValue = parseResult.GetValue(fromversionBodyOption);
+            if (fromversionValue is not null)
+                bodyNode["fromVersion"] = JsonValue.Create(fromversionValue);
+            var timetoliveValue = parseResult.GetValue(timetoliveBodyOption);
+            if (timetoliveValue is not null)
+                bodyNode["timeToLive"] = JsonValue.Create(timetoliveValue);
+            var bodyJson = bodyNode.ToJsonString();
+            var body = await KiotaJsonSerializer.DeserializeAsync<CreateDataSessionRequest>(
+                bodyJson, CreateDataSessionRequest.CreateFromDiscriminatorValue, cancellationToken);
+
+            var result = await context.Client.WellboreDdms.Ddms.V3.Wellpressuretestrawmeasurement[recordId].Sessions.PostAsync(body, cancellationToken: cancellationToken);
+
+            return context.Output.Write(
+                await OsduJson.ToJsonAsync(result),
+                OutputSpec.Table(null, ("Session", "id"), ("State", "state"), ("Mode", "mode"), ("FromVersion", "fromVersion"), ("Expiry", "expiry")));
+        }, cancellationToken));
+
+        return command;
+    }
+
+    /// <summary>Commit a session, making what it sent a new version of the WellPressureTestRawMeasurement, or abandon it.</summary>
+    /// <remarks>PATCH /ddms/v3/wellpressuretestrawmeasurement/{record_id}/sessions/{session_id} on the WellboreDdms service.</remarks>
+    private static Command BuildPressuretestDataSessionUpdate()
+    {
+        var recordIdOption = new Option<string>("--id", "-id")
+        {
+            Description = "WellPressureTestRawMeasurement record id.",
+            Required = true,
+        };
+        var sessionIdOption = new Option<Guid>("--session", "-s")
+        {
+            Description = "Session id, as session open printed it.",
+            Required = true,
+        };
+        var stateBodyOption = new Option<string>("--state")
+        {
+            Description = "commit to make what the session sent a new version, or abandon to drop it. One of: commit, abandon.",
+            Required = true,
+        };
+        stateBodyOption.AcceptAnyCasingFromAmong("commit", "abandon");
+
+        var command = new Command("update", "Commit a session, making what it sent a new version of the WellPressureTestRawMeasurement, or abandon it.");
+        command.Options.Add(recordIdOption);
+        command.Options.Add(sessionIdOption);
+        command.Options.Add(stateBodyOption);
+
+        command.SetAction((parseResult, cancellationToken) =>
+            CliRunner.RunAsync(parseResult, async (context, cancellationToken) =>
+        {
+            var recordId = parseResult.GetValue(recordIdOption)!;
+            var sessionId = parseResult.GetValue(sessionIdOption);
+            var bodyNode = new JsonObject();
+            var stateValue = parseResult.GetValue(stateBodyOption)!;
+            bodyNode["state"] = JsonValue.Create(stateValue);
+            var bodyJson = bodyNode.ToJsonString();
+            var body = await KiotaJsonSerializer.DeserializeAsync<UpdateSessionState>(
+                bodyJson, UpdateSessionState.CreateFromDiscriminatorValue, cancellationToken);
+
+            var result = await context.Client.WellboreDdms.Ddms.V3.Wellpressuretestrawmeasurement[recordId].Sessions[sessionId].PatchAsync(body, cancellationToken: cancellationToken);
+
+            return context.Output.Write(
+                await OsduJson.ToJsonAsync(result),
+                OutputSpec.Table(null, ("Session", "id"), ("State", "state"), ("Version", "version")));
+        }, cancellationToken));
+
+        return command;
+    }
+
+    /// <summary>Recompute the curve statistics of a WellLog version from its bulk data.</summary>
+    /// <remarks>POST /ddms/v3/welllogs/{record_id}/versions/{version}/data/statistics on the WellboreDdms service.</remarks>
+    private static Command BuildWelllogVersionUpdateStats()
+    {
+        var recordIdOption = new Option<string>("--id", "-id")
+        {
+            Description = "WellLog record id.",
+            Required = true,
+        };
+        var versionOption = new Option<int>("--version", "-v")
+        {
+            Description = "WellLog record version.",
+            Required = true,
+        };
+
+        var command = new Command("update-stats", "Recompute the curve statistics of a WellLog version from its bulk data.");
+        command.Options.Add(recordIdOption);
+        command.Options.Add(versionOption);
+
+        command.SetAction((parseResult, cancellationToken) =>
+            CliRunner.RunAsync(parseResult, async (context, cancellationToken) =>
+        {
+            var recordId = parseResult.GetValue(recordIdOption)!;
+            var version = parseResult.GetValue(versionOption);
+
+            var result = await context.Client.WellboreDdms.Ddms.V3.Welllogs[recordId].Versions[version].Data.Statistics.PostAsync(cancellationToken: cancellationToken);
+
+            return context.Output.Write(
+                await OsduJson.ToJsonAsync(result),
+                OutputSpec.Raw);
+        }, cancellationToken));
 
         return command;
     }

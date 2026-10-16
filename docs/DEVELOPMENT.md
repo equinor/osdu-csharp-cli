@@ -70,6 +70,7 @@ Both packages come from GitHub Packages, which needs a token even though they ar
 | `Commands/ConfigCommand.cs` | `osducs config`: create, list, select and show profiles. |
 | `Commands/CompletionCommand.cs` | `osducs completion`: shell completion scripts, and the hidden command they call. |
 | `Commands/RecordAddCommand.cs` | `osducs record add`: creates or updates records of any kind, asking before it updates one that exists. |
+| `Commands/WellboreBulkWrite.cs` | `<noun> data add` and `data session send` for the four Wellbore DDMS types with bulk data: JSON or Parquet files sent as they are, and several through an upload session. |
 | `Commands/SubscriptionSecrets.cs` | `subscription add`, `update-secret` and `find`: sent and read as JSON, since the client's models lose a subscription's secret, and kept out of `--debug`. |
 | `Commands/GroupListAll.cs` | `osducs group list --all`: every group in the data partition, added to the generated `group list`. |
 | `Commands/FileUploadCommand.cs`, `FileDownloadCommand.cs` | `osducs file upload` and `file download`: a file's bytes through the File service's signed URLs, checked against its checksum. |
@@ -100,7 +101,8 @@ coverage check knows it is accounted for. File's adds `file upload` and `file do
 endpoints they call already have generated commands, so its manifest needs no entry.
 Entitlements' extends a generated command instead: it adds `--all` and `--type` to `group list`
 and keeps the generated action for everything else. Register's replaces what three generated
-subscription commands do, keeping their options and help.
+subscription commands do, keeping their options and help. Wellbore DDMS's adds `data add` and
+`data session send` to the four types that carry bulk data.
 
 ### What happens when a command runs
 

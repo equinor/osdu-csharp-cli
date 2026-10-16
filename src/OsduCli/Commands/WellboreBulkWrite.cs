@@ -1,0 +1,253 @@
+using System.CommandLine;
+using System.Text.Json.Nodes;
+using Equinor.OsduCli.Runtime;
+using Equinor.OsduCsharpClient.Facade;
+using Equinor.OsduCsharpClient.WellboreDdms.Models;
+using Microsoft.Kiota.Abstractions;
+using Microsoft.Kiota.Abstractions.Serialization;
+
+namespace Equinor.OsduCli.Commands;
+
+/// <summary>
+/// <c>&lt;noun&gt; data add</c> and <c>&lt;noun&gt; data session send</c>: writing a WellLog's,
+/// trajectory's, PPFG dataset's or pressure test's bulk data from JSON or Parquet files.
+/// </summary>
+/// <remarks>
+/// <para>Hand-written because the body is a file, sent as it is: the service takes either
+/// format, told apart by the content type, and a file of curves can run to gigabytes, which a
+/// round trip through a model would hold in memory. The format is read from the file itself,
+/// so a Parquet file named <c>.json</c> still goes as Parquet.</para>
+///
+/// <para><c>data add</c> with one file sends it as the whole bulk, replacing the latest. Given
+/// several, or <c>--update</c>, it opens an upload session, sends them in order, and commits:
+/// one new version from all of them, as the service recommends past ten million values or
+/// three thousand columns. On any failure, an interruption included, it abandons the session,
+/// so a half-sent upload never becomes a version.</para>
+/// </remarks>
+public static class WellboreBulkWrite
+{
+    /// <summary>A record type that carries bulk data: its noun, path segment and kind.</summary>
+    internal sealed record Entity(string Noun, string Path, string Kind);
+
+    internal static readonly Entity[] Entities =
+    [
+        new("welllog", "welllogs", "WellLog"),
+        new("trajectory", "wellboretrajectories", "WellboreTrajectory"),
+        new("ppfg", "ppfgdataset", "PPFGDataset"),
+        new("pressuretest", "wellpressuretestrawmeasurement", "WellPressureTestRawMeasurement"),
+    ];
+
+    private const string Roles = "users.datalake.editors or users.datalake.admins";
+    internal const string Parquet = "application/x-parquet";
+    internal const string Json = "application/json";
+
+    /// <summary>The service's own error for a request it cannot validate.</summary>
+    private static readonly Dictionary<string, ParsableFactory<IParsable>> Errors =
+        new() { ["422"] = HTTPValidationError.CreateFromDiscriminatorValue };
+
+    /// <summary>Adds the two commands to each bulk-carrying type's <c>data</c> groups.</summary>
+    public static void Extend(CommandTree tree)
+    {
+        foreach (var entity in Entities)
+        {
+            tree.Node($"{entity.Noun} data").Subcommands.Add(BuildAdd(entity));
+            tree.Node($"{entity.Noun} data session").Subcommands.Add(BuildSend(entity));
+        }
+    }
+
+    private static Command BuildAdd(Entity entity)
+    {
+        var id = new Option<string>("--id", "-id") { Description = $"{entity.Kind} record id.", Required = true };
+        var files = new Option<string[]>("--file", "-f")
+        {
+            Description = "JSON or Parquet file of the bulk data. Repeat it to send several as the chunks of one upload "
+                          + "session, which becomes one new version.",
+            Required = true,
+            AllowMultipleArgumentsPerToken = true,
+        };
+        var update = new Option<bool>("--update")
+        {
+            Description = "Merge the files into the latest version's bulk data rather than replacing it.",
+        };
+        var command = new Command("add",
+            $"Write a {entity.Kind}'s bulk data from JSON or Parquet files, as a new version.")
+        {
+            id, files, update,
+        };
+
+        command.SetAction((parseResult, cancellationToken) => CliRunner.RunAsync(parseResult, async (context, token) =>
+        {
+            var paths = parseResult.GetValue(files)!;
+            var chunks = paths.Select(Chunk).ToList();
+            var adapter = context.Client.GetRequestAdapter("wellbore_ddms");
+            var recordId = parseResult.GetValue(id)!;
+            var progress = Console.IsErrorRedirected ? null : Console.Error;
+
+            var json = chunks.Count == 1 && !parseResult.GetValue(update)
+                ? await WriteAsync(adapter, entity, recordId, chunks[0], token)
+                : await WriteSessionAsync(adapter, entity, recordId, chunks, parseResult.GetValue(update), progress, token);
+            return context.Output.Write(json, OutputSpec.Raw);
+        }, cancellationToken, Roles));
+
+        return command;
+    }
+
+    private static Command BuildSend(Entity entity)
+    {
+        var id = new Option<string>("--id", "-id") { Description = $"{entity.Kind} record id.", Required = true };
+        var session = new Option<Guid>("--session", "-s")
+        {
+            Description = "Session id, as session open printed it.",
+            Required = true,
+        };
+        var file = new Option<string>("--file", "-f") { Description = "JSON or Parquet file of the chunk.", Required = true };
+        var command = new Command("send",
+            "Send a JSON or Parquet file as a chunk of an open session. Commit the session with session update.")
+        {
+            id, session, file,
+        };
+
+        command.SetAction((parseResult, cancellationToken) => CliRunner.RunAsync(parseResult, async (context, token) =>
+        {
+            var json = await SendChunkAsync(context.Client.GetRequestAdapter("wellbore_ddms"), entity,
+                parseResult.GetValue(id)!, parseResult.GetValue(session), Chunk(parseResult.GetValue(file)!), token);
+            return context.Output.Write(json, OutputSpec.Table(null,
+                ("Rows", "rowCount"), ("Columns", "columnCount"), ("IndexStart", "indexStart"), ("IndexEnd", "indexEnd")));
+        }, cancellationToken, Roles));
+
+        return command;
+    }
+
+    // ---- the file -----------------------------------------------------------------------
+
+    /// <summary>A file to send, and the content type its first bytes say it is.</summary>
+    internal sealed record Part(string Path, string ContentType, long Length);
+
+    /// <summary>
+    /// The file at <paramref name="path"/>, refused when it is missing or neither Parquet nor JSON.
+    /// </summary>
+    /// <remarks>
+    /// Parquet files begin with <c>PAR1</c>; JSON, after any whitespace, with <c>{</c> or
+    /// <c>[</c>. Anything else, a LAS or CSV file say, is refused here rather than by the
+    /// service, which would answer with a validation error about the content type.
+    /// </remarks>
+    internal static Part Chunk(string path)
+    {
+        var file = new FileInfo(path);
+        if (!file.Exists)
+            throw new OsduException(Directory.Exists(path) ? $"{path} is a directory, not a file." : $"File not found: {path}");
+
+        using var stream = file.OpenRead();
+        Span<byte> head = stackalloc byte[4];
+        var read = stream.ReadAtLeast(head, 4, throwOnEndOfStream: false);
+        if (read == 4 && head.SequenceEqual("PAR1"u8))
+            return new Part(path, Parquet, file.Length);
+
+        stream.Position = 0;
+        int first;
+        while ((first = stream.ReadByte()) is ' ' or '\t' or '\r' or '\n' or 0xEF or 0xBB or 0xBF)
+        {
+        }
+        if (first is '{' or '[')
+            return new Part(path, Json, file.Length);
+
+        throw new OsduException($"{path} is neither Parquet nor JSON. Bulk data is written from either, such as "
+                                + "a data frame saved with orient=\"split\".");
+    }
+
+    // ---- the service ----------------------------------------------------------------------
+
+    /// <summary>Writes one file as the record's whole bulk data, a new version.</summary>
+    internal static Task<string?> WriteAsync(IRequestAdapter adapter, Entity entity, string recordId, Part part,
+        CancellationToken cancellationToken) =>
+        SendFileAsync(adapter, Request(adapter, Method.POST, "/data", entity, recordId), part, cancellationToken);
+
+    /// <summary>Sends one file as a chunk of an open session.</summary>
+    internal static Task<string?> SendChunkAsync(IRequestAdapter adapter, Entity entity, string recordId, Guid session,
+        Part part, CancellationToken cancellationToken) =>
+        SendFileAsync(adapter, Request(adapter, Method.POST, "/sessions/{session_id}/data", entity, recordId, session),
+            part, cancellationToken);
+
+    /// <summary>
+    /// Opens a session, sends <paramref name="parts"/> in order, and commits it: one new version.
+    /// Abandons it on any failure, so a partial upload is never committed.
+    /// </summary>
+    internal static async Task<string?> WriteSessionAsync(IRequestAdapter adapter, Entity entity, string recordId,
+        IReadOnlyList<Part> parts, bool update, TextWriter? progress, CancellationToken cancellationToken)
+    {
+        var opened = await SendJsonAsync(adapter, Request(adapter, Method.POST, "/sessions", entity, recordId),
+            new JsonObject { ["mode"] = update ? "update" : "overwrite" }, cancellationToken);
+        if (JsonNode.Parse(opened ?? "null")?["id"]?.GetValue<string>() is not { } text || !Guid.TryParse(text, out var session))
+            throw new OsduException("The service opened a session but did not say its id.");
+
+        try
+        {
+            for (var index = 0; index < parts.Count; index++)
+            {
+                progress?.WriteLine($"Sending {index + 1} of {parts.Count}: {parts[index].Path} ({SignedUrlTransfer.Size(parts[index].Length)})");
+                await SendChunkAsync(adapter, entity, recordId, session, parts[index], cancellationToken);
+            }
+            return await SendJsonAsync(adapter, Request(adapter, Method.PATCH, "/sessions/{session_id}", entity, recordId, session),
+                new JsonObject { ["state"] = "commit" }, cancellationToken);
+        }
+        catch (Exception exception) when (exception is not OutOfMemoryException)
+        {
+            // Not the command's token, which an interruption has cancelled. Best effort: the
+            // failure that got here is what the user needs to see, and the service drops a
+            // session left open when its time to live runs out.
+            using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(10));
+            try
+            {
+                await SendJsonAsync(adapter, Request(adapter, Method.PATCH, "/sessions/{session_id}", entity, recordId, session),
+                    new JsonObject { ["state"] = "abandon" }, timeout.Token);
+                progress?.WriteLine($"Abandoned session {session}: nothing was written.");
+            }
+            catch (Exception abandonFailure) when (abandonFailure is not OutOfMemoryException)
+            {
+                progress?.WriteLine($"Session {session} could not be abandoned; it is dropped when its time to live runs out.");
+            }
+            throw;
+        }
+    }
+
+    private static RequestInformation Request(IRequestAdapter adapter, Method method, string tail, Entity entity,
+        string recordId, Guid? session = null)
+    {
+        var parameters = new Dictionary<string, object>
+        {
+            ["baseurl"] = adapter.BaseUrl ?? "",
+            ["entity"] = entity.Path,
+            ["record_id"] = recordId,
+        };
+        if (session is { } value)
+            parameters["session_id"] = value;
+        var request = new RequestInformation(method, "{+baseurl}/ddms/v3/{entity}/{record_id}" + tail, parameters);
+        request.Headers.TryAdd("Accept", Json);
+        return request;
+    }
+
+    private static async Task<string?> SendFileAsync(IRequestAdapter adapter, RequestInformation request, Part part,
+        CancellationToken cancellationToken)
+    {
+        await using var file = new FileStream(part.Path, FileMode.Open, FileAccess.Read, FileShare.Read, 1 << 20, useAsync: true);
+        request.SetStreamContent(file, part.ContentType);
+        return await ReadAsync(adapter, request, cancellationToken);
+    }
+
+    private static Task<string?> SendJsonAsync(IRequestAdapter adapter, RequestInformation request, JsonObject body,
+        CancellationToken cancellationToken)
+    {
+        request.SetStreamContent(new MemoryStream(System.Text.Encoding.UTF8.GetBytes(body.ToJsonString())), Json);
+        return ReadAsync(adapter, request, cancellationToken);
+    }
+
+    private static async Task<string?> ReadAsync(IRequestAdapter adapter, RequestInformation request,
+        CancellationToken cancellationToken)
+    {
+        await using var response = await adapter.SendPrimitiveAsync<Stream>(request, Errors, cancellationToken);
+        if (response is null)
+            return null;
+        using var reader = new StreamReader(response);
+        return await reader.ReadToEndAsync(cancellationToken);
+    }
+}
