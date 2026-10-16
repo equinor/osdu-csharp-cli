@@ -514,6 +514,9 @@ osducs subscription delete --id <id>
 ADME has no way to list every subscription: `subscription find --notification-id` looks them up
 by the notification id a subscription is created with.
 
+The subscription and secret files are sent as they are written, and `--debug` leaves the bodies
+of `subscription add`, `update-secret` and `find` out of its log, since they carry the secret.
+
 `record replay` takes `--operation reindex`, which sends the records to the Indexer, or `replay`,
 which publishes them as record changes to every consumer. It prints a replay id to follow with
 `record replay-status`.

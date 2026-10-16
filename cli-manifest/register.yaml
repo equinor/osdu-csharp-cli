@@ -6,7 +6,9 @@
 # and `topic list` says which topics there are to subscribe to.
 #
 # Bodies are read from files: a subscription carries its secret, which does not belong on a
-# command line or in a shell's history.
+# command line or in a shell's history. `subscription add`, `update-secret` and `find` send and
+# read that JSON as it is, and keep it out of --debug: the client's models lose the secret,
+# whose type its spec does not map. Commands/SubscriptionSecrets.cs replaces their actions.
 
 service: register
 spec: register
