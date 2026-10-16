@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.18.0](https://github.com/equinor/osdu-csharp-cli/compare/v0.17.0...v0.18.0) (2026-10-16)
+
+
+### Features
+
+* **register:** add notification subscription, topic, DDMS and action commands ([#72](https://github.com/equinor/osdu-csharp-cli/issues/72)) ([d90dd8c](https://github.com/equinor/osdu-csharp-cli/commit/d90dd8c7ff73b1d5baf82390ff33279d25573a83))
+
 ## [0.17.0](https://github.com/equinor/osdu-csharp-cli/compare/v0.16.0...v0.17.0) (2026-10-15)
 
 
