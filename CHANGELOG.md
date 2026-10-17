@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.20.0](https://github.com/equinor/osdu-csharp-cli/compare/v0.19.0...v0.20.0) (2026-10-17)
+
+
+### Features
+
+* show the roles each command needs in --help and the command reference ([#77](https://github.com/equinor/osdu-csharp-cli/issues/77)) ([c5dce89](https://github.com/equinor/osdu-csharp-cli/commit/c5dce89d5633bdc0b7af82fe02155a144603fa0f))
+
 ## [0.19.0](https://github.com/equinor/osdu-csharp-cli/compare/v0.18.0...v0.19.0) (2026-10-16)
 
 
