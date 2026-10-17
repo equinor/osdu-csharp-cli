@@ -47,6 +47,7 @@ public static class FileDownloadCommand
         {
             id, path, force,
         };
+        CommandRoles.Set(command, Requires);
 
         command.SetAction((parseResult, cancellationToken) =>
             CliRunner.RunAsync(parseResult, async (context, token) =>
@@ -82,6 +83,12 @@ public static class FileDownloadCommand
     /// What a refusal needs, for two services: the File roles alone told someone refused by
     /// Storage's read of the record to ask for a role they may already hold.
     /// </summary>
+    /// <summary>What <c>--help</c> says the command needs: a role for each of the two services.</summary>
+    private const string Requires =
+        "a Storage role to read the record (service.storage.viewer, service.storage.creator or service.storage.admin) "
+        + "and a File role to download it (service.file.viewers, users.datalake.viewers, users.datalake.editors, "
+        + "users.datalake.admins or users.datalake.ops)";
+
     private const string AccessNeeded =
         "file download needs a Storage role to read the record (service.storage.viewer, service.storage.creator "
         + "or service.storage.admin) and a File role to download it (service.file.viewers, users.datalake.viewers, "

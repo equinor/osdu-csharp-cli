@@ -185,3 +185,29 @@ def test_a_scope_written_as_a_string_is_refused(tmp_path, monkeypatch):
     # covered the whole spec.
     with pytest.raises(ManifestError, match="must be a list"):
         build_service(manifest_with_scope(tmp_path, monkeypatch, "/ddms/v3/*"))
+
+
+@pytest.mark.parametrize("roles,refused", [
+    ("users.datalake.ops", False),
+    ("", True),
+    (["users.datalake.ops"], True),
+])
+def test_a_handwritten_commands_roles_are_text(tmp_path, monkeypatch, roles, refused):
+    # For the command reference, where the spec documents none: `group list --all`.
+    path = paged_manifest(tmp_path, monkeypatch, {
+        "op": {"method": "post", "path": "/query_with_cursor"},
+        "release": {"method": "delete", "path": "/query_with_cursor/{cursor}"},
+        "limit": "limit", "page-size": 1000, "cursor": "cursor"})
+    manifest = yaml.safe_load(path.read_text(encoding="utf-8"))
+    manifest["commands"][0]["op"] = {"method": "post", "path": "/query"}
+    manifest["handwritten"] = [{"command": "record search --all", "op": {"method": "post", "path": "/query_with_cursor"},
+                                "reason": "r", "roles": roles}]
+    manifest["commands"][0].pop("paging")
+    manifest["exclude"] = [{"op": {"method": "delete", "path": "/query_with_cursor/{cursor}"}, "reason": "r"}]
+    path.write_text(yaml.safe_dump(manifest), encoding="utf-8")
+
+    if refused:
+        with pytest.raises(ManifestError, match="roles"):
+            build_service(path)
+    else:
+        build_service(path)

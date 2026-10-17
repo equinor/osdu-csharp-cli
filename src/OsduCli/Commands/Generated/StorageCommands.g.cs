@@ -61,6 +61,7 @@ public static partial class StorageCommands
         };
 
         var command = new Command("list", "List records of a given kind.");
+        CommandRoles.Set(command, "service.storage.admin", operatorRole: true);
         command.Options.Add(kindOption);
         command.Options.Add(limitOption);
         command.Options.Add(cursorOption);
@@ -105,6 +106,7 @@ public static partial class StorageCommands
         };
 
         var command = new Command("get", "Get the latest version of a record by id.");
+        CommandRoles.Set(command, "service.storage.viewer, service.storage.creator or service.storage.admin");
         command.Options.Add(idOption);
         command.Options.Add(attributeOption);
 
@@ -200,6 +202,7 @@ public static partial class StorageCommands
         };
 
         var command = new Command("delete", "Soft-delete a record by id.");
+        CommandRoles.Set(command, "service.storage.creator or service.storage.admin");
         command.Options.Add(idOption);
         command.Options.Add(yesOption);
 
@@ -237,6 +240,7 @@ public static partial class StorageCommands
         };
 
         var command = new Command("purge", "Permanently delete a record and every version of it.");
+        CommandRoles.Set(command, "service.storage.admin", operatorRole: true);
         command.Options.Add(idOption);
         command.Options.Add(yesOption);
 
@@ -270,6 +274,7 @@ public static partial class StorageCommands
         };
 
         var command = new Command("list", "List all versions of a record.");
+        CommandRoles.Set(command, "service.storage.viewer, service.storage.creator or service.storage.admin");
         command.Options.Add(idOption);
 
         command.SetAction((parseResult, cancellationToken) =>
@@ -308,6 +313,7 @@ public static partial class StorageCommands
         };
 
         var command = new Command("get", "Get a specific version of a record.");
+        CommandRoles.Set(command, "service.storage.viewer, service.storage.creator or service.storage.admin");
         command.Options.Add(idOption);
         command.Options.Add(versionOption);
         command.Options.Add(attributeOption);
@@ -442,6 +448,7 @@ public static partial class StorageCommands
         };
 
         var command = new Command("replay", "Send records from Storage to their consumers again, to rebuild the index or more.");
+        CommandRoles.Set(command, "users.datalake.ops", operatorRole: true);
         command.Options.Add(operationBodyOption);
         command.Options.Add(filterKindsBodyOption);
         command.Options.Add(replayidBodyOption);
@@ -497,6 +504,7 @@ public static partial class StorageCommands
         };
 
         var command = new Command("replay-status", "Show how far a replay has got; -o json breaks it down by kind.");
+        CommandRoles.Set(command, "users.datalake.ops", operatorRole: true);
         command.Options.Add(idOption);
 
         command.SetAction((parseResult, cancellationToken) =>

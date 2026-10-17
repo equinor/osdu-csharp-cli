@@ -114,6 +114,7 @@ public static partial class WellboreDdmsCommands
         };
 
         var command = new Command("get", "Get a Well record by id.");
+        CommandRoles.Set(command, "users.datalake.viewers, users.datalake.editors or users.datalake.admins");
         command.Options.Add(recordIdOption);
 
         command.SetAction((parseResult, cancellationToken) =>
@@ -142,6 +143,7 @@ public static partial class WellboreDdmsCommands
         };
 
         var command = new Command("add", "Add a Well record from a JSON file.");
+        CommandRoles.Set(command, "users.datalake.editors or users.datalake.admins");
         command.Options.Add(fileOption);
 
         command.SetAction((parseResult, cancellationToken) =>
@@ -176,6 +178,7 @@ public static partial class WellboreDdmsCommands
         };
 
         var command = new Command("delete", "Soft-delete a Well record by id.");
+        CommandRoles.Set(command, "users.datalake.editors or users.datalake.admins");
         command.Options.Add(recordIdOption);
         command.Options.Add(yesOption);
 
@@ -209,6 +212,7 @@ public static partial class WellboreDdmsCommands
         };
 
         var command = new Command("list", "List all versions of a Well record.");
+        CommandRoles.Set(command, "users.datalake.viewers, users.datalake.editors or users.datalake.admins");
         command.Options.Add(recordIdOption);
 
         command.SetAction((parseResult, cancellationToken) =>
@@ -242,6 +246,7 @@ public static partial class WellboreDdmsCommands
         };
 
         var command = new Command("get", "Get a specific version of a Well record.");
+        CommandRoles.Set(command, "users.datalake.viewers, users.datalake.editors or users.datalake.admins");
         command.Options.Add(recordIdOption);
         command.Options.Add(versionOption);
 
@@ -272,6 +277,7 @@ public static partial class WellboreDdmsCommands
         };
 
         var command = new Command("get", "Get a Wellbore record by id.");
+        CommandRoles.Set(command, "users.datalake.viewers, users.datalake.editors or users.datalake.admins");
         command.Options.Add(recordIdOption);
 
         command.SetAction((parseResult, cancellationToken) =>
@@ -300,6 +306,7 @@ public static partial class WellboreDdmsCommands
         };
 
         var command = new Command("add", "Add a Wellbore record from a JSON file.");
+        CommandRoles.Set(command, "users.datalake.editors or users.datalake.admins");
         command.Options.Add(fileOption);
 
         command.SetAction((parseResult, cancellationToken) =>
@@ -334,6 +341,7 @@ public static partial class WellboreDdmsCommands
         };
 
         var command = new Command("delete", "Soft-delete a Wellbore record by id.");
+        CommandRoles.Set(command, "users.datalake.editors or users.datalake.admins");
         command.Options.Add(recordIdOption);
         command.Options.Add(yesOption);
 
@@ -367,6 +375,7 @@ public static partial class WellboreDdmsCommands
         };
 
         var command = new Command("list", "List all versions of a Wellbore record.");
+        CommandRoles.Set(command, "users.datalake.viewers, users.datalake.editors or users.datalake.admins");
         command.Options.Add(recordIdOption);
 
         command.SetAction((parseResult, cancellationToken) =>
@@ -400,6 +409,7 @@ public static partial class WellboreDdmsCommands
         };
 
         var command = new Command("get", "Get a specific version of a Wellbore record.");
+        CommandRoles.Set(command, "users.datalake.viewers, users.datalake.editors or users.datalake.admins");
         command.Options.Add(recordIdOption);
         command.Options.Add(versionOption);
 
@@ -430,6 +440,7 @@ public static partial class WellboreDdmsCommands
         };
 
         var command = new Command("get", "Get a WellLog record by id.");
+        CommandRoles.Set(command, "users.datalake.viewers, users.datalake.editors or users.datalake.admins");
         command.Options.Add(recordIdOption);
 
         command.SetAction((parseResult, cancellationToken) =>
@@ -458,6 +469,7 @@ public static partial class WellboreDdmsCommands
         };
 
         var command = new Command("add", "Add a WellLog record from a JSON file.");
+        CommandRoles.Set(command, "users.datalake.editors or users.datalake.admins");
         command.Options.Add(fileOption);
 
         command.SetAction((parseResult, cancellationToken) =>
@@ -492,6 +504,7 @@ public static partial class WellboreDdmsCommands
         };
 
         var command = new Command("delete", "Soft-delete a WellLog record by id.");
+        CommandRoles.Set(command, "users.datalake.editors or users.datalake.admins");
         command.Options.Add(recordIdOption);
         command.Options.Add(yesOption);
 
@@ -525,6 +538,7 @@ public static partial class WellboreDdmsCommands
         };
 
         var command = new Command("list", "List all versions of a WellLog record.");
+        CommandRoles.Set(command, "users.datalake.viewers, users.datalake.editors or users.datalake.admins");
         command.Options.Add(recordIdOption);
 
         command.SetAction((parseResult, cancellationToken) =>
@@ -558,6 +572,7 @@ public static partial class WellboreDdmsCommands
         };
 
         var command = new Command("get", "Get a specific version of a WellLog record.");
+        CommandRoles.Set(command, "users.datalake.viewers, users.datalake.editors or users.datalake.admins");
         command.Options.Add(recordIdOption);
         command.Options.Add(versionOption);
 
@@ -613,6 +628,7 @@ public static partial class WellboreDdmsCommands
         orientOption.AcceptAnyCasingFromAmong("split", "columns");
 
         var command = new Command("get", "Read the bulk data of a WellLog record.");
+        CommandRoles.Set(command, "users.datalake.viewers, users.datalake.editors or users.datalake.admins");
         command.Options.Add(recordIdOption);
         command.Options.Add(offsetOption);
         command.Options.Add(limitOption);
@@ -692,6 +708,7 @@ public static partial class WellboreDdmsCommands
         orientOption.AcceptAnyCasingFromAmong("split", "columns");
 
         var command = new Command("data", "Read the bulk data of a specific WellLog version.");
+        CommandRoles.Set(command, "users.datalake.viewers, users.datalake.editors or users.datalake.admins");
         command.Options.Add(recordIdOption);
         command.Options.Add(versionOption);
         command.Options.Add(offsetOption);
@@ -824,6 +841,7 @@ public static partial class WellboreDdmsCommands
         };
 
         var command = new Command("get", "Get a WellboreTrajectory record by id.");
+        CommandRoles.Set(command, "users.datalake.viewers, users.datalake.editors or users.datalake.admins");
         command.Options.Add(recordIdOption);
 
         command.SetAction((parseResult, cancellationToken) =>
@@ -852,6 +870,7 @@ public static partial class WellboreDdmsCommands
         };
 
         var command = new Command("add", "Add a WellboreTrajectory record from a JSON file.");
+        CommandRoles.Set(command, "users.datalake.editors or users.datalake.admins");
         command.Options.Add(fileOption);
 
         command.SetAction((parseResult, cancellationToken) =>
@@ -886,6 +905,7 @@ public static partial class WellboreDdmsCommands
         };
 
         var command = new Command("delete", "Soft-delete a WellboreTrajectory record by id.");
+        CommandRoles.Set(command, "users.datalake.editors or users.datalake.admins");
         command.Options.Add(recordIdOption);
         command.Options.Add(yesOption);
 
@@ -919,6 +939,7 @@ public static partial class WellboreDdmsCommands
         };
 
         var command = new Command("list", "List all versions of a WellboreTrajectory record.");
+        CommandRoles.Set(command, "users.datalake.viewers, users.datalake.editors or users.datalake.admins");
         command.Options.Add(recordIdOption);
 
         command.SetAction((parseResult, cancellationToken) =>
@@ -952,6 +973,7 @@ public static partial class WellboreDdmsCommands
         };
 
         var command = new Command("get", "Get a specific version of a WellboreTrajectory record.");
+        CommandRoles.Set(command, "users.datalake.viewers, users.datalake.editors or users.datalake.admins");
         command.Options.Add(recordIdOption);
         command.Options.Add(versionOption);
 
@@ -1007,6 +1029,7 @@ public static partial class WellboreDdmsCommands
         orientOption.AcceptAnyCasingFromAmong("split", "columns");
 
         var command = new Command("get", "Read the bulk data of a WellboreTrajectory record.");
+        CommandRoles.Set(command, "users.datalake.viewers, users.datalake.editors or users.datalake.admins");
         command.Options.Add(recordIdOption);
         command.Options.Add(offsetOption);
         command.Options.Add(limitOption);
@@ -1086,6 +1109,7 @@ public static partial class WellboreDdmsCommands
         orientOption.AcceptAnyCasingFromAmong("split", "columns");
 
         var command = new Command("data", "Read the bulk data of a specific WellboreTrajectory version.");
+        CommandRoles.Set(command, "users.datalake.viewers, users.datalake.editors or users.datalake.admins");
         command.Options.Add(recordIdOption);
         command.Options.Add(versionOption);
         command.Options.Add(offsetOption);
@@ -1137,6 +1161,7 @@ public static partial class WellboreDdmsCommands
         };
 
         var command = new Command("get", "Get a WellboreMarkerSet record by id.");
+        CommandRoles.Set(command, "users.datalake.viewers, users.datalake.editors or users.datalake.admins");
         command.Options.Add(recordIdOption);
 
         command.SetAction((parseResult, cancellationToken) =>
@@ -1165,6 +1190,7 @@ public static partial class WellboreDdmsCommands
         };
 
         var command = new Command("add", "Add a WellboreMarkerSet record from a JSON file.");
+        CommandRoles.Set(command, "users.datalake.editors or users.datalake.admins");
         command.Options.Add(fileOption);
 
         command.SetAction((parseResult, cancellationToken) =>
@@ -1199,6 +1225,7 @@ public static partial class WellboreDdmsCommands
         };
 
         var command = new Command("delete", "Soft-delete a WellboreMarkerSet record by id.");
+        CommandRoles.Set(command, "users.datalake.editors or users.datalake.admins");
         command.Options.Add(recordIdOption);
         command.Options.Add(yesOption);
 
@@ -1232,6 +1259,7 @@ public static partial class WellboreDdmsCommands
         };
 
         var command = new Command("list", "List all versions of a WellboreMarkerSet record.");
+        CommandRoles.Set(command, "users.datalake.viewers, users.datalake.editors or users.datalake.admins");
         command.Options.Add(recordIdOption);
 
         command.SetAction((parseResult, cancellationToken) =>
@@ -1265,6 +1293,7 @@ public static partial class WellboreDdmsCommands
         };
 
         var command = new Command("get", "Get a specific version of a WellboreMarkerSet record.");
+        CommandRoles.Set(command, "users.datalake.viewers, users.datalake.editors or users.datalake.admins");
         command.Options.Add(recordIdOption);
         command.Options.Add(versionOption);
 
@@ -1295,6 +1324,7 @@ public static partial class WellboreDdmsCommands
         };
 
         var command = new Command("get", "Get a WellboreIntervalSet record by id.");
+        CommandRoles.Set(command, "users.datalake.viewers, users.datalake.editors or users.datalake.admins");
         command.Options.Add(recordIdOption);
 
         command.SetAction((parseResult, cancellationToken) =>
@@ -1323,6 +1353,7 @@ public static partial class WellboreDdmsCommands
         };
 
         var command = new Command("add", "Add a WellboreIntervalSet record from a JSON file.");
+        CommandRoles.Set(command, "users.datalake.editors or users.datalake.admins");
         command.Options.Add(fileOption);
 
         command.SetAction((parseResult, cancellationToken) =>
@@ -1357,6 +1388,7 @@ public static partial class WellboreDdmsCommands
         };
 
         var command = new Command("delete", "Soft-delete a WellboreIntervalSet record by id.");
+        CommandRoles.Set(command, "users.datalake.editors or users.datalake.admins");
         command.Options.Add(recordIdOption);
         command.Options.Add(yesOption);
 
@@ -1390,6 +1422,7 @@ public static partial class WellboreDdmsCommands
         };
 
         var command = new Command("list", "List all versions of a WellboreIntervalSet record.");
+        CommandRoles.Set(command, "users.datalake.viewers, users.datalake.editors or users.datalake.admins");
         command.Options.Add(recordIdOption);
 
         command.SetAction((parseResult, cancellationToken) =>
@@ -1423,6 +1456,7 @@ public static partial class WellboreDdmsCommands
         };
 
         var command = new Command("get", "Get a specific version of a WellboreIntervalSet record.");
+        CommandRoles.Set(command, "users.datalake.viewers, users.datalake.editors or users.datalake.admins");
         command.Options.Add(recordIdOption);
         command.Options.Add(versionOption);
 
@@ -1453,6 +1487,7 @@ public static partial class WellboreDdmsCommands
         };
 
         var command = new Command("get", "Get a WellLogAcquisition record by id.");
+        CommandRoles.Set(command, "users.datalake.viewers, users.datalake.editors or users.datalake.admins");
         command.Options.Add(recordIdOption);
 
         command.SetAction((parseResult, cancellationToken) =>
@@ -1481,6 +1516,7 @@ public static partial class WellboreDdmsCommands
         };
 
         var command = new Command("add", "Add a WellLogAcquisition record from a JSON file.");
+        CommandRoles.Set(command, "users.datalake.editors or users.datalake.admins");
         command.Options.Add(fileOption);
 
         command.SetAction((parseResult, cancellationToken) =>
@@ -1515,6 +1551,7 @@ public static partial class WellboreDdmsCommands
         };
 
         var command = new Command("delete", "Soft-delete a WellLogAcquisition record by id.");
+        CommandRoles.Set(command, "users.datalake.editors or users.datalake.admins");
         command.Options.Add(recordIdOption);
         command.Options.Add(yesOption);
 
@@ -1548,6 +1585,7 @@ public static partial class WellboreDdmsCommands
         };
 
         var command = new Command("list", "List all versions of a WellLogAcquisition record.");
+        CommandRoles.Set(command, "users.datalake.viewers, users.datalake.editors or users.datalake.admins");
         command.Options.Add(recordIdOption);
 
         command.SetAction((parseResult, cancellationToken) =>
@@ -1581,6 +1619,7 @@ public static partial class WellboreDdmsCommands
         };
 
         var command = new Command("get", "Get a specific version of a WellLogAcquisition record.");
+        CommandRoles.Set(command, "users.datalake.viewers, users.datalake.editors or users.datalake.admins");
         command.Options.Add(recordIdOption);
         command.Options.Add(versionOption);
 
@@ -1639,6 +1678,7 @@ public static partial class WellboreDdmsCommands
         };
 
         var command = new Command("add", "Add a PPFGDataset record from a JSON file.");
+        CommandRoles.Set(command, "users.datalake.editors or users.datalake.admins");
         command.Options.Add(fileOption);
 
         command.SetAction((parseResult, cancellationToken) =>
@@ -1794,6 +1834,7 @@ public static partial class WellboreDdmsCommands
         orientOption.AcceptAnyCasingFromAmong("split", "columns");
 
         var command = new Command("get", "Read the bulk data of a PPFGDataset record.");
+        CommandRoles.Set(command, "users.datalake.viewers, users.datalake.editors or users.datalake.admins");
         command.Options.Add(recordIdOption);
         command.Options.Add(offsetOption);
         command.Options.Add(limitOption);
@@ -1873,6 +1914,7 @@ public static partial class WellboreDdmsCommands
         orientOption.AcceptAnyCasingFromAmong("split", "columns");
 
         var command = new Command("data", "Read the bulk data of a specific PPFGDataset version.");
+        CommandRoles.Set(command, "users.datalake.viewers, users.datalake.editors or users.datalake.admins");
         command.Options.Add(recordIdOption);
         command.Options.Add(versionOption);
         command.Options.Add(offsetOption);
@@ -1952,6 +1994,7 @@ public static partial class WellboreDdmsCommands
         };
 
         var command = new Command("add", "Add a WellPressureTestRawMeasurement record from a JSON file.");
+        CommandRoles.Set(command, "users.datalake.editors or users.datalake.admins");
         command.Options.Add(fileOption);
 
         command.SetAction((parseResult, cancellationToken) =>
@@ -2107,6 +2150,7 @@ public static partial class WellboreDdmsCommands
         orientOption.AcceptAnyCasingFromAmong("split", "columns");
 
         var command = new Command("get", "Read the bulk data of a WellPressureTestRawMeasurement record.");
+        CommandRoles.Set(command, "users.datalake.viewers, users.datalake.editors or users.datalake.admins");
         command.Options.Add(recordIdOption);
         command.Options.Add(offsetOption);
         command.Options.Add(limitOption);
@@ -2186,6 +2230,7 @@ public static partial class WellboreDdmsCommands
         orientOption.AcceptAnyCasingFromAmong("split", "columns");
 
         var command = new Command("data", "Read the bulk data of a specific WellPressureTestRawMeasurement version.");
+        CommandRoles.Set(command, "users.datalake.viewers, users.datalake.editors or users.datalake.admins");
         command.Options.Add(recordIdOption);
         command.Options.Add(versionOption);
         command.Options.Add(offsetOption);

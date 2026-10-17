@@ -37,6 +37,10 @@ your OSDU administrator for the role, or take the alternative. It also appears o
 says the same thing: ADME answers a missing entitlement either way, and the operator commands,
 such as `index`, are where it does.
 
+The same roles are in each command's `--help`, under *Requires*, so they can be checked before
+running it; [the command reference](COMMANDS.md#commands-that-need-an-operator-role) lists the
+commands that need an operator role.
+
 `record list` is the common case: it uses Storage's kind-scoped query, which needs
 `service.storage.admin`. **Use `record search` instead.**
 

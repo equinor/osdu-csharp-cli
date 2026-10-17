@@ -129,6 +129,15 @@ public static class CliHelp
             output.WriteLine();
         }
 
+        // Before running it, not after a refusal: an operator command says so here.
+        if (CommandRoles.Describe(command) is { } roles)
+        {
+            output.WriteLine("Requires:");
+            foreach (var line in Wrap(roles, width - Indent))
+                output.WriteLine(new string(' ', Indent) + line);
+            output.WriteLine();
+        }
+
         output.WriteLine("Usage:");
         output.WriteLine(new string(' ', Indent) + Usage(command));
         output.WriteLine();

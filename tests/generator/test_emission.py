@@ -205,6 +205,15 @@ CASES = {
          "output": "raw"},
         operation(body={"$ref": "#/components/schemas/ReplayRequest"}),
     ),
+    # The roles the spec documents, for --help as well as for a refusal; an operator's marked.
+    "documented_roles": (
+        {"command": "index delete", "summary": "Delete an index.",
+         "op": {"method": "delete", "path": "/index"},
+         "params": {"kind": {"flag": "--kind", "required": True, "help": "Kind."}},
+         "output": "raw"},
+        {**operation(parameters=[{"name": "kind", "in": "query", "required": True, "schema": {"type": "string"}}]),
+         "description": "Delete Index for the given kind. Required roles: `users.datalake.ops`"},
+    ),
     "require_one_of": (
         {"command": "crs get", "summary": "Get a CRS.",
          "op": {"method": "get", "path": "/v3/coordinate-reference-system"},

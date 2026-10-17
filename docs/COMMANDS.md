@@ -15,6 +15,10 @@ their options; `record add` is in [USAGE.md](USAGE.md#writing-records), and the 
 [USAGE.md](USAGE.md#files). Neither are `group list`'s `--all` and `--type`, added by hand; see
 [USAGE.md](USAGE.md#operations). Run `osducs --help` for the full tree.
 
+Each command says what it **requires**: the roles its service's spec documents, which are also
+what `--help` and a refused request show. They are what the spec says, not a guarantee; a
+deployment may differ, and ADME answers some refusals with 401 rather than 403.
+
 
 | Noun | Commands |
 |---|---|
@@ -45,6 +49,31 @@ their options; `record add` is in [USAGE.md](USAGE.md#writing-records), and the 
 | [`welllog`](#welllog) | `get`, `add`, `delete`, `version list`, `version get`, `data get`, `version data`, `data stats`, `version stats`, `data session list`, `data session get`, `data session open`, `data session update`, `version update-stats` |
 | [`workflow`](#workflow) | `list`, `get`, `add`, `delete`, `run list`, `run get`, `run trigger`, `run update`, `run latest` |
 
+## Commands that need an operator role
+
+Every role that admits these is an admin or ops role, such as `users.datalake.ops`, `users.datalake.admins` or a `service.*.admin`, which data users do not usually hold. Everything else a data user's viewer or editor groups admit, where the spec says.
+
+| Command | Requires |
+|---|---|
+| [`osducs action add`](#osducs-action-add) | users.datalake.ops or users.datalake.admins |
+| [`osducs action delete`](#osducs-action-delete) | users.datalake.ops or users.datalake.admins |
+| [`osducs dataset revoke-url`](#osducs-dataset-revoke-url) | service.dataset.admin |
+| [`osducs ddms delete`](#osducs-ddms-delete) | users.datalake.ops or users.datalake.admins |
+| [`osducs file revoke-url`](#osducs-file-revoke-url) | service.file.admin |
+| `osducs group list --all` (hand-written) | users.datalake.ops or service.entitlements.admin |
+| [`osducs index delete`](#osducs-index-delete) | users.datalake.ops |
+| [`osducs index provision`](#osducs-index-provision) | users.datalake.ops |
+| [`osducs index reindex`](#osducs-index-reindex) | service.search.admin |
+| [`osducs index reindex-partition`](#osducs-index-reindex-partition) | users.datalake.ops |
+| [`osducs index reindex-records`](#osducs-index-reindex-records) | service.search.admin |
+| [`osducs record list`](#osducs-record-list) | service.storage.admin |
+| [`osducs record purge`](#osducs-record-purge) | service.storage.admin |
+| [`osducs record replay`](#osducs-record-replay) | users.datalake.ops |
+| [`osducs record replay-status`](#osducs-record-replay-status) | users.datalake.ops |
+| [`osducs subscription delete`](#osducs-subscription-delete) | users.datalake.ops or users.datalake.admins |
+| [`osducs workflow add`](#osducs-workflow-add) | service.workflow.admin |
+| [`osducs workflow delete`](#osducs-workflow-delete) | service.workflow.admin |
+
 ## action
 
 ### `osducs action add`
@@ -52,6 +81,8 @@ their options; `record add` is in [USAGE.md](USAGE.md#writing-records), and the 
 Register an action from a JSON file.
 
 `POST /action` — register
+
+Requires users.datalake.ops or users.datalake.admins — an operator role.
 
 | Option | Required | Description |
 |---|---|---|
@@ -66,6 +97,8 @@ osducs action add --file action.json
 Delete an action registration.
 
 `DELETE /action/{id}` — register
+
+Requires users.datalake.ops or users.datalake.admins — an operator role.
 
 | Option | Required | Description |
 |---|---|---|
@@ -84,6 +117,8 @@ Get an action registration by id.
 
 `GET /action/{id}` — register
 
+Requires users.datalake.ops, users.datalake.admins, users.datalake.editors or users.datalake.viewers.
+
 | Option | Required | Description |
 |---|---|---|
 | `-id`, `--id` | yes | Action registration id. |
@@ -98,6 +133,8 @@ The registered actions offered for a record, with their urls filled from it.
 
 `POST /action:retrieve` — register
 
+Requires users.datalake.ops, users.datalake.admins, users.datalake.editors or users.datalake.viewers.
+
 | Option | Required | Description |
 |---|---|---|
 | `-f`, `--file` | yes | JSON file with the record, or the fields of it the actions are filtered and filled by. |
@@ -111,6 +148,8 @@ osducs action match --file record.json
 Check how an action would fill its url from a sample record, without registering it.
 
 `POST /action:test` — register
+
+Requires users.datalake.ops, users.datalake.admins, users.datalake.editors or users.datalake.viewers.
 
 | Option | Required | Description |
 |---|---|---|
@@ -196,6 +235,8 @@ Create or update dataset registry records from a JSON file.
 
 `PUT /registerDataset` — dataset
 
+Requires service.storage.creator or service.storage.admin.
+
 | Option | Required | Description |
 |---|---|---|
 | `-f`, `--file` | yes | JSON file containing the dataset registry records. |
@@ -205,6 +246,8 @@ Create or update dataset registry records from a JSON file.
 Soft-delete a dataset metadata record.
 
 `POST /metadataRecord/{id}/softDelete` — dataset
+
+Requires service.storage.creator or service.storage.admin.
 
 | Option | Required | Description |
 |---|---|---|
@@ -219,6 +262,8 @@ Get instructions for reading a dataset's bytes.
 
 `GET /retrievalInstructions` — dataset
 
+Requires service.dataset.viewers.
+
 | Option | Required | Description |
 |---|---|---|
 | `-id`, `--id` | yes | Dataset registry record id. |
@@ -230,6 +275,8 @@ Get a dataset registry record by id.
 
 `GET /getDatasetRegistry` — dataset
 
+Requires service.storage.creator, service.storage.admin or service.storage.viewer.
+
 | Option | Required | Description |
 |---|---|---|
 | `-id`, `--id` | yes | Dataset registry record id. |
@@ -239,6 +286,8 @@ Get a dataset registry record by id.
 Revoke previously issued dataset URLs.
 
 `POST /revokeURL` — dataset
+
+Requires service.dataset.admin — an operator role.
 
 | Option | Required | Description |
 |---|---|---|
@@ -251,6 +300,8 @@ Restore a soft-deleted dataset metadata record.
 
 `POST /metadataRecord/{id}/undelete` — dataset
 
+Requires service.storage.creator or service.storage.admin.
+
 | Option | Required | Description |
 |---|---|---|
 | `-id`, `--id` | yes | Dataset metadata record id to restore. |
@@ -260,6 +311,8 @@ Restore a soft-deleted dataset metadata record.
 Get instructions for writing a new dataset's bytes.
 
 `POST /storageInstructions` — dataset
+
+Requires service.dataset.editors.
 
 | Option | Required | Description |
 |---|---|---|
@@ -274,6 +327,8 @@ Register a DDMS from a JSON file holding its OpenAPI 3 description.
 
 `POST /ddms` — register
 
+Requires users.datalake.editors, users.datalake.admins or users.datalake.ops.
+
 | Option | Required | Description |
 |---|---|---|
 | `-f`, `--file` | yes | JSON file with the registration — id, name, contactEmail and interfaces. |
@@ -287,6 +342,8 @@ osducs ddms add --file ddms.json
 Delete a DDMS registration.
 
 `DELETE /ddms/{id}` — register
+
+Requires users.datalake.ops or users.datalake.admins — an operator role.
 
 | Option | Required | Description |
 |---|---|---|
@@ -305,6 +362,8 @@ Get a DDMS registration by id.
 
 `GET /ddms/{id}` — register
 
+Requires users.datalake.ops, users.datalake.admins, users.datalake.editors or users.datalake.viewers.
+
 | Option | Required | Description |
 |---|---|---|
 | `-id`, `--id` | yes | DDMS registration id. |
@@ -318,6 +377,8 @@ osducs ddms get --id "wellbore-ddms"
 List the DDMS registrations of a type.
 
 `GET /ddms` — register
+
+Requires users.datalake.ops, users.datalake.admins, users.datalake.editors or users.datalake.viewers.
 
 | Option | Required | Description |
 |---|---|---|
@@ -335,6 +396,8 @@ Register metadata for a file already uploaded to the landing zone.
 
 `POST /v2/files/metadata` — file
 
+Requires service.file.editors, users.datalake.editors, users.datalake.admins or users.datalake.ops.
+
 | Option | Required | Description |
 |---|---|---|
 | `-f`, `--file` | yes | JSON file containing the file metadata record. |
@@ -344,6 +407,8 @@ Register metadata for a file already uploaded to the landing zone.
 Delete a file and its metadata record.
 
 `DELETE /v2/files/{id}/metadata` — file
+
+Requires users.datalake.editors or users.datalake.admins.
 
 | Option | Required | Description |
 |---|---|---|
@@ -358,6 +423,8 @@ Get a signed URL to download a file from.
 
 `GET /v2/files/{id}/downloadURL` — file
 
+Requires service.file.viewers, users.datalake.viewers, users.datalake.editors, users.datalake.admins or users.datalake.ops.
+
 | Option | Required | Description |
 |---|---|---|
 | `-id`, `--id` | yes | File metadata record id. |
@@ -369,6 +436,8 @@ Get the metadata record for a file.
 
 `GET /v2/files/{id}/metadata` — file
 
+Requires service.file.editors, users.datalake.editors, users.datalake.admins or users.datalake.ops.
+
 | Option | Required | Description |
 |---|---|---|
 | `-id`, `--id` | yes | File metadata record id. |
@@ -379,6 +448,8 @@ Revoke previously issued signed URLs.
 
 `POST /v2/files/revokeURL` — file
 
+Requires service.file.admin — an operator role.
+
 | Option | Required | Description |
 |---|---|---|
 | `-f`, `--file` | yes | JSON file naming the resource whose URLs should be revoked. |
@@ -388,6 +459,8 @@ Revoke previously issued signed URLs.
 Get a signed URL and landing-zone location to upload a file to.
 
 `GET /v2/files/uploadURL` — file
+
+Requires service.file.editors, users.datalake.editors, users.datalake.admins or users.datalake.ops.
 
 | Option | Required | Description |
 |---|---|---|
@@ -490,6 +563,8 @@ Delete the search index of a kind.
 
 `DELETE /index` — indexer
 
+Requires users.datalake.ops — an operator role.
+
 | Option | Required | Description |
 |---|---|---|
 | `-k`, `--kind` | yes | Kind whose index to delete, e.g. osdu:wks:master-data--Well:1.0.0. |
@@ -507,6 +582,8 @@ Provision the Indexer for the data partition.
 
 `PUT /partitions/provision` — indexer
 
+Requires users.datalake.ops — an operator role.
+
 | Option | Required | Description |
 |---|---|---|
 | `--yes` |  | Go ahead without asking. The command says what it is about to do and asks first, and refuses when there is no terminal to ask at. |
@@ -518,6 +595,8 @@ Provision the Indexer for the data partition.
 Re-index every record of a kind from Storage.
 
 `POST /reindex` — indexer
+
+Requires service.search.admin — an operator role.
 
 | Option | Required | Description |
 |---|---|---|
@@ -537,6 +616,8 @@ Re-index every kind in the data partition from Storage.
 
 `PATCH /reindex` — indexer
 
+Requires users.datalake.ops — an operator role.
+
 | Option | Required | Description |
 |---|---|---|
 | `--force-clean` |  | Delete each kind's index first and rebuild it from scratch. Until it finishes, searches find only what has been re-indexed. |
@@ -549,6 +630,8 @@ Re-index every kind in the data partition from Storage.
 Re-index specific records from Storage.
 
 `POST /reindex/records` — indexer
+
+Requires service.search.admin — an operator role.
 
 | Option | Required | Description |
 |---|---|---|
@@ -566,6 +649,8 @@ Add a WellboreIntervalSet record from a JSON file.
 
 `POST /ddms/v3/wellboreintervalsets` — wellbore_ddms
 
+Requires users.datalake.editors or users.datalake.admins.
+
 | Option | Required | Description |
 |---|---|---|
 | `-f`, `--file` | yes | JSON file containing the WellboreIntervalSet record. |
@@ -575,6 +660,8 @@ Add a WellboreIntervalSet record from a JSON file.
 Soft-delete a WellboreIntervalSet record by id.
 
 `DELETE /ddms/v3/wellboreintervalsets/{record_id}` — wellbore_ddms
+
+Requires users.datalake.editors or users.datalake.admins.
 
 | Option | Required | Description |
 |---|---|---|
@@ -589,6 +676,8 @@ Get a WellboreIntervalSet record by id.
 
 `GET /ddms/v3/wellboreintervalsets/{record_id}` — wellbore_ddms
 
+Requires users.datalake.viewers, users.datalake.editors or users.datalake.admins.
+
 | Option | Required | Description |
 |---|---|---|
 | `-id`, `--id` | yes | WellboreIntervalSet record id. |
@@ -598,6 +687,8 @@ Get a WellboreIntervalSet record by id.
 Get a specific version of a WellboreIntervalSet record.
 
 `GET /ddms/v3/wellboreintervalsets/{record_id}/versions/{version}` — wellbore_ddms
+
+Requires users.datalake.viewers, users.datalake.editors or users.datalake.admins.
 
 | Option | Required | Description |
 |---|---|---|
@@ -609,6 +700,8 @@ Get a specific version of a WellboreIntervalSet record.
 List all versions of a WellboreIntervalSet record.
 
 `GET /ddms/v3/wellboreintervalsets/{record_id}/versions` — wellbore_ddms
+
+Requires users.datalake.viewers, users.datalake.editors or users.datalake.admins.
 
 | Option | Required | Description |
 |---|---|---|
@@ -701,6 +794,8 @@ Add a WellLogAcquisition record from a JSON file.
 
 `POST /ddms/v3/welllogacquisition` — wellbore_ddms
 
+Requires users.datalake.editors or users.datalake.admins.
+
 | Option | Required | Description |
 |---|---|---|
 | `-f`, `--file` | yes | JSON file containing the WellLogAcquisition record. |
@@ -710,6 +805,8 @@ Add a WellLogAcquisition record from a JSON file.
 Soft-delete a WellLogAcquisition record by id.
 
 `DELETE /ddms/v3/welllogacquisition/{record_id}` — wellbore_ddms
+
+Requires users.datalake.editors or users.datalake.admins.
 
 | Option | Required | Description |
 |---|---|---|
@@ -724,6 +821,8 @@ Get a WellLogAcquisition record by id.
 
 `GET /ddms/v3/welllogacquisition/{record_id}` — wellbore_ddms
 
+Requires users.datalake.viewers, users.datalake.editors or users.datalake.admins.
+
 | Option | Required | Description |
 |---|---|---|
 | `-id`, `--id` | yes | WellLogAcquisition record id. |
@@ -733,6 +832,8 @@ Get a WellLogAcquisition record by id.
 Get a specific version of a WellLogAcquisition record.
 
 `GET /ddms/v3/welllogacquisition/{record_id}/versions/{version}` — wellbore_ddms
+
+Requires users.datalake.viewers, users.datalake.editors or users.datalake.admins.
 
 | Option | Required | Description |
 |---|---|---|
@@ -744,6 +845,8 @@ Get a specific version of a WellLogAcquisition record.
 List all versions of a WellLogAcquisition record.
 
 `GET /ddms/v3/welllogacquisition/{record_id}/versions` — wellbore_ddms
+
+Requires users.datalake.viewers, users.datalake.editors or users.datalake.admins.
 
 | Option | Required | Description |
 |---|---|---|
@@ -757,6 +860,8 @@ Add a WellboreMarkerSet record from a JSON file.
 
 `POST /ddms/v3/wellboremarkersets` — wellbore_ddms
 
+Requires users.datalake.editors or users.datalake.admins.
+
 | Option | Required | Description |
 |---|---|---|
 | `-f`, `--file` | yes | JSON file containing the WellboreMarkerSet record. |
@@ -766,6 +871,8 @@ Add a WellboreMarkerSet record from a JSON file.
 Soft-delete a WellboreMarkerSet record by id.
 
 `DELETE /ddms/v3/wellboremarkersets/{record_id}` — wellbore_ddms
+
+Requires users.datalake.editors or users.datalake.admins.
 
 | Option | Required | Description |
 |---|---|---|
@@ -780,6 +887,8 @@ Get a WellboreMarkerSet record by id.
 
 `GET /ddms/v3/wellboremarkersets/{record_id}` — wellbore_ddms
 
+Requires users.datalake.viewers, users.datalake.editors or users.datalake.admins.
+
 | Option | Required | Description |
 |---|---|---|
 | `-id`, `--id` | yes | WellboreMarkerSet record id. |
@@ -789,6 +898,8 @@ Get a WellboreMarkerSet record by id.
 Get a specific version of a WellboreMarkerSet record.
 
 `GET /ddms/v3/wellboremarkersets/{record_id}/versions/{version}` — wellbore_ddms
+
+Requires users.datalake.viewers, users.datalake.editors or users.datalake.admins.
 
 | Option | Required | Description |
 |---|---|---|
@@ -800,6 +911,8 @@ Get a specific version of a WellboreMarkerSet record.
 List all versions of a WellboreMarkerSet record.
 
 `GET /ddms/v3/wellboremarkersets/{record_id}/versions` — wellbore_ddms
+
+Requires users.datalake.viewers, users.datalake.editors or users.datalake.admins.
 
 | Option | Required | Description |
 |---|---|---|
@@ -887,6 +1000,8 @@ Add a PPFGDataset record from a JSON file.
 
 `POST /ddms/v3/ppfgdataset` — wellbore_ddms
 
+Requires users.datalake.editors or users.datalake.admins.
+
 | Option | Required | Description |
 |---|---|---|
 | `-f`, `--file` | yes | JSON file containing the PPFGDataset record. |
@@ -896,6 +1011,8 @@ Add a PPFGDataset record from a JSON file.
 Read the bulk data of a PPFGDataset record.
 
 `GET /ddms/v3/ppfgdataset/{record_id}/data` — wellbore_ddms
+
+Requires users.datalake.viewers, users.datalake.editors or users.datalake.admins.
 
 | Option | Required | Description |
 |---|---|---|
@@ -998,6 +1115,8 @@ Read the bulk data of a specific PPFGDataset version.
 
 `GET /ddms/v3/ppfgdataset/{record_id}/versions/{version}/data` — wellbore_ddms
 
+Requires users.datalake.viewers, users.datalake.editors or users.datalake.admins.
+
 | Option | Required | Description |
 |---|---|---|
 | `-id`, `--id` | yes | PPFGDataset record id. |
@@ -1038,6 +1157,8 @@ Add a WellPressureTestRawMeasurement record from a JSON file.
 
 `POST /ddms/v3/wellpressuretestrawmeasurement` — wellbore_ddms
 
+Requires users.datalake.editors or users.datalake.admins.
+
 | Option | Required | Description |
 |---|---|---|
 | `-f`, `--file` | yes | JSON file containing the WellPressureTestRawMeasurement record. |
@@ -1047,6 +1168,8 @@ Add a WellPressureTestRawMeasurement record from a JSON file.
 Read the bulk data of a WellPressureTestRawMeasurement record.
 
 `GET /ddms/v3/wellpressuretestrawmeasurement/{record_id}/data` — wellbore_ddms
+
+Requires users.datalake.viewers, users.datalake.editors or users.datalake.admins.
 
 | Option | Required | Description |
 |---|---|---|
@@ -1149,6 +1272,8 @@ Read the bulk data of a specific WellPressureTestRawMeasurement version.
 
 `GET /ddms/v3/wellpressuretestrawmeasurement/{record_id}/versions/{version}/data` — wellbore_ddms
 
+Requires users.datalake.viewers, users.datalake.editors or users.datalake.admins.
+
 | Option | Required | Description |
 |---|---|---|
 | `-id`, `--id` | yes | WellPressureTestRawMeasurement record id. |
@@ -1189,6 +1314,8 @@ Count distinct values of a field across matching records.
 
 `POST /query` — search
 
+Requires users.datalake.viewers, users.datalake.editors, users.datalake.admins or users.datalake.ops.
+
 | Option | Required | Description |
 |---|---|---|
 | `-k`, `--kind` | yes | Kind to aggregate over. Wildcards allowed per segment. |
@@ -1206,6 +1333,8 @@ Soft-delete a record by id.
 
 `POST /records/{id}:delete` — storage
 
+Requires service.storage.creator or service.storage.admin.
+
 | Option | Required | Description |
 |---|---|---|
 | `-id`, `--id` | yes | Record id to delete. |
@@ -1218,6 +1347,8 @@ Soft-delete a record by id.
 Get the latest version of a record by id.
 
 `GET /records/{id}` — storage
+
+Requires service.storage.viewer, service.storage.creator or service.storage.admin.
 
 | Option | Required | Description |
 |---|---|---|
@@ -1249,6 +1380,8 @@ List records of a given kind.
 
 `GET /query/records` — storage
 
+Requires service.storage.admin — an operator role.
+
 | Option | Required | Description |
 |---|---|---|
 | `-k`, `--kind` | yes | Kind of records to list. |
@@ -1264,6 +1397,8 @@ osducs record list --kind "osdu:wks:master-data--Well:1.2.0" --limit 5
 Permanently delete a record and every version of it.
 
 `DELETE /records/{id}` — storage
+
+Requires service.storage.admin — an operator role.
 
 | Option | Required | Description |
 |---|---|---|
@@ -1281,6 +1416,8 @@ osducs record purge --id "opendes:master-data--Well:1000"
 Send records from Storage to their consumers again, to rebuild the index or more.
 
 `POST /replay` — storage
+
+Requires users.datalake.ops — an operator role.
 
 | Option | Required | Description |
 |---|---|---|
@@ -1301,6 +1438,8 @@ Show how far a replay has got; -o json breaks it down by kind.
 
 `GET /replay/status/{id}` — storage
 
+Requires users.datalake.ops — an operator role.
+
 | Option | Required | Description |
 |---|---|---|
 | `-id`, `--id` | yes | Replay id, as `record replay` printed it. |
@@ -1314,6 +1453,8 @@ osducs record replay-status --id "f506be08-b51f-4cdd-a9ee-d9454ad51600"
 Search records with a Lucene query.
 
 `POST /query` — search
+
+Requires users.datalake.viewers, users.datalake.editors, users.datalake.admins or users.datalake.ops.
 
 | Option | Required | Description |
 |---|---|---|
@@ -1355,6 +1496,8 @@ Get a specific version of a record.
 
 `GET /records/{id}/{version}` — storage
 
+Requires service.storage.viewer, service.storage.creator or service.storage.admin.
+
 | Option | Required | Description |
 |---|---|---|
 | `-id`, `--id` | yes | Record id. |
@@ -1366,6 +1509,8 @@ Get a specific version of a record.
 List all versions of a record.
 
 `GET /records/versions/{id}` — storage
+
+Requires service.storage.viewer, service.storage.creator or service.storage.admin.
 
 | Option | Required | Description |
 |---|---|---|
@@ -1462,6 +1607,8 @@ Create a notification subscription from a JSON file, secret included.
 
 `POST /subscription` — register
 
+Requires users.datalake.ops, users.datalake.admins or users.datalake.editors.
+
 | Option | Required | Description |
 |---|---|---|
 | `-f`, `--file` | yes | JSON file with the subscription: name, topic, pushEndpoint, and a secret such as {"secretType": "HMAC", "value": "..."}. |
@@ -1475,6 +1622,8 @@ osducs subscription add --file subscription.json
 Delete a notification subscription.
 
 `DELETE /subscription/{id}` — register
+
+Requires users.datalake.ops or users.datalake.admins — an operator role.
 
 | Option | Required | Description |
 |---|---|---|
@@ -1493,6 +1642,8 @@ Find the subscriptions for a notification id.
 
 `GET /subscription` — register
 
+Requires users.datalake.ops, users.datalake.admins or users.datalake.editors.
+
 | Option | Required | Description |
 |---|---|---|
 | `--notification-id` | yes | Notification id, as `subscription get` shows it. |
@@ -1507,6 +1658,8 @@ Get a notification subscription by id.
 
 `GET /subscription/{id}` — register
 
+Requires users.datalake.ops, users.datalake.admins or users.datalake.editors.
+
 | Option | Required | Description |
 |---|---|---|
 | `-id`, `--id` | yes | Subscription id. |
@@ -1520,6 +1673,8 @@ osducs subscription get --id "ZGV2LWRlZmF1bHQtcmVjb3Jkc2NoYW5nZWQtdjI"
 Replace the secret a subscription's push endpoint checks messages with.
 
 `PUT /subscription/{id}/secret` — register
+
+Requires users.datalake.ops, users.datalake.admins or users.datalake.editors.
 
 | Option | Required | Description |
 |---|---|---|
@@ -1538,6 +1693,8 @@ List the topics a notification subscription can be made for.
 
 `GET /topics` — register
 
+Requires users.datalake.ops, users.datalake.admins or users.datalake.editors.
+
 ```bash
 osducs topic list 
 ```
@@ -1550,6 +1707,8 @@ Add a WellboreTrajectory record from a JSON file.
 
 `POST /ddms/v3/wellboretrajectories` — wellbore_ddms
 
+Requires users.datalake.editors or users.datalake.admins.
+
 | Option | Required | Description |
 |---|---|---|
 | `-f`, `--file` | yes | JSON file containing the WellboreTrajectory record. |
@@ -1559,6 +1718,8 @@ Add a WellboreTrajectory record from a JSON file.
 Read the bulk data of a WellboreTrajectory record.
 
 `GET /ddms/v3/wellboretrajectories/{record_id}/data` — wellbore_ddms
+
+Requires users.datalake.viewers, users.datalake.editors or users.datalake.admins.
 
 | Option | Required | Description |
 |---|---|---|
@@ -1638,6 +1799,8 @@ Soft-delete a WellboreTrajectory record by id.
 
 `DELETE /ddms/v3/wellboretrajectories/{record_id}` — wellbore_ddms
 
+Requires users.datalake.editors or users.datalake.admins.
+
 | Option | Required | Description |
 |---|---|---|
 | `-id`, `--id` | yes | WellboreTrajectory record id to delete. |
@@ -1651,6 +1814,8 @@ Get a WellboreTrajectory record by id.
 
 `GET /ddms/v3/wellboretrajectories/{record_id}` — wellbore_ddms
 
+Requires users.datalake.viewers, users.datalake.editors or users.datalake.admins.
+
 | Option | Required | Description |
 |---|---|---|
 | `-id`, `--id` | yes | WellboreTrajectory record id. |
@@ -1660,6 +1825,8 @@ Get a WellboreTrajectory record by id.
 Read the bulk data of a specific WellboreTrajectory version.
 
 `GET /ddms/v3/wellboretrajectories/{record_id}/versions/{version}/data` — wellbore_ddms
+
+Requires users.datalake.viewers, users.datalake.editors or users.datalake.admins.
 
 | Option | Required | Description |
 |---|---|---|
@@ -1678,6 +1845,8 @@ Get a specific version of a WellboreTrajectory record.
 
 `GET /ddms/v3/wellboretrajectories/{record_id}/versions/{version}` — wellbore_ddms
 
+Requires users.datalake.viewers, users.datalake.editors or users.datalake.admins.
+
 | Option | Required | Description |
 |---|---|---|
 | `-id`, `--id` | yes | WellboreTrajectory record id. |
@@ -1688,6 +1857,8 @@ Get a specific version of a WellboreTrajectory record.
 List all versions of a WellboreTrajectory record.
 
 `GET /ddms/v3/wellboretrajectories/{record_id}/versions` — wellbore_ddms
+
+Requires users.datalake.viewers, users.datalake.editors or users.datalake.admins.
 
 | Option | Required | Description |
 |---|---|---|
@@ -1881,6 +2052,8 @@ Add a Well record from a JSON file.
 
 `POST /ddms/v3/wells` — wellbore_ddms
 
+Requires users.datalake.editors or users.datalake.admins.
+
 | Option | Required | Description |
 |---|---|---|
 | `-f`, `--file` | yes | JSON file containing the Well record. |
@@ -1890,6 +2063,8 @@ Add a Well record from a JSON file.
 Soft-delete a Well record by id.
 
 `DELETE /ddms/v3/wells/{record_id}` — wellbore_ddms
+
+Requires users.datalake.editors or users.datalake.admins.
 
 | Option | Required | Description |
 |---|---|---|
@@ -1904,6 +2079,8 @@ Get a Well record by id.
 
 `GET /ddms/v3/wells/{record_id}` — wellbore_ddms
 
+Requires users.datalake.viewers, users.datalake.editors or users.datalake.admins.
+
 | Option | Required | Description |
 |---|---|---|
 | `-id`, `--id` | yes | Well record id. |
@@ -1913,6 +2090,8 @@ Get a Well record by id.
 Get a specific version of a Well record.
 
 `GET /ddms/v3/wells/{record_id}/versions/{version}` — wellbore_ddms
+
+Requires users.datalake.viewers, users.datalake.editors or users.datalake.admins.
 
 | Option | Required | Description |
 |---|---|---|
@@ -1924,6 +2103,8 @@ Get a specific version of a Well record.
 List all versions of a Well record.
 
 `GET /ddms/v3/wells/{record_id}/versions` — wellbore_ddms
+
+Requires users.datalake.viewers, users.datalake.editors or users.datalake.admins.
 
 | Option | Required | Description |
 |---|---|---|
@@ -1937,6 +2118,8 @@ Add a Wellbore record from a JSON file.
 
 `POST /ddms/v3/wellbores` — wellbore_ddms
 
+Requires users.datalake.editors or users.datalake.admins.
+
 | Option | Required | Description |
 |---|---|---|
 | `-f`, `--file` | yes | JSON file containing the Wellbore record. |
@@ -1946,6 +2129,8 @@ Add a Wellbore record from a JSON file.
 Soft-delete a Wellbore record by id.
 
 `DELETE /ddms/v3/wellbores/{record_id}` — wellbore_ddms
+
+Requires users.datalake.editors or users.datalake.admins.
 
 | Option | Required | Description |
 |---|---|---|
@@ -1960,6 +2145,8 @@ Get a Wellbore record by id.
 
 `GET /ddms/v3/wellbores/{record_id}` — wellbore_ddms
 
+Requires users.datalake.viewers, users.datalake.editors or users.datalake.admins.
+
 | Option | Required | Description |
 |---|---|---|
 | `-id`, `--id` | yes | Wellbore record id. |
@@ -1969,6 +2156,8 @@ Get a Wellbore record by id.
 Get a specific version of a Wellbore record.
 
 `GET /ddms/v3/wellbores/{record_id}/versions/{version}` — wellbore_ddms
+
+Requires users.datalake.viewers, users.datalake.editors or users.datalake.admins.
 
 | Option | Required | Description |
 |---|---|---|
@@ -1980,6 +2169,8 @@ Get a specific version of a Wellbore record.
 List all versions of a Wellbore record.
 
 `GET /ddms/v3/wellbores/{record_id}/versions` — wellbore_ddms
+
+Requires users.datalake.viewers, users.datalake.editors or users.datalake.admins.
 
 | Option | Required | Description |
 |---|---|---|
@@ -1993,6 +2184,8 @@ Add a WellLog record from a JSON file.
 
 `POST /ddms/v3/welllogs` — wellbore_ddms
 
+Requires users.datalake.editors or users.datalake.admins.
+
 | Option | Required | Description |
 |---|---|---|
 | `-f`, `--file` | yes | JSON file containing the WellLog record. |
@@ -2002,6 +2195,8 @@ Add a WellLog record from a JSON file.
 Read the bulk data of a WellLog record.
 
 `GET /ddms/v3/welllogs/{record_id}/data` — wellbore_ddms
+
+Requires users.datalake.viewers, users.datalake.editors or users.datalake.admins.
 
 | Option | Required | Description |
 |---|---|---|
@@ -2092,6 +2287,8 @@ Soft-delete a WellLog record by id.
 
 `DELETE /ddms/v3/welllogs/{record_id}` — wellbore_ddms
 
+Requires users.datalake.editors or users.datalake.admins.
+
 | Option | Required | Description |
 |---|---|---|
 | `-id`, `--id` | yes | WellLog record id to delete. |
@@ -2105,6 +2302,8 @@ Get a WellLog record by id.
 
 `GET /ddms/v3/welllogs/{record_id}` — wellbore_ddms
 
+Requires users.datalake.viewers, users.datalake.editors or users.datalake.admins.
+
 | Option | Required | Description |
 |---|---|---|
 | `-id`, `--id` | yes | WellLog record id. |
@@ -2114,6 +2313,8 @@ Get a WellLog record by id.
 Read the bulk data of a specific WellLog version.
 
 `GET /ddms/v3/welllogs/{record_id}/versions/{version}/data` — wellbore_ddms
+
+Requires users.datalake.viewers, users.datalake.editors or users.datalake.admins.
 
 | Option | Required | Description |
 |---|---|---|
@@ -2132,6 +2333,8 @@ Get a specific version of a WellLog record.
 
 `GET /ddms/v3/welllogs/{record_id}/versions/{version}` — wellbore_ddms
 
+Requires users.datalake.viewers, users.datalake.editors or users.datalake.admins.
+
 | Option | Required | Description |
 |---|---|---|
 | `-id`, `--id` | yes | WellLog record id. |
@@ -2142,6 +2345,8 @@ Get a specific version of a WellLog record.
 List all versions of a WellLog record.
 
 `GET /ddms/v3/welllogs/{record_id}/versions` — wellbore_ddms
+
+Requires users.datalake.viewers, users.datalake.editors or users.datalake.admins.
 
 | Option | Required | Description |
 |---|---|---|
@@ -2182,6 +2387,8 @@ Register a workflow definition from a JSON file.
 
 `POST /v1/workflow` — workflow
 
+Requires service.workflow.admin — an operator role.
+
 | Option | Required | Description |
 |---|---|---|
 | `-f`, `--file` | yes | JSON file containing the workflow definition. |
@@ -2191,6 +2398,8 @@ Register a workflow definition from a JSON file.
 Delete a workflow definition by name.
 
 `DELETE /v1/workflow/{workflow_name}` — workflow
+
+Requires service.workflow.admin — an operator role.
 
 | Option | Required | Description |
 |---|---|---|
@@ -2205,6 +2414,8 @@ Get a workflow definition by name.
 
 `GET /v1/workflow/{workflow_name}` — workflow
 
+Requires service.workflow.viewer.
+
 | Option | Required | Description |
 |---|---|---|
 | `-n`, `--name` | yes | Workflow name. |
@@ -2215,6 +2426,8 @@ List workflows registered in the partition.
 
 `GET /v1/workflow` — workflow
 
+Requires service.workflow.viewer.
+
 | Option | Required | Description |
 |---|---|---|
 | `--prefix` |  | Return only workflows whose name starts with this. |
@@ -2224,6 +2437,8 @@ List workflows registered in the partition.
 Get one workflow run.
 
 `GET /v1/workflow/{workflow_name}/workflowRun/{runId}` — workflow
+
+Requires service.workflow.viewer.
 
 | Option | Required | Description |
 |---|---|---|
@@ -2236,6 +2451,8 @@ Show execution detail for the most recent task of a run.
 
 `GET /v1/workflow/{workflow_name}/workflowRun/{runId}/latestInfo` — workflow
 
+Requires service.workflow.viewer.
+
 | Option | Required | Description |
 |---|---|---|
 | `-n`, `--name` | yes | Workflow name. |
@@ -2247,6 +2464,8 @@ List the runs of a workflow.
 
 `GET /v1/workflow/{workflow_name}/workflowRun` — workflow
 
+Requires service.workflow.viewer.
+
 | Option | Required | Description |
 |---|---|---|
 | `-n`, `--name` | yes | Workflow name. |
@@ -2256,6 +2475,8 @@ List the runs of a workflow.
 Start a new run of a workflow.
 
 `POST /v1/workflow/{workflow_name}/workflowRun` — workflow
+
+Requires service.workflow.creator.
 
 | Option | Required | Description |
 |---|---|---|
@@ -2267,6 +2488,8 @@ Start a new run of a workflow.
 Update the status of a workflow run.
 
 `PUT /v1/workflow/{workflow_name}/workflowRun/{runId}` — workflow
+
+Requires service.workflow.viewer.
 
 | Option | Required | Description |
 |---|---|---|

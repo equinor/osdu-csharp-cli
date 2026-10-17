@@ -56,6 +56,7 @@ public static partial class RegisterCommands
         };
 
         var command = new Command("find", "Find the subscriptions for a notification id.");
+        CommandRoles.Set(command, "users.datalake.ops, users.datalake.admins or users.datalake.editors");
         command.Options.Add(notificationidOption);
 
         command.SetAction((parseResult, cancellationToken) =>
@@ -87,6 +88,7 @@ public static partial class RegisterCommands
         };
 
         var command = new Command("get", "Get a notification subscription by id.");
+        CommandRoles.Set(command, "users.datalake.ops, users.datalake.admins or users.datalake.editors");
         command.Options.Add(idOption);
 
         command.SetAction((parseResult, cancellationToken) =>
@@ -115,6 +117,7 @@ public static partial class RegisterCommands
         };
 
         var command = new Command("add", "Create a notification subscription from a JSON file, secret included.");
+        CommandRoles.Set(command, "users.datalake.ops, users.datalake.admins or users.datalake.editors");
         command.Options.Add(fileOption);
 
         command.SetAction((parseResult, cancellationToken) =>
@@ -150,6 +153,7 @@ public static partial class RegisterCommands
         };
 
         var command = new Command("update-secret", "Replace the secret a subscription's push endpoint checks messages with.");
+        CommandRoles.Set(command, "users.datalake.ops, users.datalake.admins or users.datalake.editors");
         command.Options.Add(idOption);
         command.Options.Add(fileOption);
 
@@ -184,6 +188,7 @@ public static partial class RegisterCommands
         };
 
         var command = new Command("delete", "Delete a notification subscription.");
+        CommandRoles.Set(command, "users.datalake.ops or users.datalake.admins", operatorRole: true);
         command.Options.Add(idOption);
         command.Options.Add(yesOption);
 
@@ -212,6 +217,7 @@ public static partial class RegisterCommands
     {
 
         var command = new Command("list", "List the topics a notification subscription can be made for.");
+        CommandRoles.Set(command, "users.datalake.ops, users.datalake.admins or users.datalake.editors");
 
         command.SetAction((parseResult, cancellationToken) =>
             CliRunner.RunAsync(parseResult, async (context, cancellationToken) =>
@@ -238,6 +244,7 @@ public static partial class RegisterCommands
         };
 
         var command = new Command("list", "List the DDMS registrations of a type.");
+        CommandRoles.Set(command, "users.datalake.ops, users.datalake.admins, users.datalake.editors or users.datalake.viewers");
         command.Options.Add(typeOption);
 
         command.SetAction((parseResult, cancellationToken) =>
@@ -269,6 +276,7 @@ public static partial class RegisterCommands
         };
 
         var command = new Command("get", "Get a DDMS registration by id.");
+        CommandRoles.Set(command, "users.datalake.ops, users.datalake.admins, users.datalake.editors or users.datalake.viewers");
         command.Options.Add(idOption);
 
         command.SetAction((parseResult, cancellationToken) =>
@@ -297,6 +305,7 @@ public static partial class RegisterCommands
         };
 
         var command = new Command("add", "Register a DDMS from a JSON file holding its OpenAPI 3 description.");
+        CommandRoles.Set(command, "users.datalake.editors, users.datalake.admins or users.datalake.ops");
         command.Options.Add(fileOption);
 
         command.SetAction((parseResult, cancellationToken) =>
@@ -331,6 +340,7 @@ public static partial class RegisterCommands
         };
 
         var command = new Command("delete", "Delete a DDMS registration.");
+        CommandRoles.Set(command, "users.datalake.ops or users.datalake.admins", operatorRole: true);
         command.Options.Add(idOption);
         command.Options.Add(yesOption);
 
@@ -364,6 +374,7 @@ public static partial class RegisterCommands
         };
 
         var command = new Command("get", "Get an action registration by id.");
+        CommandRoles.Set(command, "users.datalake.ops, users.datalake.admins, users.datalake.editors or users.datalake.viewers");
         command.Options.Add(idOption);
 
         command.SetAction((parseResult, cancellationToken) =>
@@ -392,6 +403,7 @@ public static partial class RegisterCommands
         };
 
         var command = new Command("add", "Register an action from a JSON file.");
+        CommandRoles.Set(command, "users.datalake.ops or users.datalake.admins", operatorRole: true);
         command.Options.Add(fileOption);
 
         command.SetAction((parseResult, cancellationToken) =>
@@ -422,6 +434,7 @@ public static partial class RegisterCommands
         };
 
         var command = new Command("test", "Check how an action would fill its url from a sample record, without registering it.");
+        CommandRoles.Set(command, "users.datalake.ops, users.datalake.admins, users.datalake.editors or users.datalake.viewers");
         command.Options.Add(fileOption);
 
         command.SetAction((parseResult, cancellationToken) =>
@@ -452,6 +465,7 @@ public static partial class RegisterCommands
         };
 
         var command = new Command("match", "The registered actions offered for a record, with their urls filled from it.");
+        CommandRoles.Set(command, "users.datalake.ops, users.datalake.admins, users.datalake.editors or users.datalake.viewers");
         command.Options.Add(fileOption);
 
         command.SetAction((parseResult, cancellationToken) =>
@@ -486,6 +500,7 @@ public static partial class RegisterCommands
         };
 
         var command = new Command("delete", "Delete an action registration.");
+        CommandRoles.Set(command, "users.datalake.ops or users.datalake.admins", operatorRole: true);
         command.Options.Add(idOption);
         command.Options.Add(yesOption);
 

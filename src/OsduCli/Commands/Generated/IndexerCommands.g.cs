@@ -55,6 +55,7 @@ public static partial class IndexerCommands
         };
 
         var command = new Command("reindex", "Re-index every record of a kind from Storage.");
+        CommandRoles.Set(command, "service.search.admin", operatorRole: true);
         command.Options.Add(forceCleanOption);
         command.Options.Add(kindBodyOption);
         command.Options.Add(yesOption);
@@ -105,6 +106,7 @@ public static partial class IndexerCommands
         };
 
         var command = new Command("reindex-records", "Re-index specific records from Storage.");
+        CommandRoles.Set(command, "service.search.admin", operatorRole: true);
         command.Options.Add(recordidsBodyOption);
 
         // The spec's maxItems, checked here rather than by the service.
@@ -148,6 +150,7 @@ public static partial class IndexerCommands
         };
 
         var command = new Command("reindex-partition", "Re-index every kind in the data partition from Storage.");
+        CommandRoles.Set(command, "users.datalake.ops", operatorRole: true);
         command.Options.Add(forceCleanOption);
         command.Options.Add(yesOption);
 
@@ -190,6 +193,7 @@ public static partial class IndexerCommands
         };
 
         var command = new Command("delete", "Delete the search index of a kind.");
+        CommandRoles.Set(command, "users.datalake.ops", operatorRole: true);
         command.Options.Add(kindOption);
         command.Options.Add(yesOption);
 
@@ -227,6 +231,7 @@ public static partial class IndexerCommands
         };
 
         var command = new Command("provision", "Provision the Indexer for the data partition.");
+        CommandRoles.Set(command, "users.datalake.ops", operatorRole: true);
         command.Options.Add(yesOption);
 
         command.SetAction((parseResult, cancellationToken) =>

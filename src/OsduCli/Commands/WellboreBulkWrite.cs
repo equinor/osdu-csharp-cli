@@ -138,6 +138,7 @@ public static class WellboreBulkWrite
         {
             id, files, update,
         };
+        CommandRoles.Set(command, Roles);
 
         command.SetAction((parseResult, cancellationToken) => CliRunner.RunAsync(parseResult, async (context, token) =>
         {
@@ -172,6 +173,7 @@ public static class WellboreBulkWrite
         {
             id, session, file,
         };
+        CommandRoles.Set(command, Roles);
 
         command.SetAction((parseResult, cancellationToken) => CliRunner.RunAsync(parseResult, async (context, token) =>
         {

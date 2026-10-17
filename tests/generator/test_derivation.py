@@ -2,7 +2,7 @@
 
 import pytest
 
-from generate_cli import (ManifestError, camel, csharp_type, derive_builder, pascal,
+from generate_cli import (ManifestError, camel, csharp_type, derive_builder, needs_operator_role, pascal,
                           resolve_field_schema, returns_value)
 
 
@@ -30,6 +30,24 @@ class TestBuilderDerivation:
     def test_a_hyphenated_segment_refuses_to_guess(self):
         with pytest.raises(ManifestError, match="cannot derive"):
             derive_builder("/log-recognition")
+
+
+class TestOperatorRoles:
+    """Which commands need a role beyond what a data user holds."""
+
+    @pytest.mark.parametrize("roles,operator", [
+        ("users.datalake.ops", True),
+        ("service.storage.admin", True),
+        ("users.datalake.ops or users.datalake.admins", True),
+        ("users.datalake.ops, users.datalake.admins or service.entitlements.admin", True),
+        # A data user's role among them is enough.
+        ("users.datalake.editors or users.datalake.admins", False),
+        ("service.storage.creator or service.storage.admin", False),
+        ("service.workflow.viewer", False),
+        (None, False),
+    ])
+    def test_only_admin_and_ops_roles_throughout_make_an_operator_command(self, roles, operator):
+        assert needs_operator_role(roles) is operator
 
 
 class TestTypeMapping:

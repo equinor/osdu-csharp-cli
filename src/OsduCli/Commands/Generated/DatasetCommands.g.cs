@@ -48,6 +48,7 @@ public static partial class DatasetCommands
         };
 
         var command = new Command("get", "Get a dataset registry record by id.");
+        CommandRoles.Set(command, "service.storage.creator, service.storage.admin or service.storage.viewer");
         command.Options.Add(idOption);
 
         command.SetAction((parseResult, cancellationToken) =>
@@ -79,6 +80,7 @@ public static partial class DatasetCommands
         };
 
         var command = new Command("add", "Create or update dataset registry records from a JSON file.");
+        CommandRoles.Set(command, "service.storage.creator or service.storage.admin");
         command.Options.Add(fileOption);
 
         command.SetAction((parseResult, cancellationToken) =>
@@ -113,6 +115,7 @@ public static partial class DatasetCommands
         };
 
         var command = new Command("delete", "Soft-delete a dataset metadata record.");
+        CommandRoles.Set(command, "service.storage.creator or service.storage.admin");
         command.Options.Add(idOption);
         command.Options.Add(yesOption);
 
@@ -146,6 +149,7 @@ public static partial class DatasetCommands
         };
 
         var command = new Command("undelete", "Restore a soft-deleted dataset metadata record.");
+        CommandRoles.Set(command, "service.storage.creator or service.storage.admin");
         command.Options.Add(idOption);
 
         command.SetAction((parseResult, cancellationToken) =>
@@ -178,6 +182,7 @@ public static partial class DatasetCommands
         };
 
         var command = new Command("upload-url", "Get instructions for writing a new dataset's bytes.");
+        CommandRoles.Set(command, "service.dataset.editors");
         command.Options.Add(kindsubtypeOption);
         command.Options.Add(expirytimeOption);
 
@@ -216,6 +221,7 @@ public static partial class DatasetCommands
         };
 
         var command = new Command("download-url", "Get instructions for reading a dataset's bytes.");
+        CommandRoles.Set(command, "service.dataset.viewers");
         command.Options.Add(idOption);
         command.Options.Add(expirytimeOption);
 
@@ -255,6 +261,7 @@ public static partial class DatasetCommands
         };
 
         var command = new Command("revoke-url", "Revoke previously issued dataset URLs.");
+        CommandRoles.Set(command, "service.dataset.admin", operatorRole: true);
         command.Options.Add(kindsubtypeOption);
         command.Options.Add(fileOption);
 

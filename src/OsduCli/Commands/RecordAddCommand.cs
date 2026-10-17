@@ -31,6 +31,9 @@ namespace Equinor.OsduCli.Commands;
 /// </remarks>
 public static class RecordAddCommand
 {
+    /// <summary>The roles Storage documents for writing records.</summary>
+    private const string Roles = "users.datalake.editors or users.datalake.admins";
+
     /// <summary>Storage's limit on the records one request may carry.</summary>
     internal const int MaxRecords = 500;
 
@@ -64,6 +67,7 @@ public static class RecordAddCommand
         {
             file, dryRun, yes, skipUnchanged,
         };
+        CommandRoles.Set(command, Roles);
 
         command.SetAction((parseResult, cancellationToken) =>
             CliRunner.RunAsync(parseResult, async (context, token) =>
@@ -92,7 +96,7 @@ public static class RecordAddCommand
             return context.Output.Format == OutputFormat.Json
                 ? context.Output.Write(await OsduJson.ToJsonAsync(response), OutputSpec.Raw)
                 : context.Output.Write(Results(response, existing).ToJsonString(), ResultSpec);
-        }, cancellationToken, "users.datalake.editors or users.datalake.admins"));
+        }, cancellationToken, Roles));
 
         return command;
     }
