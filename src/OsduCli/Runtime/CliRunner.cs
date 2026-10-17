@@ -223,7 +223,7 @@ public static class CliRunner
             // stack trace above it is not.
             var detail = Describe(exception);
             Console.Error.WriteLine(
-                $"error: {exception.ResponseStatusCode} from the service. " + (detail ?? string.Empty));
+                $"error: {exception.ResponseStatusCode} from the service." + (detail is null ? "" : $" {detail}"));
 
             // "The user is not authorized to perform this action" does not say which
             // authorisation, and several OSDU endpoints need an admin role a normal user will

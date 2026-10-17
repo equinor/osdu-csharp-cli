@@ -49,65 +49,7 @@ public static class WellboreBulkWrite
 
     /// <summary>Every failure, read for the reason the service gives.</summary>
     private static readonly Dictionary<string, ParsableFactory<IParsable>> Errors =
-        new() { ["XXX"] = DdmsError.CreateFromDiscriminatorValue };
-
-    /// <summary>
-    /// A failure from Wellbore DDMS, with the reason it gives in <c>detail</c>.
-    /// </summary>
-    /// <remarks>
-    /// <c>detail</c> is a sentence for most refusals, such as "Column(s) do(es) not match any
-    /// CurveID of the WellLog record.", and a list of <c>{loc, msg}</c> entries for a request it
-    /// cannot validate. The client maps only the second, so the first reached the user as a bare
-    /// "400 from the service." and the reason was only in the response.
-    /// </remarks>
-    internal sealed class DdmsError : ApiException, IParsable
-    {
-        private UntypedNode? _detail;
-        private string? _message;
-
-        // `message` is where an error page from a gateway in front of the service ends up: the
-        // text body reader puts the page's title there.
-        public override string Message => Reason(_detail) ?? _message ?? string.Empty;
-
-        public IDictionary<string, Action<IParseNode>> GetFieldDeserializers() =>
-            new Dictionary<string, Action<IParseNode>>
-            {
-                ["detail"] = node => _detail = node.GetObjectValue(UntypedNode.CreateFromDiscriminatorValue),
-                ["message"] = node => _message = node.GetStringValue(),
-            };
-
-        public void Serialize(ISerializationWriter writer)
-        {
-        }
-
-        public static DdmsError CreateFromDiscriminatorValue(IParseNode parseNode) => new();
-
-        /// <summary>The sentence, or the first three validation messages with where they apply.</summary>
-        internal static string? Reason(UntypedNode? detail) => detail switch
-        {
-            UntypedString text => text.GetValue(),
-            UntypedArray entries => Join(entries.GetValue().Select(Entry).Where(text => !string.IsNullOrWhiteSpace(text)).Take(3)),
-            _ => null,
-        };
-
-        private static string? Entry(UntypedNode entry)
-        {
-            if (entry is UntypedString text)
-                return text.GetValue();
-            if (entry is not UntypedObject fields)
-                return null;
-            var values = fields.GetValue();
-            var message = values.TryGetValue("msg", out var msg) && msg is UntypedString said ? said.GetValue() : null;
-            // FastAPI's location starts with where in the request it was found: "body".
-            var where = values.TryGetValue("loc", out var loc) && loc is UntypedArray path
-                ? string.Join('.', path.GetValue().OfType<UntypedString>().Select(part => part.GetValue()).Skip(1))
-                : "";
-            return where.Length > 0 && message is not null ? $"{where}: {message}" : message;
-        }
-
-        private static string? Join(IEnumerable<string?> messages) =>
-            string.Join("; ", messages) is { Length: > 0 } joined ? joined : null;
-    }
+        new() { ["XXX"] = ServiceError.CreateFromDiscriminatorValue };
 
     /// <summary>Adds the two commands to each bulk-carrying type's <c>data</c> groups.</summary>
     public static void Extend(CommandTree tree)

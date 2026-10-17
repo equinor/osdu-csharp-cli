@@ -56,6 +56,18 @@ error: 400 from the service. Validation Error: schema must not be null; status m
 
 At most three specific failures are shown. `--debug` prints the whole response body.
 
+A status the service's spec does not describe at all was printed bare for another reason:
+Kiota does not read the body of one. Wellbore DDMS describes only 422, so a well log with no
+bulk data, a curve name it does not have and a record that is not there all ended in
+`error: 404 from the service.` Every such body is now read too:
+
+```
+error: 404 from the service. Bulk error: curves=['DEPT']
+```
+
+A status with nothing after it now means the service gave no reason; `--debug` shows what it
+did send.
+
 ## `401 Not authorized`
 
 Also entitlements. `group member list` and `group member count` need rights on the

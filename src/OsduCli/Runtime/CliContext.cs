@@ -10,12 +10,12 @@ using Equinor.OsduCsharpClient.Msal;
 namespace Equinor.OsduCli.Runtime;
 
 /// <summary>
-/// Per-invocation state handed to every generated command action: an authenticated
-/// <see cref="OsduClient"/> and a configured <see cref="OutputWriter"/>.
+/// Per-invocation state handed to every generated command action: authenticated service
+/// clients and a configured <see cref="OutputWriter"/>.
 /// </summary>
 public sealed class CliContext : IDisposable
 {
-    public OsduClient Client { get; }
+    public ServiceClients Client { get; }
     public OutputWriter Output { get; }
 
     /// <summary>The configuration this invocation resolved, for commands that report it.</summary>
@@ -47,7 +47,7 @@ public sealed class CliContext : IDisposable
         OsduClient client, OutputWriter output, OsduConfig config,
         MsalInteractiveTokenProvider? msal, string? username, AzureTokenProvider? azure = null)
     {
-        Client = client;
+        Client = new ServiceClients(client);
         Output = output;
         Config = config;
         Msal = msal;

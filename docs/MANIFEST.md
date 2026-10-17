@@ -45,7 +45,7 @@ exclude:
 |---|---|---|
 | `service` | yes | Names the service in reports and errors, and names the generated class: `storage` becomes `StorageCommands`. A test requires `osducs status` to probe every service named here. |
 | `spec` | yes | The spec to read: `openapi_specs/<spec>/openapi.yaml` or `.json`, for example `storage` or `unit/v3`. |
-| `client` | yes | The `OsduClient` property the commands call, for example `Storage` or `UnitV3`. |
+| `client` | yes | The `OsduClient` property the commands call, for example `Storage` or `UnitV3`. Commands reach it through `Runtime/ServiceClients.cs`, which needs a line for a service no command has used yet. |
 | `models` | no | The namespace under `Equinor.OsduCsharpClient` that holds the service's request models and enums. Defaults to `client`. Set it where the client library renamed the namespace, as `File` did to `FileNamespace` to avoid `System.IO.File`. |
 | `description` | no | Doc comment on the generated class. Not shown to users. |
 | `groups` | see text | Help text for each group a command sits under, keyed by its path: `record`, `record version`. Every group needs exactly one description, which may come from any manifest that puts commands under it, so a manifest adding commands to a group another manifest already describes does not repeat it. Two manifests describing the same group differently is an error, and so is describing a group no command sits under. |
