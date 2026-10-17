@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.20.1](https://github.com/equinor/osdu-csharp-cli/compare/v0.20.0...v0.20.1) (2026-10-17)
+
+
+### Bug Fixes
+
+* show the reason for every refusal and stop escaping JSON output ([#79](https://github.com/equinor/osdu-csharp-cli/issues/79)) ([5534ede](https://github.com/equinor/osdu-csharp-cli/commit/5534ede1ac25389eb593be0fc453ce953bc7c176))
+
 ## [0.20.0](https://github.com/equinor/osdu-csharp-cli/compare/v0.19.0...v0.20.0) (2026-10-17)
 
 
