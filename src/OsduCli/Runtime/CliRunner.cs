@@ -3,6 +3,7 @@ using System.Text.Json;
 using Microsoft.Identity.Client;
 using Microsoft.Kiota.Abstractions;
 using Microsoft.Kiota.Abstractions.Serialization;
+using Microsoft.Kiota.Serialization.Json;
 using Equinor.OsduCsharpClient.Facade;
 
 namespace Equinor.OsduCli.Runtime;
@@ -46,7 +47,15 @@ public static class CliRunner
         if (exception.Message.StartsWith("The server returned an unexpected status code", StringComparison.Ordinal))
             return null;
 
-        if (!string.IsNullOrWhiteSpace(exception.Message))
+        // An error model that does not make its `message` the exception's keeps .NET's own,
+        // which names the class: Wellbore DDMS's 422 printed "Exception of type
+        // '…HTTPValidationError' was thrown." Its model expects `errors` and the service sends
+        // `detail`, which only ServiceError's reading finds.
+        var unnamed = exception.Message == $"Exception of type '{exception.GetType()}' was thrown.";
+        if (unnamed && exception is IParsable error && Reread(error) is { } reason)
+            return reason;
+
+        if (!unnamed && !string.IsNullOrWhiteSpace(exception.Message))
             return exception.Message;
 
         if (exception is not IAdditionalDataHolder holder)
@@ -62,6 +71,20 @@ public static class CliRunner
         }
 
         return null;
+    }
+
+    /// <summary>
+    /// The error written back out, fields it did not expect included, and read as
+    /// <see cref="ServiceError"/> reads a body.
+    /// </summary>
+    private static string? Reread(IParsable error)
+    {
+        using var writer = new JsonSerializationWriter();
+        writer.WriteObjectValue(null, error);
+        using var content = writer.GetSerializedContent();
+        using var body = JsonDocument.Parse(content);
+        var reason = new JsonParseNode(body.RootElement).GetObjectValue(ServiceError.CreateFromDiscriminatorValue).Message;
+        return string.IsNullOrWhiteSpace(reason) ? null : reason;
     }
 
     /// <summary>Pulls readable text out of whatever shape the error body arrived in.</summary>

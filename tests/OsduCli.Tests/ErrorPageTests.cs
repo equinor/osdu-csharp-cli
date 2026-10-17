@@ -8,6 +8,7 @@ using Microsoft.Kiota.Abstractions;
 using Microsoft.Kiota.Abstractions.Authentication;
 using Microsoft.Kiota.Abstractions.Serialization;
 using Microsoft.Kiota.Http.HttpClientLibrary;
+using Microsoft.Kiota.Serialization.Json;
 using Microsoft.Kiota.Serialization.Text;
 using Xunit;
 
@@ -151,9 +152,12 @@ public class ErrorPageTests
         TextBodyParseNodeFactory.Register();
 
         ApiClientBuilder.RegisterDefaultDeserializer<TextParseNodeFactory>();
+        ApiClientBuilder.RegisterDefaultDeserializer<JsonParseNodeFactory>();
 
         Assert.IsType<TextBodyParseNodeFactory>(
             ParseNodeFactoryRegistry.DefaultInstance.ContentTypeAssociatedFactories["text/plain"]);
+        Assert.IsType<JsonBodyParseNodeFactory>(
+            ParseNodeFactoryRegistry.DefaultInstance.ContentTypeAssociatedFactories["application/json"]);
     }
 
     [Fact]

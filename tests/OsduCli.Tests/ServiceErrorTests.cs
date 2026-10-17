@@ -87,6 +87,8 @@ public class ServiceErrorTests
 
         Assert.IsType<HTTPValidationError>(exception);
         Assert.Equal(422, exception.ResponseStatusCode);
+        // Not "Exception of type '…HTTPValidationError' was thrown.", which it printed before.
+        Assert.Equal("limit: bad", CliRunner.Describe(exception));
     }
 
     [Fact]
@@ -97,6 +99,32 @@ public class ServiceErrorTests
 
         Assert.Equal(502, exception.ResponseStatusCode);
         Assert.Equal("502 Bad Gateway", CliRunner.Describe(exception));
+    }
+
+    [Theory]
+    [InlineData(HttpStatusCode.NotFound)]
+    // One the spec describes: Kiota's JSON parser threw on it too.
+    [InlineData(HttpStatusCode.UnprocessableEntity)]
+    public async Task ARefusalCutShortKeepsItsStatus(HttpStatusCode status)
+    {
+        // The parser threw before an error could be built, so the status was lost, and the
+        // CLI said "invalid JSON in request body" for a GET.
+        const string cut = """{"detail":"bulk for rec""";
+
+        var exception = await Assert.ThrowsAnyAsync<ApiException>(() =>
+            ReadBulk(new ReasonReadingAdapter(Adapter(status, cut))));
+
+        Assert.Equal((int)status, exception.ResponseStatusCode);
+        Assert.Equal(cut, CliRunner.Describe(exception));
+    }
+
+    [Fact]
+    public async Task AnAnswerCutShortSaysSo()
+    {
+        var exception = await Assert.ThrowsAsync<OsduException>(() =>
+            ReadBulk(new ReasonReadingAdapter(Adapter(HttpStatusCode.OK, """{"columns":["MD","GR"],"data":[[1"""))));
+
+        Assert.Contains("where JSON was expected", exception.Message);
     }
 
     [Fact]
