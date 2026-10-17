@@ -1,4 +1,5 @@
 using System.CommandLine;
+using System.Text.Json;
 using System.Text.Json.Nodes;
 using Microsoft.Kiota.Abstractions;
 using Microsoft.Kiota.Serialization.Json;
@@ -10,12 +11,12 @@ using Equinor.OsduCsharpClient.Msal;
 namespace Equinor.OsduCli.Runtime;
 
 /// <summary>
-/// Per-invocation state handed to every generated command action: an authenticated
-/// <see cref="OsduClient"/> and a configured <see cref="OutputWriter"/>.
+/// Per-invocation state handed to every generated command action: authenticated service
+/// clients and a configured <see cref="OutputWriter"/>.
 /// </summary>
 public sealed class CliContext : IDisposable
 {
-    public OsduClient Client { get; }
+    public ServiceClients Client { get; }
     public OutputWriter Output { get; }
 
     /// <summary>The configuration this invocation resolved, for commands that report it.</summary>
@@ -47,7 +48,7 @@ public sealed class CliContext : IDisposable
         OsduClient client, OutputWriter output, OsduConfig config,
         MsalInteractiveTokenProvider? msal, string? username, AzureTokenProvider? azure = null)
     {
-        Client = client;
+        Client = new ServiceClients(client);
         Output = output;
         Config = config;
         Msal = msal;
@@ -201,11 +202,18 @@ public sealed class CliContext : IDisposable
     internal const string BodyLog = "Equinor.OsduCsharpClient.Body";
 
     /// <summary>Reads and returns the contents of a JSON file passed via a command option.</summary>
+    /// <exception cref="JsonException">
+    /// When the file is not JSON, which <see cref="CliRunner"/> reports with where it went wrong.
+    /// Checked here because the client's JSON reader cannot tell a file from a response: it takes
+    /// a body that does not parse for a service's answer, and says the service sent text.
+    /// </exception>
     public static async Task<string> ReadBodyFileAsync(string path, CancellationToken cancellationToken)
     {
         if (!File.Exists(path))
             throw new OsduException($"File not found: {path}");
-        return await File.ReadAllTextAsync(path, cancellationToken);
+        var json = await File.ReadAllTextAsync(path, cancellationToken);
+        using (JsonDocument.Parse(json))
+            return json;
     }
 
     /// <summary>

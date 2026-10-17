@@ -51,7 +51,9 @@ it is whatever branch happens to be checked out, which is the drift the pin remo
 
 Every generated command calls [`Equinor.OsduCsharpClient`](https://github.com/equinor/osdu-csharp-client),
 which is generated from the same specs with Kiota. Its `OsduClient` has one property per service,
-which is what a manifest's `client:` names. Sign-in comes from the separate
+which is what a manifest's `client:` names. Commands reach them through `Runtime/ServiceClients.cs`,
+which names them the same and reads a refusal the spec does not describe for the reason the
+service gave; a service no command has used yet needs a line there. Sign-in comes from the separate
 `Equinor.OsduCsharpClient.Msal` package. The CLI sends no HTTP requests of its own, with one
 exception: `status` probes CRS Conversion's `/info` directly, because that service's spec does
 not declare it.
@@ -76,7 +78,8 @@ Both packages come from GitHub Packages, which needs a token even though they ar
 | `Commands/FileUploadCommand.cs`, `FileDownloadCommand.cs` | `osducs file upload` and `file download`: a file's bytes through the File service's signed URLs, checked against its checksum. |
 | `Runtime/CommandTree.cs` | Joins commands from several manifests under one noun, such as `crs`. |
 | `Runtime/CliRunner.cs` | Runs every command: builds the context, and turns failures into one-line errors and exit codes. |
-| `Runtime/CliContext.cs` | Per-command state: the loaded configuration, the signed-in `OsduClient` and the output writer. |
+| `Runtime/CliContext.cs` | Per-command state: the loaded configuration, the signed-in service clients and the output writer. |
+| `Runtime/ServiceClients.cs`, `ServiceError.cs` | The service clients commands call, reading every refusal for its reason, wherever the service put it. |
 | `Runtime/CliConfig.cs` | Finds and loads the configuration: osducs's JSON profiles, the Python CLI's profiles, the selection and environment variables. |
 | `Runtime/OsduCliIniConfiguration.cs` | Reads a Python CLI profile. |
 | `Runtime/SignIn.cs` | How a profile signs in: through a browser, as an application with a client secret, or through Azure. |

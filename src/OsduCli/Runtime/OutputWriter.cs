@@ -1,5 +1,6 @@
 using System.Globalization;
 using System.Text;
+using System.Text.Encodings.Web;
 using System.Text.Json;
 using System.Text.Json.Nodes;
 
@@ -17,7 +18,16 @@ public enum OutputFormat
 /// <summary>Renders a command's JSON response according to its <see cref="OutputSpec"/>.</summary>
 public sealed class OutputWriter(OutputFormat format, TextWriter output, TextWriter? error = null)
 {
-    private static readonly JsonSerializerOptions Indented = new() { WriteIndented = true };
+    // The default encoder escapes for a web page: `+` came out as \u002B, so a time read
+    // 14:03:41\u002B00:00, and every letter outside ASCII as a code, "Omega S\u00F8r". This
+    // output goes to a terminal or a JSON parser, and neither needs either.
+    private static readonly JsonSerializerOptions Indented = new()
+    {
+        WriteIndented = true,
+        Encoder = JavaScriptEncoder.UnsafeRelaxedJsonEscaping,
+    };
+
+    private static readonly JsonSerializerOptions Compact = new() { Encoder = JavaScriptEncoder.UnsafeRelaxedJsonEscaping };
 
     private readonly TextWriter _error = error ?? Console.Error;
 
@@ -185,7 +195,7 @@ public sealed class OutputWriter(OutputFormat format, TextWriter output, TextWri
             if (property.Name.StartsWith(prefix, StringComparison.Ordinal))
                 gathered[property.Name[prefix.Length..]] = JsonNode.Parse(property.Value.GetRawText());
         }
-        return gathered.Count > 0 ? gathered.ToJsonString() : null;
+        return gathered.Count > 0 ? gathered.ToJsonString(Compact) : null;
     }
 
     private static string Render(JsonElement element) => element.ValueKind switch
@@ -193,7 +203,7 @@ public sealed class OutputWriter(OutputFormat format, TextWriter output, TextWri
         JsonValueKind.String => element.GetString() ?? string.Empty,
         JsonValueKind.Null or JsonValueKind.Undefined => string.Empty,
         JsonValueKind.Number or JsonValueKind.True or JsonValueKind.False => element.ToString(),
-        _ => JsonSerializer.Serialize(element),
+        _ => JsonSerializer.Serialize(element, Compact),
     };
 
     /// <summary>

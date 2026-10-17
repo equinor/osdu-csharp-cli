@@ -234,7 +234,7 @@ public static class RecordAddCommand
     }
 
     /// <summary>The latest version of a record, or null when there is none.</summary>
-    private static async Task<JsonObject?> CurrentAsync(OsduClient client, string id, CancellationToken cancellationToken)
+    private static async Task<JsonObject?> CurrentAsync(ServiceClients client, string id, CancellationToken cancellationToken)
     {
         try
         {

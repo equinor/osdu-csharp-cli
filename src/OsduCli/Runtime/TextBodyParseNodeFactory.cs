@@ -1,4 +1,5 @@
 using System.Net;
+using System.Text;
 using System.Text.Json;
 using System.Text.RegularExpressions;
 using Microsoft.Kiota.Abstractions.Serialization;
@@ -30,11 +31,12 @@ internal sealed class TextBodyParseNodeFactory(string contentType) : IParseNodeF
     public string ValidContentType { get; } = contentType;
 
     /// <summary>
-    /// Registers this for <c>text/html</c> and <c>text/plain</c>, in place of Kiota's text parser.
+    /// Registers this for <c>text/html</c> and <c>text/plain</c>, in place of Kiota's text parser,
+    /// and <see cref="JsonBodyParseNodeFactory"/> for JSON.
     /// </summary>
     /// <remarks>
-    /// Assigned rather than added, so it replaces a text parser registered before it. Kiota
-    /// registers its own with <c>TryAdd</c> when a client is built, which leaves this in place;
+    /// Assigned rather than added, so they replace a parser registered before them. Kiota
+    /// registers its own with <c>TryAdd</c> when a client is built, which leaves these in place;
     /// a test holds it to that.
     /// </remarks>
     internal static void Register()
@@ -44,6 +46,8 @@ internal sealed class TextBodyParseNodeFactory(string contentType) : IParseNodeF
             ParseNodeFactoryRegistry.DefaultInstance.ContentTypeAssociatedFactories[type] =
                 new TextBodyParseNodeFactory(type);
         }
+        ParseNodeFactoryRegistry.DefaultInstance.ContentTypeAssociatedFactories[JsonBodyParseNodeFactory.Json] =
+            new JsonBodyParseNodeFactory();
     }
 
     public async Task<IParseNode> GetRootParseNodeAsync(
@@ -52,6 +56,45 @@ internal sealed class TextBodyParseNodeFactory(string contentType) : IParseNodeF
         using var reader = new StreamReader(content);
         var text = await reader.ReadToEndAsync(cancellationToken);
         return new TextBodyParseNode(text, html: ValidContentType == "text/html");
+    }
+}
+
+/// <summary>
+/// Reads a JSON body, and one sent as JSON that is not: cut short, or empty.
+/// </summary>
+/// <remarks>
+/// Kiota's JSON parser throws on such a body before an error can be built from it, so the
+/// status was lost and <c>CliRunner</c> took the <see cref="JsonException"/> for a malformed
+/// <c>--file</c>: "invalid JSON in request body", for a GET. Read as text instead, a refusal
+/// keeps its status with the text as its reason, and a successful response that cannot be read
+/// says so, as an error page does.
+/// </remarks>
+internal sealed class JsonBodyParseNodeFactory : IParseNodeFactory
+{
+    internal const string Json = "application/json";
+
+    public string ValidContentType => Json;
+
+    public async Task<IParseNode> GetRootParseNodeAsync(
+        string contentType, Stream content, CancellationToken cancellationToken = default)
+    {
+        // Held as bytes, which the document reads in place, so a large body is not copied
+        // again for the text it might turn out to be.
+        using var body = new MemoryStream();
+        await content.CopyToAsync(body, cancellationToken);
+        var bytes = body.GetBuffer().AsMemory(0, (int)body.Length);
+        // Kiota's parser read from the stream, which skips a byte order mark; reading in place does not.
+        if (bytes.Span.StartsWith(Encoding.UTF8.Preamble))
+            bytes = bytes[Encoding.UTF8.Preamble.Length..];
+        try
+        {
+            using var document = JsonDocument.Parse(bytes);
+            return new JsonParseNode(document.RootElement.Clone());
+        }
+        catch (JsonException)
+        {
+            return new TextBodyParseNode(Encoding.UTF8.GetString(bytes.Span), html: false);
+        }
     }
 }
 
