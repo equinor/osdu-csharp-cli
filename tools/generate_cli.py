@@ -721,7 +721,7 @@ MANIFEST_KEYS = {
     "example": {"args", "skip"},
     "paging": {"op", "release", "limit", "page-size", "cursor", "not-with"},
     "confirm": {"message", "when", "unless"},
-    "handwritten": {"command", "op", "reason"},
+    "handwritten": {"command", "op", "reason", "roles"},
     "exclude": {"op", "reason"},
 }
 
@@ -824,6 +824,10 @@ def build_service(manifest_path: Path) -> Service:
         if key not in operations:
             raise ManifestError(f"{where}: {key[0].upper()} {key[1]} is not in {spec_label}")
         refuse_if_deprecated(key, where)
+        # For the command reference, where the spec documents no roles and the code knows them.
+        if "roles" in entry and (not isinstance(entry["roles"], str) or not entry["roles"].strip()):
+            raise ManifestError(f"{where}: `roles:` names the roles the command needs, as text, "
+                                f"not {entry['roles']!r}")
         claimed.add(key)
 
     for entry in manifest.get("exclude") or []:
@@ -943,6 +947,21 @@ def documented_roles(operation: dict) -> str | None:
     if len(unique) == 1:
         return unique[0]
     return ", ".join(unique[:-1]) + f" or {unique[-1]}"
+
+
+def needs_operator_role(roles: str | None) -> bool:
+    """Whether every role that admits an operation is an admin or ops role.
+
+    A data user holds the viewer, editor and creator roles through `users.datalake.viewers` and
+    `users.datalake.editors`; `users.datalake.admins`, `users.datalake.ops` and the
+    `service.*.admin` roles are given to few. An operation any of the first admits is a data
+    user's, whatever else is listed beside it: "users.datalake.editors or users.datalake.admins"
+    is not an operator command.
+    """
+    if not roles:
+        return False
+    alternatives = [role for role in re.split(r",\s*|\s+or\s+", roles) if role]
+    return all(re.search(r"(^|\.)(admin|admins|ops)$", role) for role in alternatives)
 
 
 def check_column_shape(entry: dict, operation: dict, spec: dict, where: str) -> None:
@@ -1761,6 +1780,9 @@ def emit_command(service: Service, command: Command) -> list[str]:
     lines.append("")
     lines.append(f"        var command = new Command({csharp_string(command.name)}, "
                  f"{csharp_string(command.summary)});")
+    if command.roles:
+        lines.append(f"        CommandRoles.Set(command, {csharp_string(command.roles)}"
+                     f"{', operatorRole: true' if needs_operator_role(command.roles) else ''});")
     for param in command.params:
         lines.append(f"        command.Options.Add({param.option_var});")
     if command.body:

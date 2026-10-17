@@ -33,8 +33,8 @@ osducs group member add --group users.datalake.viewers@dev.dataservices.energy -
   one account signed in, it lists them and waits to be told which, rather than guessing.
 - **Readable by default, scriptable when needed.** Tables for people, `-o json` for scripts,
   and `-f` to pick the columns a search returns.
-- **Help that answers the question.** `--help` at every level. A refused request names the role
-  the endpoint needs, where its spec says. A mistyped command gets a suggestion, so
+- **Help that answers the question.** `--help` at every level, including the role a command
+  needs where its spec says, and the same role in a refusal. A mistyped command gets a suggestion, so
   `osducs member add group` points to `osducs group member add`.
 - **One file, no runtime to install.** About 30 MB to download, with .NET inside, and tab completion for
   bash, zsh, fish and PowerShell.

@@ -172,6 +172,8 @@ handwritten:
       Every group in the data partition, paged by a cursor. `--all` sends `group list` to this
       endpoint, with options of its own, which one manifest entry cannot express
       (docs/COMMAND-GRAMMAR.md §3.2). Commands/GroupListAll.cs, through the Customize hook.
+    # The spec documents none; these are the service's own authorization check, as in GroupListAll.Roles.
+    roles: users.datalake.ops or service.entitlements.admin
 
   - command: status
     op: { method: get, path: /info }

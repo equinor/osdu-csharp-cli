@@ -515,7 +515,8 @@ The `index` commands re-index from Storage, and delete a kind's index; `record r
 records from Storage to what consumes them again, and `record purge` deletes for good.
 `group list --all` lists every group in the data partition, where `group list` lists yours. They
 need operator roles, such as `service.search.admin`, `users.datalake.ops` or
-`service.storage.admin`; a refusal names the one each command needs.
+`service.storage.admin`. Each command's `--help` says which under *Requires*, and the command
+reference lists [every command that needs an operator role](COMMANDS.md#commands-that-need-an-operator-role).
 
 ```bash
 osducs index reindex --kind "osdu:wks:master-data--Well:1.0.0"                # re-index a kind in place

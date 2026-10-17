@@ -47,6 +47,7 @@ public static partial class FileCommands
         };
 
         var command = new Command("get", "Get the metadata record for a file.");
+        CommandRoles.Set(command, "service.file.editors, users.datalake.editors, users.datalake.admins or users.datalake.ops");
         command.Options.Add(idOption);
 
         command.SetAction((parseResult, cancellationToken) =>
@@ -75,6 +76,7 @@ public static partial class FileCommands
         };
 
         var command = new Command("add", "Register metadata for a file already uploaded to the landing zone.");
+        CommandRoles.Set(command, "service.file.editors, users.datalake.editors, users.datalake.admins or users.datalake.ops");
         command.Options.Add(fileOption);
 
         command.SetAction((parseResult, cancellationToken) =>
@@ -109,6 +111,7 @@ public static partial class FileCommands
         };
 
         var command = new Command("delete", "Delete a file and its metadata record.");
+        CommandRoles.Set(command, "users.datalake.editors or users.datalake.admins");
         command.Options.Add(idOption);
         command.Options.Add(yesOption);
 
@@ -141,6 +144,7 @@ public static partial class FileCommands
         };
 
         var command = new Command("upload-url", "Get a signed URL and landing-zone location to upload a file to.");
+        CommandRoles.Set(command, "service.file.editors, users.datalake.editors, users.datalake.admins or users.datalake.ops");
         command.Options.Add(expirytimeOption);
 
         command.SetAction((parseResult, cancellationToken) =>
@@ -176,6 +180,7 @@ public static partial class FileCommands
         };
 
         var command = new Command("download-url", "Get a signed URL to download a file from.");
+        CommandRoles.Set(command, "service.file.viewers, users.datalake.viewers, users.datalake.editors, users.datalake.admins or users.datalake.ops");
         command.Options.Add(idOption);
         command.Options.Add(expirytimeOption);
 
@@ -209,6 +214,7 @@ public static partial class FileCommands
         };
 
         var command = new Command("revoke-url", "Revoke previously issued signed URLs.");
+        CommandRoles.Set(command, "service.file.admin", operatorRole: true);
         command.Options.Add(fileOption);
 
         command.SetAction((parseResult, cancellationToken) =>

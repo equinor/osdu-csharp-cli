@@ -41,18 +41,43 @@ their options; `record add` is in [USAGE.md](USAGE.md#writing-records), and the 
 [USAGE.md](USAGE.md#files). Neither are `group list`'s `--all` and `--type`, added by hand; see
 [USAGE.md](USAGE.md#operations). Run `osducs --help` for the full tree.
 
+Each command says what it **requires**: the roles its service's spec documents, which are also
+what `--help` and a refused request show. They are what the spec says, not a guarantee; a
+deployment may differ, and ADME answers some refusals with 401 rather than 403.
+
 """
 
 
-def load() -> dict[str, list[dict]]:
-    """Commands grouped by their top-level noun."""
+def load() -> tuple[dict[str, list[dict]], list[tuple[str, str]]]:
+    """Commands grouped by their top-level noun, and the hand-written ones with the roles they need.
+
+    Each generated command carries the roles its operation's spec documents, from the same
+    function that puts them in `--help` and in a refused request's message.
+    """
+    from generate_cli import documented_roles, resolve_spec
+
     grouped: dict[str, list[dict]] = {}
+    handwritten: list[tuple[str, str]] = []
     for path in sorted(MANIFEST_DIR.glob("*.yaml")):
         manifest = yaml.safe_load(path.read_text(encoding="utf-8"))
+        paths = yaml.safe_load(resolve_spec(manifest["spec"]).read_text(encoding="utf-8"))["paths"]
+
+        def roles(op: dict) -> str | None:
+            return documented_roles(paths[op["path"]][op["method"].lower()])
+
         for command in manifest.get("commands") or []:
             noun = command["command"].split()[0]
-            grouped.setdefault(noun, []).append({**command, "_service": manifest["service"]})
-    return dict(sorted(grouped.items()))
+            grouped.setdefault(noun, []).append(
+                {**command, "_service": manifest["service"], "_roles": roles(command["op"])})
+        for entry in manifest.get("handwritten") or []:
+            if required := entry.get("roles") or roles(entry["op"]):
+                handwritten.append((entry["command"], required))
+    return dict(sorted(grouped.items())), handwritten
+
+
+def anchor(heading: str) -> str:
+    """GitHub's anchor for a heading: lower case, punctuation dropped, spaces to hyphens."""
+    return re.sub(r"[^\w\- ]", "", heading.strip().lower()).replace(" ", "-")
 
 
 def options(command: dict) -> list[tuple[str, str, bool]]:
@@ -113,7 +138,9 @@ def rules(command: dict) -> list[str]:
 
 
 def render() -> str:
-    grouped = load()
+    from generate_cli import needs_operator_role
+
+    grouped, handwritten = load()
     out = [HEADER]
 
     out.append("| Noun | Commands |")
@@ -121,6 +148,24 @@ def render() -> str:
     for noun, commands in grouped.items():
         verbs = ", ".join(f"`{c['command'].split(maxsplit=1)[1]}`" for c in commands)
         out.append(f"| [`{noun}`](#{noun}) | {verbs} |")
+    out.append("")
+
+    # The question an operator asks first, answered in one place. Hand-written commands are
+    # here too, since the rest of this page does not describe them.
+    operator = sorted(
+        [(c["command"], c["_roles"], True) for commands in grouped.values() for c in commands
+         if needs_operator_role(c["_roles"])]
+        + [(command, roles, False) for command, roles in handwritten if needs_operator_role(roles)])
+    out.append("## Commands that need an operator role\n")
+    out.append("Every role that admits these is an admin or ops role, such as `users.datalake.ops`, "
+               "`users.datalake.admins` or a `service.*.admin`, which data users do not usually hold. "
+               "Everything else a data user's viewer or editor groups admit, where the spec says.\n")
+    out.append("| Command | Requires |")
+    out.append("|---|---|")
+    for command, roles, generated in operator:
+        name = (f"[`osducs {command}`](#{anchor(f'osducs {command}')})" if generated
+                else f"`osducs {command}` (hand-written)")
+        out.append(f"| {name} | {roles} |")
     out.append("")
 
     for noun, commands in grouped.items():
@@ -132,6 +177,9 @@ def render() -> str:
             operation = command["op"]
             out.append(f"`{operation['method'].upper()} {operation['path']}` "
                        f"— {command['_service']}\n")
+            if command["_roles"]:
+                out.append(f"Requires {command['_roles']}"
+                           f"{' — an operator role' if needs_operator_role(command['_roles']) else ''}.\n")
 
             if flags_found := options(command):
                 out.append("| Option | Required | Description |")
@@ -174,7 +222,7 @@ def main() -> int:
     TARGET.parent.mkdir(parents=True, exist_ok=True)
     TARGET.write_text(produced, encoding="utf-8")
     print(f"Wrote {TARGET.relative_to(ROOT)} "
-          f"({len(load())} nouns, {sum(len(v) for v in load().values())} commands)")
+          f"({len(load()[0])} nouns, {sum(len(v) for v in load()[0].values())} commands)")
     return 0
 
 

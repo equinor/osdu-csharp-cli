@@ -241,6 +241,7 @@ directory of files and uploads them in batches.
 | `op` | yes | The operation, as for [`op`](#op). |
 | `command` | no | The command that covers it, or will. |
 | `reason` | no | Why it cannot be generated. |
+| `roles` | no | The roles the command needs, for [the command reference](COMMANDS.md#commands-that-need-an-operator-role), where the operation's spec documents none. Without it, the spec's are used. |
 
 An entry only accounts for the operation in the coverage check; the generator does not check
 that the command exists. Each service's `/info` operation is listed here because `osducs status`

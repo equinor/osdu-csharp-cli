@@ -50,6 +50,7 @@ public static partial class WorkflowCommands
         };
 
         var command = new Command("list", "List workflows registered in the partition.");
+        CommandRoles.Set(command, "service.workflow.viewer");
         command.Options.Add(prefixOption);
 
         command.SetAction((parseResult, cancellationToken) =>
@@ -81,6 +82,7 @@ public static partial class WorkflowCommands
         };
 
         var command = new Command("get", "Get a workflow definition by name.");
+        CommandRoles.Set(command, "service.workflow.viewer");
         command.Options.Add(workflowNameOption);
 
         command.SetAction((parseResult, cancellationToken) =>
@@ -109,6 +111,7 @@ public static partial class WorkflowCommands
         };
 
         var command = new Command("add", "Register a workflow definition from a JSON file.");
+        CommandRoles.Set(command, "service.workflow.admin", operatorRole: true);
         command.Options.Add(fileOption);
 
         command.SetAction((parseResult, cancellationToken) =>
@@ -143,6 +146,7 @@ public static partial class WorkflowCommands
         };
 
         var command = new Command("delete", "Delete a workflow definition by name.");
+        CommandRoles.Set(command, "service.workflow.admin", operatorRole: true);
         command.Options.Add(workflowNameOption);
         command.Options.Add(yesOption);
 
@@ -176,6 +180,7 @@ public static partial class WorkflowCommands
         };
 
         var command = new Command("list", "List the runs of a workflow.");
+        CommandRoles.Set(command, "service.workflow.viewer");
         command.Options.Add(workflowNameOption);
 
         command.SetAction((parseResult, cancellationToken) =>
@@ -209,6 +214,7 @@ public static partial class WorkflowCommands
         };
 
         var command = new Command("get", "Get one workflow run.");
+        CommandRoles.Set(command, "service.workflow.viewer");
         command.Options.Add(workflowNameOption);
         command.Options.Add(runidOption);
 
@@ -244,6 +250,7 @@ public static partial class WorkflowCommands
         };
 
         var command = new Command("trigger", "Start a new run of a workflow.");
+        CommandRoles.Set(command, "service.workflow.creator");
         command.Options.Add(workflowNameOption);
         command.Options.Add(fileOption);
 
@@ -287,6 +294,7 @@ public static partial class WorkflowCommands
         statusBodyOption.AcceptAnyCasingFromAmong("submitted", "running", "finished", "failed", "success", "queued");
 
         var command = new Command("update", "Update the status of a workflow run.");
+        CommandRoles.Set(command, "service.workflow.viewer");
         command.Options.Add(workflowNameOption);
         command.Options.Add(runidOption);
         command.Options.Add(statusBodyOption);
@@ -329,6 +337,7 @@ public static partial class WorkflowCommands
         };
 
         var command = new Command("latest", "Show execution detail for the most recent task of a run.");
+        CommandRoles.Set(command, "service.workflow.viewer");
         command.Options.Add(workflowNameOption);
         command.Options.Add(runidOption);
 

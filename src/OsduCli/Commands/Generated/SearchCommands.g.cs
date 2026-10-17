@@ -151,6 +151,7 @@ public static partial class SearchCommands
         };
 
         var command = new Command("search", "Search records with a Lucene query.");
+        CommandRoles.Set(command, "users.datalake.viewers, users.datalake.editors, users.datalake.admins or users.datalake.ops");
         command.Options.Add(kindBodyOption);
         command.Options.Add(queryBodyOption);
         command.Options.Add(limitBodyOption);
@@ -303,6 +304,7 @@ public static partial class SearchCommands
         };
 
         var command = new Command("aggregate", "Count distinct values of a field across matching records.");
+        CommandRoles.Set(command, "users.datalake.viewers, users.datalake.editors, users.datalake.admins or users.datalake.ops");
         command.Options.Add(kindBodyOption);
         command.Options.Add(aggregatebyBodyOption);
         command.Options.Add(queryBodyOption);

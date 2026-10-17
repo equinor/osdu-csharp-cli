@@ -51,6 +51,8 @@ public static class GroupListAll
         type.AcceptAnyCasingFromAmong(Types);
         list.Options.Add(all);
         list.Options.Add(type);
+        // Plain `group list` needs no particular role; only --all does.
+        CommandRoles.Set(list, $"with --all, {Roles}", operatorRole: true);
 
         var roleRequired = list.Options.Single(option => option.Name == "--role-required");
         list.Validators.Add(result =>

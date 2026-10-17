@@ -30,6 +30,9 @@ namespace Equinor.OsduCli.Commands;
 /// </remarks>
 public static partial class FileUploadCommand
 {
+    /// <summary>The roles the File service documents for an upload URL and a metadata record.</summary>
+    private const string Roles = "service.file.editors, users.datalake.editors, users.datalake.admins or users.datalake.ops";
+
     /// <summary>The kind a record is created as unless the template says otherwise.</summary>
     internal const string DefaultKind = "osdu:wks:dataset--File.Generic:1.0.0";
 
@@ -70,6 +73,7 @@ public static partial class FileUploadCommand
         {
             file, name, description, legalTags, countries, owners, viewers, metadata, dryRun,
         };
+        CommandRoles.Set(command, Roles);
 
         command.SetAction((parseResult, cancellationToken) =>
             CliRunner.RunAsync(parseResult, async (context, token) =>
@@ -114,7 +118,7 @@ public static partial class FileUploadCommand
                 ["size"] = local.Length,
                 ["md5"] = Convert.ToHexStringLower(md5),
             }).ToJsonString(), ResultSpec);
-        }, cancellationToken, "service.file.editors, users.datalake.editors, users.datalake.admins or users.datalake.ops"));
+        }, cancellationToken, Roles));
 
         return command;
     }
