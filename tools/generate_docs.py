@@ -211,6 +211,14 @@ def main() -> int:
                         help="fail if the file on disk is out of date")
     args = parser.parse_args()
 
+    # The page carries the roles the specs document, so a fetched tree from another ref than
+    # the pin would publish stale ones, which the CLI generator refuses to build from. Checked
+    # the same way, overrides and sibling checkouts included.
+    from generate_cli import stale_specs
+    if stale := stale_specs():
+        print(f"error: {stale}", file=sys.stderr)
+        return 1
+
     produced = render()
     if args.check:
         current = TARGET.read_text(encoding="utf-8") if TARGET.exists() else ""

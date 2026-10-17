@@ -60,3 +60,17 @@ def test_an_unnamed_handwritten_entry_has_no_row(tmp_path, monkeypatch):
 
     assert handwritten == []
     assert table == "| [`osducs index delete`](#osducs-index-delete) | users.datalake.ops |"
+
+
+def test_stale_specs_are_refused_before_anything_is_written(tmp_path, monkeypatch, capsys):
+    # The roles come from the specs, so a tree from another ref than the pin would publish
+    # stale ones; the CLI generator already refuses it.
+    manifests(tmp_path, monkeypatch, [])
+    target = tmp_path / "COMMANDS.md"
+    monkeypatch.setattr(generate_docs, "TARGET", target)
+    monkeypatch.setattr(generate_cli, "stale_specs", lambda: "openapi_specs/ is from v1, the pin is v2.")
+    monkeypatch.setattr("sys.argv", ["generate_docs.py"])
+
+    assert generate_docs.main() == 1
+    assert not target.exists()
+    assert "openapi_specs/ is from v1, the pin is v2." in capsys.readouterr().err
