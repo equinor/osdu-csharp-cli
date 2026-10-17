@@ -1,5 +1,6 @@
 using System.Net;
 using System.Text;
+using System.Text.Json;
 using Equinor.OsduCli.Runtime;
 using Equinor.OsduCsharpClient.Facade;
 using Equinor.OsduCsharpClient.Facade.Auth;
@@ -61,6 +62,13 @@ public class ServiceErrorTests
     [InlineData("""{"code":404,"reason":"Not Found","message":"The record 'dev:x' was not found"}""", "The record 'dev:x' was not found")]
     // All Entitlements says when it leaves `message` empty.
     [InlineData("""{"code":404,"reason":"Not Found","message":""}""", "Not Found")]
+    [InlineData("""{"code":404,"reason":"Not Found","message":"Validation Error","errors":[{"message":"schema must not be null"},{"message":"status must not be null"}]}""",
+        "Validation Error: schema must not be null; status must not be null")]
+    // Schema Service nests its answer.
+    [InlineData("""{"error":{"code":404,"message":"Schema Id is already present","errors":[{"message":"Schema Id is already present"}]}}""",
+        "Schema Id is already present")]
+    // Spring's default answer: its first text is a time, not a reason.
+    [InlineData("""{"timestamp":"2026-10-17T11:40:14Z","status":404,"error":"Not Found","path":"/api/x"}""", "Not Found")]
     public async Task ARefusalTheSpecLeavesOutSaysWhy(string body, string reason)
     {
         var exception = await Assert.ThrowsAnyAsync<ApiException>(() =>
@@ -125,6 +133,24 @@ public class ServiceErrorTests
             ReadBulk(new ReasonReadingAdapter(Adapter(HttpStatusCode.OK, """{"columns":["MD","GR"],"data":[[1"""))));
 
         Assert.Contains("where JSON was expected", exception.Message);
+    }
+
+    [Fact]
+    public async Task AFileThatIsNotJsonIsTheUsersToFix()
+    {
+        // Read by the client's JSON reader, it would be taken for a service's answer: "The
+        // service answered with text", before anything was sent.
+        var path = Path.Combine(Path.GetTempPath(), $"{Guid.NewGuid():N}.json");
+        await File.WriteAllTextAsync(path, """{"name": "dev-tag",""", TestContext.Current.CancellationToken);
+        try
+        {
+            await Assert.ThrowsAnyAsync<JsonException>(() =>
+                CliContext.ReadBodyFileAsync(path, TestContext.Current.CancellationToken));
+        }
+        finally
+        {
+            File.Delete(path);
+        }
     }
 
     [Fact]

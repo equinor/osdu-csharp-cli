@@ -19,20 +19,26 @@ namespace Equinor.OsduCli.Runtime;
 /// <item><c>detail</c>, from Wellbore DDMS: a sentence, a list of <c>{loc, msg}</c> entries for a
 /// request it cannot validate, or, from its bulk reads, the JSON of another answer.</item>
 /// <item><c>message</c>, from the Java services, and where the text body reader puts the title
-/// of a gateway's error page.</item>
-/// <item><c>errors</c>, a list of <c>{message}</c>: Wellbore DDMS passing on Storage's answer.</item>
+/// of a gateway's error page, followed by what a list of <c>errors</c> adds to it: "Validation
+/// Error: schema must not be null". Without a <c>message</c>, the list alone: Wellbore DDMS
+/// passing on Storage's answer.</item>
+/// <item><c>error</c>: an object holding the same, as Schema Service nests its answer, or the
+/// status's name, as Spring's default answer gives it.</item>
 /// <item><c>reason</c>, the status's name: all Entitlements gives when <c>message</c> is empty.</item>
 /// </list>
+/// <para>Only these: the other fields of an answer, such as Spring's <c>timestamp</c> and
+/// <c>path</c>, are not reasons, and reading the first text found would print them as one.</para>
 /// </remarks>
 internal sealed class ServiceError : ApiException, IParsable
 {
     private UntypedNode? _detail;
     private string? _message;
     private UntypedNode? _errors;
+    private UntypedNode? _error;
     private string? _reason;
 
     public override string Message =>
-        Reason(_detail) ?? Unwrapped(_message) ?? Reason(_errors) ?? Text(_reason) ?? string.Empty;
+        Reason(_detail) ?? Summary() ?? CliRunner.Flatten(_error) ?? Text(_reason) ?? string.Empty;
 
     public IDictionary<string, Action<IParseNode>> GetFieldDeserializers() =>
         new Dictionary<string, Action<IParseNode>>
@@ -40,8 +46,22 @@ internal sealed class ServiceError : ApiException, IParsable
             ["detail"] = node => _detail = node.GetObjectValue(UntypedNode.CreateFromDiscriminatorValue),
             ["message"] = node => _message = node.GetStringValue(),
             ["errors"] = node => _errors = node.GetObjectValue(UntypedNode.CreateFromDiscriminatorValue),
+            ["error"] = node => _error = node.GetObjectValue(UntypedNode.CreateFromDiscriminatorValue),
             ["reason"] = node => _reason = node.GetStringValue(),
         };
+
+    /// <summary><c>message</c>, followed by up to three of the <c>errors</c> that say more.</summary>
+    private string? Summary()
+    {
+        var message = Unwrapped(_message);
+        var details = _errors is UntypedArray entries
+            ? entries.GetValue().Select(Entry).OfType<string>().Where(text => text != message).Distinct().Take(3).ToList()
+            : [];
+        if (details.Count == 0)
+            return message;
+        var joined = string.Join("; ", details);
+        return message is null ? joined : $"{message}: {joined}";
+    }
 
     public void Serialize(ISerializationWriter writer)
     {
