@@ -69,9 +69,11 @@ def load() -> tuple[dict[str, list[dict]], list[tuple[str, str]]]:
             noun = command["command"].split()[0]
             grouped.setdefault(noun, []).append(
                 {**command, "_service": manifest["service"], "_roles": roles(command["op"])})
+        # `command` is optional on a hand-written entry, which may only account for an operation;
+        # one without it has no row to give.
         for entry in manifest.get("handwritten") or []:
-            if required := entry.get("roles") or roles(entry["op"]):
-                handwritten.append((entry["command"], required))
+            if (name := entry.get("command")) and (required := entry.get("roles") or roles(entry["op"])):
+                handwritten.append((name, required))
     return dict(sorted(grouped.items())), handwritten
 
 
