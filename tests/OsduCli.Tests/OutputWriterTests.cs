@@ -128,6 +128,30 @@ public class OutputWriterTests
         Assert.Contains("[\"a\",\"b\"]", output);
     }
 
+    private const string Wellbore = """
+        {"data":{"FacilityName":"34/4-19 S (Omega Sør Alfa)","Spud":"2026-06-12T14:03:41+00:00","Names":["Sør","<A&B>"]}}
+        """;
+
+    [Fact]
+    public void JsonIsWrittenWithTheCharactersAsTheyAre()
+    {
+        // The default encoder wrote "Omega Sør Alfa" and "14:03:41+00:00": escaped
+        // for a web page, which neither a terminal nor a JSON parser needs.
+        var output = Render(Wellbore, OutputSpec.Raw, OutputFormat.Json);
+
+        Assert.Contains("\"34/4-19 S (Omega Sør Alfa)\"", output);
+        Assert.Contains("\"2026-06-12T14:03:41+00:00\"", output);
+        Assert.Contains("\"<A&B>\"", output);
+    }
+
+    [Fact]
+    public void ACompactJsonCellIsWrittenWithTheCharactersAsTheyAre()
+    {
+        var output = Render(Wellbore, OutputSpec.Table(null, ("Names", "data.Names")));
+
+        Assert.Contains("""["Sør","<A&B>"]""", output);
+    }
+
     [Fact]
     public void EmptyResponseWritesNothing()
     {
