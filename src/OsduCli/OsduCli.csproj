@@ -45,10 +45,13 @@
        the request for a field that had been supplied.
 
        3.0.0 regenerates from refreshed upstream specs. Entitlements' group `type` became an
-       enum, and Indexer's reindex and provision operations return the raw body as a Stream. -->
+       enum, and Indexer's reindex and provision operations return the raw body as a Stream.
+
+       3.0.1 fixes 3.0.0's Search spatialFilter, which could not be serialised: every search
+       with a bounding box or distance filter failed before it was sent. -->
   <ItemGroup>
-    <PackageReference Include="Equinor.OsduCsharpClient" Version="3.0.0"/>
-    <PackageReference Include="Equinor.OsduCsharpClient.Msal" Version="3.0.0"/>
+    <PackageReference Include="Equinor.OsduCsharpClient" Version="3.0.1"/>
+    <PackageReference Include="Equinor.OsduCsharpClient.Msal" Version="3.0.1"/>
   </ItemGroup>
 
   <!-- For the `azure` authentication mode: `az login`, a managed or workload identity, or

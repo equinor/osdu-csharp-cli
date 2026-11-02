@@ -27,8 +27,7 @@ public class RequestBodyRoundTripTests
     private static async Task<JsonNode?> RoundTrip<T>(string json, ParsableFactory<T> factory) where T : IParsable
     {
         var model = await KiotaJsonSerializer.DeserializeAsync(json, factory, TestContext.Current.CancellationToken);
-        return JsonNode.Parse(await KiotaJsonSerializer.SerializeAsStringAsync(model!,
-            cancellationToken: TestContext.Current.CancellationToken));
+        return JsonNode.Parse(await KiotaJsonSerializer.SerializeAsStringAsync(model!));
     }
 
     // `schema add` and `schema update`: the schema itself is a free-form JSON document, held by
