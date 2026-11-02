@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.20.3](https://github.com/equinor/osdu-csharp-cli/compare/v0.20.2...v0.20.3) (2026-11-02)
+
+
+### Dependencies
+
+* bump actions/setup-python from 7.0.0 to 7.1.0 in the github-actions group ([#85](https://github.com/equinor/osdu-csharp-cli/issues/85)) ([219b369](https://github.com/equinor/osdu-csharp-cli/commit/219b3694bc8be4c6b660133019c8d720143dba81))
+* move to Equinor.OsduCsharpClient 3.0.1 ([#86](https://github.com/equinor/osdu-csharp-cli/issues/86)) ([b8bc1c4](https://github.com/equinor/osdu-csharp-cli/commit/b8bc1c4da35f4ae59feeff78cd7a0d62a5973b1c))
+
 ## [0.20.2](https://github.com/equinor/osdu-csharp-cli/compare/v0.20.1...v0.20.2) (2026-10-31)
 
 
