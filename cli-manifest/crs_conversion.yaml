@@ -38,3 +38,11 @@ commands:
       short: -f
       help: JSON file containing the GeoJSON or AnyCrsGeoJson structure.
     output: raw
+
+handwritten:
+  - command: status
+    op: { method: get, path: /v4/info }
+    reason: >
+      Reported by `osducs status`, which probes every service's /info in one command rather
+      than giving each service its own. See cli-manifest/storage.yaml for the rationale. It
+      probes v3/info by hand: the spec declares v4/info, but the service answers it with 404.

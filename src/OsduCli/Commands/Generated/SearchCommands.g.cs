@@ -193,6 +193,20 @@ public static partial class SearchCommands
                 result.AddError("--offset cannot be combined with --all or a --limit above 1000: those page through /query_with_cursor, which starts at the first match.");
         });
 
+        // The spec's maxItems, checked here rather than by the service.
+        command.Validators.Add(result =>
+        {
+            if (OptionValues.Usable(result, sortFieldBodyOption) is { Length: > 16 })
+                result.AddError("--sort-by takes at most 16 values.");
+        });
+
+        // The spec's maxItems, checked here rather than by the service.
+        command.Validators.Add(result =>
+        {
+            if (OptionValues.Usable(result, sortOrderBodyOption) is { Length: > 16 })
+                result.AddError("--sort-order takes at most 16 values.");
+        });
+
         command.SetAction((parseResult, cancellationToken) =>
             CliRunner.RunAsync(parseResult, async (context, cancellationToken) =>
         {

@@ -3,6 +3,7 @@ using System.CommandLine.Invocation;
 using System.Text.Json.Nodes;
 using Equinor.OsduCli.Runtime;
 using Equinor.OsduCsharpClient.Entitlements.Groups.All;
+using Equinor.OsduCsharpClient.Entitlements.Models;
 
 namespace Equinor.OsduCli.Commands;
 
@@ -69,7 +70,9 @@ public static class GroupListAll
         list.SetAction((parseResult, cancellationToken) => parseResult.GetValue(all)
             ? CliRunner.RunAsync(parseResult, async (context, token) =>
                 {
-                    var json = await CollectAsync(context.Client.Entitlements.Groups.All, parseResult.GetValue(type)!,
+                    // The option has already checked the value and normalised its casing.
+                    var json = await CollectAsync(context.Client.Entitlements.Groups.All,
+                        Enum.Parse<GroupType>(parseResult.GetValue(type)!, ignoreCase: true),
                         Console.IsErrorRedirected ? null : Console.Error, token);
                     return context.Output.Write(json, Columns);
                 }, cancellationToken, Roles)
@@ -78,7 +81,7 @@ public static class GroupListAll
 
     /// <summary>Every group of <paramref name="type"/>, page by page, as one <c>groups</c> list.</summary>
     internal static Task<string> CollectAsync(
-        AllRequestBuilder groups, string type, TextWriter? progress, CancellationToken cancellationToken) =>
+        AllRequestBuilder groups, GroupType type, TextWriter? progress, CancellationToken cancellationToken) =>
         CursorPaging.CollectAsync(
             new JsonObject(), limit: null, PageSize, "limit", "cursor", "groups", "totalCount",
             async (page, pageCancellation) => await OsduJson.ToJsonAsync(await groups.GetAsync(configuration =>

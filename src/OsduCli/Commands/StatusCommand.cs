@@ -42,10 +42,10 @@ public static class StatusCommand
     /// and the exceptions are the interesting part:
     /// <list type="bullet">
     /// <item>Wellbore DDMS predates the shared convention and serves <c>/about</c>.</item>
-    /// <item>CRS Conversion's OpenAPI document declares only its three <c>convert</c>
-    /// operations, so no <c>Info</c> builder is generated for it even though the running
-    /// service answers <c>/v4/info</c> like every other. Until the spec is fixed upstream
-    /// this one goes through the request adapter by hand.</item>
+    /// <item>CRS Conversion's OpenAPI document declares <c>/v4/info</c>, which the running
+    /// service answers with 404; it serves info under v2 and v3 only. The generated
+    /// <c>V4.Info</c> builder would always fail, so this one goes through the request
+    /// adapter by hand.</item>
     /// </list>
     /// </remarks>
     private static readonly (string Name, Func<CliContext, CancellationToken, Task<string?>> Probe)[] Services =
@@ -53,10 +53,9 @@ public static class StatusCommand
         ("crs-catalog", async (context, cancellationToken) =>
             await OsduJson.ToJsonAsync(
                 await context.Client.CrsCatalog.V3.Info.GetAsync(cancellationToken: cancellationToken))),
-        // Hand-rolled: see the remarks above. Kiota generates nothing for a path the spec
-        // does not declare, so this issues the request the missing builder would have.
-        // Note the version skew: the service's operations are v4, but it serves info under
-        // v2 and v3 only — v4/info is a 404. Verified against dev, 2026-08-26.
+        // Hand-rolled: see the remarks above. Note the version skew: the service's operations
+        // are v4, but it serves info under v2 and v3 only — v4/info is a 404, though the spec
+        // has declared it since client 3.0.0. Verified against dev, 2026-08-26.
         ("crs-conversion", async (context, cancellationToken) =>
             await RawGetAsync(context, "crs_conversion", "v3/info", cancellationToken)),
         ("dataset", async (context, cancellationToken) =>

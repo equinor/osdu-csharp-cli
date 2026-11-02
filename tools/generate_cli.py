@@ -334,9 +334,14 @@ def derive_builder(path: str) -> str:
 
 
 def returns_value(operation: dict) -> bool:
-    """True when the operation has a 2xx response carrying a body.
+    """True when the operation has a 2xx response that may carry a body.
 
     Determines whether the emitted call is ``var result = await ...`` or a bare ``await``.
+
+    A 2xx that declares no ``content`` still counts. Kiota cannot type its body, so it
+    returns the raw ``Stream`` rather than nothing — Indexer's ``POST /reindex`` is one.
+    Treating that as void discarded the stream undisposed and dropped whatever the service
+    said; ``OsduJson.ToJsonAsync(Stream)`` reads it as text instead.
 
     Statuses that are defined to have no body are ignored even when the spec attaches a
     schema to them, which several OSDU specs do: Legal's ``DELETE /legaltags/{name}``
@@ -347,7 +352,7 @@ def returns_value(operation: dict) -> bool:
     bodyless = {"204", "205", "304"}
     for status, response in (operation.get("responses") or {}).items():
         status = str(status)
-        if status.startswith("2") and status not in bodyless and (response or {}).get("content"):
+        if status.startswith("2") and status not in bodyless:
             return True
     return False
 

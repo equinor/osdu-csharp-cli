@@ -15,11 +15,11 @@
   </ItemGroup>
 
   <ItemGroup>
-    <PackageReference Include="Microsoft.Extensions.Logging.Console" Version="10.0.11"/>
+    <PackageReference Include="Microsoft.Extensions.Logging.Console" Version="10.0.13"/>
     <PackageReference Include="System.CommandLine" Version="2.0.11"/>
-    <PackageReference Include="Microsoft.Extensions.Configuration" Version="10.0.11"/>
-    <PackageReference Include="Microsoft.Extensions.Configuration.Json" Version="10.0.11"/>
-    <PackageReference Include="Microsoft.Extensions.Configuration.EnvironmentVariables" Version="10.0.11"/>
+    <PackageReference Include="Microsoft.Extensions.Configuration" Version="10.0.13"/>
+    <PackageReference Include="Microsoft.Extensions.Configuration.Json" Version="10.0.13"/>
+    <PackageReference Include="Microsoft.Extensions.Configuration.EnvironmentVariables" Version="10.0.13"/>
   </ItemGroup>
 
   <!-- The client is consumed as a package, not a sibling checkout, so this repo builds on
@@ -42,10 +42,13 @@
 
        2.2.1 untypes spec properties declared as strings but exemplified as JSON objects.
        Without it `schema add` silently dropped the caller's schema and the service rejected
-       the request for a field that had been supplied. -->
+       the request for a field that had been supplied.
+
+       3.0.0 regenerates from refreshed upstream specs. Entitlements' group `type` became an
+       enum, and Indexer's reindex and provision operations return the raw body as a Stream. -->
   <ItemGroup>
-    <PackageReference Include="Equinor.OsduCsharpClient" Version="2.2.1"/>
-    <PackageReference Include="Equinor.OsduCsharpClient.Msal" Version="2.2.1"/>
+    <PackageReference Include="Equinor.OsduCsharpClient" Version="3.0.0"/>
+    <PackageReference Include="Equinor.OsduCsharpClient.Msal" Version="3.0.0"/>
   </ItemGroup>
 
   <!-- For the `azure` authentication mode: `az login`, a managed or workload identity, or

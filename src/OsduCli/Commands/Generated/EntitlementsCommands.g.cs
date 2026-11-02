@@ -337,9 +337,10 @@ public static partial class EntitlementsCommands
         };
         var typeOption = new Option<string>("--type")
         {
-            Description = "Group type: NONE for all groups, or DATA, SERVICE or USER to filter.",
+            Description = "Group type: NONE for all groups, or DATA, SERVICE or USER to filter. One of: NONE, DATA, USER, SERVICE.",
             Required = true,
         };
+        typeOption.AcceptAnyCasingFromAmong("NONE", "DATA", "USER", "SERVICE");
         var appidOption = new Option<string>("--appid")
         {
             Description = "Filter to groups granted to this application id.",
@@ -365,7 +366,8 @@ public static partial class EntitlementsCommands
 
             var result = await context.Client.Entitlements.Members[memberEmail].Groups.GetAsync(configuration =>
             {
-                configuration.QueryParameters.Type = type;
+                if (type is not null)
+                    configuration.QueryParameters.Type = Enum.Parse<global::Equinor.OsduCsharpClient.Entitlements.Models.GroupType>(type, true);
                 configuration.QueryParameters.Appid = appid;
                 configuration.QueryParameters.RoleRequired = rolerequired;
             }, cancellationToken);

@@ -78,6 +78,9 @@ class TestResponseShape:
     def test_a_2xx_with_content_returns_a_value(self):
         assert returns_value({"responses": {"200": {"content": {"application/json": {}}}}})
 
+    def test_a_2xx_without_content_returns_the_stream_kiota_does(self):
+        assert returns_value({"responses": {"200": {"description": "OK"}}})
+
     def test_a_204_returns_nothing(self):
         assert not returns_value({"responses": {"204": {"description": "No Content"}}})
 

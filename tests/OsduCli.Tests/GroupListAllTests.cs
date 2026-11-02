@@ -7,6 +7,7 @@ using Equinor.OsduCli.Commands;
 using Equinor.OsduCli.Commands.Generated;
 using Equinor.OsduCli.Runtime;
 using Equinor.OsduCsharpClient.Entitlements;
+using Equinor.OsduCsharpClient.Entitlements.Models;
 using Microsoft.Kiota.Abstractions.Authentication;
 using Microsoft.Kiota.Http.HttpClientLibrary;
 using Xunit;
@@ -85,7 +86,7 @@ public class GroupListAllTests
         };
 
         var json = JsonNode.Parse(await GroupListAll.CollectAsync(
-            new EntitlementsClient(adapter).Groups.All, "DATA", null, TestContext.Current.CancellationToken))!;
+            new EntitlementsClient(adapter).Groups.All, GroupType.DATA, null, TestContext.Current.CancellationToken))!;
 
         var emails = json["groups"]!.AsArray().Select(group => group!["email"]!.GetValue<string>()).ToList();
         Assert.Equal(groups, emails.Count);
