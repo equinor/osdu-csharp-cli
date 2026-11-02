@@ -70,7 +70,7 @@ public static partial class RegisterCommands
             }, cancellationToken);
 
             return context.Output.Write(
-                await OsduJson.ToJsonAsync(result),
+                await OsduJson.ToJsonAsync(result, cancellationToken),
                 OutputSpec.Table(null, ("Id", "id"), ("Name", "name"), ("Topic", "topic"), ("Endpoint", "pushEndpoint")));
         }, cancellationToken, "users.datalake.ops, users.datalake.admins or users.datalake.editors"));
 
@@ -99,7 +99,7 @@ public static partial class RegisterCommands
             var result = await context.Client.Register.Subscription[id].GetAsync(cancellationToken: cancellationToken);
 
             return context.Output.Write(
-                await OsduJson.ToJsonAsync(result),
+                await OsduJson.ToJsonAsync(result, cancellationToken),
                 OutputSpec.Table(null, ("Id", "id"), ("Name", "name"), ("Topic", "topic"), ("Endpoint", "pushEndpoint"), ("NotificationId", "notificationId"), ("CreatedBy", "createdBy")));
         }, cancellationToken, "users.datalake.ops, users.datalake.admins or users.datalake.editors"));
 
@@ -130,7 +130,7 @@ public static partial class RegisterCommands
             var result = await context.Client.Register.Subscription.PostAsync(body, cancellationToken: cancellationToken);
 
             return context.Output.Write(
-                await OsduJson.ToJsonAsync(result),
+                await OsduJson.ToJsonAsync(result, cancellationToken),
                 OutputSpec.Table(null, ("Id", "id"), ("Name", "name"), ("Topic", "topic"), ("NotificationId", "notificationId")));
         }, cancellationToken, "users.datalake.ops, users.datalake.admins or users.datalake.editors"));
 
@@ -226,7 +226,7 @@ public static partial class RegisterCommands
             var result = await context.Client.Register.Topics.GetAsync(cancellationToken: cancellationToken);
 
             return context.Output.Write(
-                await OsduJson.ToJsonAsync(result),
+                await OsduJson.ToJsonAsync(result, cancellationToken),
                 OutputSpec.Table(null, ("Name", "name"), ("State", "state"), ("Description", "description")));
         }, cancellationToken, "users.datalake.ops, users.datalake.admins or users.datalake.editors"));
 
@@ -258,7 +258,7 @@ public static partial class RegisterCommands
             }, cancellationToken);
 
             return context.Output.Write(
-                await OsduJson.ToJsonAsync(result),
+                await OsduJson.ToJsonAsync(result, cancellationToken),
                 OutputSpec.Table(null, ("Id", "id"), ("Name", "name"), ("Contact", "contactEmail"), ("Description", "description")));
         }, cancellationToken, "users.datalake.ops, users.datalake.admins, users.datalake.editors or users.datalake.viewers"));
 
@@ -287,7 +287,7 @@ public static partial class RegisterCommands
             var result = await context.Client.Register.Ddms[id].GetAsync(cancellationToken: cancellationToken);
 
             return context.Output.Write(
-                await OsduJson.ToJsonAsync(result),
+                await OsduJson.ToJsonAsync(result, cancellationToken),
                 OutputSpec.Raw);
         }, cancellationToken, "users.datalake.ops, users.datalake.admins, users.datalake.editors or users.datalake.viewers"));
 
@@ -318,7 +318,7 @@ public static partial class RegisterCommands
             var result = await context.Client.Register.Ddms.PostAsync(body, cancellationToken: cancellationToken);
 
             return context.Output.Write(
-                await OsduJson.ToJsonAsync(result),
+                await OsduJson.ToJsonAsync(result, cancellationToken),
                 OutputSpec.Table(null, ("Id", "id"), ("Name", "name")));
         }, cancellationToken, "users.datalake.editors, users.datalake.admins or users.datalake.ops"));
 
@@ -385,7 +385,7 @@ public static partial class RegisterCommands
             var result = await context.Client.Register.Action[id].GetAsync(cancellationToken: cancellationToken);
 
             return context.Output.Write(
-                await OsduJson.ToJsonAsync(result),
+                await OsduJson.ToJsonAsync(result, cancellationToken),
                 OutputSpec.Raw);
         }, cancellationToken, "users.datalake.ops, users.datalake.admins, users.datalake.editors or users.datalake.viewers"));
 
@@ -416,7 +416,7 @@ public static partial class RegisterCommands
             var result = await context.Client.Register.Action.PostAsync(body, cancellationToken: cancellationToken);
 
             return context.Output.Write(
-                await OsduJson.ToJsonAsync(result),
+                await OsduJson.ToJsonAsync(result, cancellationToken),
                 OutputSpec.Table(null, ("Id", "id"), ("Name", "name"), ("Url", "url")));
         }, cancellationToken, "users.datalake.ops or users.datalake.admins"));
 
@@ -447,7 +447,7 @@ public static partial class RegisterCommands
             var result = await context.Client.Register.ActionTest.PostAsync(body, cancellationToken: cancellationToken);
 
             return context.Output.Write(
-                await OsduJson.ToJsonAsync(result),
+                await OsduJson.ToJsonAsync(result, cancellationToken),
                 OutputSpec.Table(null, ("Url", "url"), ("Errors", "errors")));
         }, cancellationToken, "users.datalake.ops, users.datalake.admins, users.datalake.editors or users.datalake.viewers"));
 
@@ -478,7 +478,7 @@ public static partial class RegisterCommands
             var result = await context.Client.Register.ActionRetrieve.PostAsync(body, cancellationToken: cancellationToken);
 
             return context.Output.Write(
-                await OsduJson.ToJsonAsync(result),
+                await OsduJson.ToJsonAsync(result, cancellationToken),
                 OutputSpec.Table(null, ("Id", "id"), ("Name", "name"), ("Url", "url")));
         }, cancellationToken, "users.datalake.ops, users.datalake.admins, users.datalake.editors or users.datalake.viewers"));
 

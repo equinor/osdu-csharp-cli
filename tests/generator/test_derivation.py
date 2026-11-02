@@ -78,6 +78,25 @@ class TestResponseShape:
     def test_a_2xx_with_content_returns_a_value(self):
         assert returns_value({"responses": {"200": {"content": {"application/json": {}}}}})
 
+    # What Kiota 1.36 generates for each, checked against its output: a Stream, or nothing.
+    @pytest.mark.parametrize("statuses, returns", [
+        (["200"], True),
+        (["2XX"], True),
+        (["203"], True),
+        (["206"], True),
+        (["200", "400"], True),
+        (["201"], False),
+        (["202"], False),
+        (["200", "204"], False),
+        (["200", "201"], False),
+    ])
+    def test_a_2xx_without_content_returns_what_kiota_returns(self, statuses, returns):
+        assert returns_value({"responses": {s: {"description": s} for s in statuses}}) is returns
+
+    def test_content_on_a_201_is_a_value_even_beside_a_204(self):
+        assert returns_value({"responses": {"201": {"content": {"application/json": {}}},
+                                            "204": {"description": "No Content"}}})
+
     def test_a_204_returns_nothing(self):
         assert not returns_value({"responses": {"204": {"description": "No Content"}}})
 

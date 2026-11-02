@@ -44,7 +44,7 @@
             }, cancellationToken);
 
             return context.Output.Write(
-                await OsduJson.ToJsonAsync(result),
+                await OsduJson.ToJsonAsync(result, cancellationToken),
                 OutputSpec.Raw);
         }, cancellationToken));
 

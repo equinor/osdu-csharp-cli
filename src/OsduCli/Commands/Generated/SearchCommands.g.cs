@@ -193,6 +193,20 @@ public static partial class SearchCommands
                 result.AddError("--offset cannot be combined with --all or a --limit above 1000: those page through /query_with_cursor, which starts at the first match.");
         });
 
+        // The spec's maxItems, checked here rather than by the service.
+        command.Validators.Add(result =>
+        {
+            if (OptionValues.Usable(result, sortFieldBodyOption) is { Length: > 16 })
+                result.AddError("--sort-by takes at most 16 values.");
+        });
+
+        // The spec's maxItems, checked here rather than by the service.
+        command.Validators.Add(result =>
+        {
+            if (OptionValues.Usable(result, sortOrderBodyOption) is { Length: > 16 })
+                result.AddError("--sort-order takes at most 16 values.");
+        });
+
         command.SetAction((parseResult, cancellationToken) =>
             CliRunner.RunAsync(parseResult, async (context, cancellationToken) =>
         {
@@ -255,7 +269,7 @@ public static partial class SearchCommands
                         await context.Client.Search.Query_with_cursor.PostAsync(
                             await KiotaJsonSerializer.DeserializeAsync<CursorQueryRequest>(
                                 page.ToJsonString(), CursorQueryRequest.CreateFromDiscriminatorValue, pageCancellation),
-                            cancellationToken: pageCancellation)),
+                            cancellationToken: pageCancellation), pageCancellation),
                     (cursor, releaseCancellation) => context.Client.Search.Query_with_cursor[cursor].DeleteAsync(cancellationToken: releaseCancellation),
                     Console.IsErrorRedirected ? null : Console.Error,
                     cancellationToken);
@@ -272,7 +286,7 @@ public static partial class SearchCommands
 
             var result = await context.Client.Search.Query.PostAsync(body, cancellationToken: cancellationToken);
 
-            var json = await OsduJson.ToJsonAsync(result);
+            var json = await OsduJson.ToJsonAsync(result, cancellationToken);
             context.Output.WriteTotal(json, "totalCount");
             return context.Output.Write(
                 json,
@@ -328,7 +342,7 @@ public static partial class SearchCommands
             var result = await context.Client.Search.Query.PostAsync(body, cancellationToken: cancellationToken);
 
             return context.Output.Write(
-                await OsduJson.ToJsonAsync(result),
+                await OsduJson.ToJsonAsync(result, cancellationToken),
                 OutputSpec.Table("aggregations", ("Value", "key"), ("Count", "count")));
         }, cancellationToken, "users.datalake.viewers, users.datalake.editors, users.datalake.admins or users.datalake.ops"));
 

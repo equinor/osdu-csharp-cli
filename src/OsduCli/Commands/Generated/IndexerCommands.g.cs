@@ -83,7 +83,7 @@ public static partial class IndexerCommands
             }, cancellationToken);
 
             return context.Output.Write(
-                await OsduJson.ToJsonAsync(result),
+                await OsduJson.ToJsonAsync(result, cancellationToken),
                 OutputSpec.Raw);
         }, cancellationToken, "service.search.admin"));
 
@@ -129,7 +129,7 @@ public static partial class IndexerCommands
             var result = await context.Client.Indexer.Reindex.Records.PostAsync(body, cancellationToken: cancellationToken);
 
             return context.Output.Write(
-                await OsduJson.ToJsonAsync(result),
+                await OsduJson.ToJsonAsync(result, cancellationToken),
                 OutputSpec.Raw);
         }, cancellationToken, "service.search.admin"));
 
@@ -171,7 +171,7 @@ public static partial class IndexerCommands
             }, cancellationToken);
 
             return context.Output.Write(
-                await OsduJson.ToJsonAsync(result),
+                await OsduJson.ToJsonAsync(result, cancellationToken),
                 OutputSpec.Raw);
         }, cancellationToken, "users.datalake.ops"));
 
@@ -214,7 +214,7 @@ public static partial class IndexerCommands
             }, cancellationToken);
 
             return context.Output.Write(
-                await OsduJson.ToJsonAsync(result),
+                await OsduJson.ToJsonAsync(result, cancellationToken),
                 OutputSpec.Raw);
         }, cancellationToken, "users.datalake.ops"));
 
@@ -247,7 +247,7 @@ public static partial class IndexerCommands
             var result = await context.Client.Indexer.Partitions.Provision.PutAsync(cancellationToken: cancellationToken);
 
             return context.Output.Write(
-                await OsduJson.ToJsonAsync(result),
+                await OsduJson.ToJsonAsync(result, cancellationToken),
                 OutputSpec.Raw);
         }, cancellationToken, "users.datalake.ops"));
 

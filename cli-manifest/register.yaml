@@ -254,19 +254,9 @@ exclude:
       `subscription find` looks them up by notification id.
   - op: { method: get, path: "/ddms/{id}/{type}/{localid}" }
     reason: Redirects to the record in the DDMS; a browser's job, not a command's.
-  - op: { method: get, path: "/test-gc/gsa-challenge/{path}" }
-    reason: Google Cloud test endpoint for the push handshake, not part of the service's API.
-  - op: { method: post, path: "/test-gc/gsa-challenge/{path}" }
-    reason: Google Cloud test endpoint for the push handshake, not part of the service's API.
-  - op: { method: get, path: "/test-gc/challenge/{path}" }
-    reason: Google Cloud test endpoint for the push handshake, not part of the service's API.
-  - op: { method: post, path: "/test-gc/challenge/{path}" }
-    reason: Google Cloud test endpoint for the push handshake, not part of the service's API.
-  - op: { method: get, path: /test-gc/state }
-    reason: Google Cloud test endpoint for the push handshake, not part of the service's API.
-  - op: { method: get, path: /ah/readiness_check }
+  - op: { method: get, path: /readiness_check }
     reason: Infrastructure probe, covered by `osducs status`.
-  - op: { method: get, path: /ah/liveness_check }
+  - op: { method: get, path: /liveness_check }
     reason: Infrastructure probe, covered by `osducs status`.
 
 handwritten:

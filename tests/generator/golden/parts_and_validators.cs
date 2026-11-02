@@ -73,7 +73,7 @@
             var result = await context.Client.Storage.Query.PostAsync(body, cancellationToken: cancellationToken);
 
             return context.Output.Write(
-                await OsduJson.ToJsonAsync(result),
+                await OsduJson.ToJsonAsync(result, cancellationToken),
                 OutputSpec.Table("results", ("Id", "id")));
         }, cancellationToken));
 

@@ -60,7 +60,7 @@
                         await context.Client.Storage.Query_with_cursor.PostAsync(
                             await KiotaJsonSerializer.DeserializeAsync<CursorQueryRequest>(
                                 page.ToJsonString(), CursorQueryRequest.CreateFromDiscriminatorValue, pageCancellation),
-                            cancellationToken: pageCancellation)),
+                            cancellationToken: pageCancellation), pageCancellation),
                     (cursor, releaseCancellation) => context.Client.Storage.Query_with_cursor[cursor].DeleteAsync(cancellationToken: releaseCancellation),
                     Console.IsErrorRedirected ? null : Console.Error,
                     cancellationToken);
@@ -75,7 +75,7 @@
 
             var result = await context.Client.Storage.Query.PostAsync(body, cancellationToken: cancellationToken);
 
-            var json = await OsduJson.ToJsonAsync(result);
+            var json = await OsduJson.ToJsonAsync(result, cancellationToken);
             context.Output.WriteTotal(json, "totalCount");
             return context.Output.Write(
                 json,

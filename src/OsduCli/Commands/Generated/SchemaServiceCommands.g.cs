@@ -106,7 +106,7 @@ public static partial class SchemaServiceCommands
             }, cancellationToken);
 
             return context.Output.Write(
-                await OsduJson.ToJsonAsync(result),
+                await OsduJson.ToJsonAsync(result, cancellationToken),
                 OutputSpec.Table("schemaInfos", ("Id", "schemaIdentity.id"), ("Status", "status"), ("Scope", "scope")));
         }, cancellationToken));
 
@@ -134,7 +134,7 @@ public static partial class SchemaServiceCommands
             var result = await context.Client.SchemaService.Schema[id].GetAsync(cancellationToken: cancellationToken);
 
             return context.Output.Write(
-                await OsduJson.ToJsonAsync(result),
+                await OsduJson.ToJsonAsync(result, cancellationToken),
                 OutputSpec.Raw);
         }, cancellationToken));
 
@@ -164,7 +164,7 @@ public static partial class SchemaServiceCommands
             var result = await context.Client.SchemaService.Schema.PostAsync(body, cancellationToken: cancellationToken);
 
             return context.Output.Write(
-                await OsduJson.ToJsonAsync(result),
+                await OsduJson.ToJsonAsync(result, cancellationToken),
                 OutputSpec.Table(null, ("Id", "schemaIdentity.id"), ("Status", "status")));
         }, cancellationToken));
 
@@ -194,7 +194,7 @@ public static partial class SchemaServiceCommands
             var result = await context.Client.SchemaService.Schema.PutAsync(body, cancellationToken: cancellationToken);
 
             return context.Output.Write(
-                await OsduJson.ToJsonAsync(result),
+                await OsduJson.ToJsonAsync(result, cancellationToken),
                 OutputSpec.Table(null, ("Id", "schemaIdentity.id"), ("Status", "status")));
         }, cancellationToken));
 

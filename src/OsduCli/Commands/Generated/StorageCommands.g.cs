@@ -80,7 +80,7 @@ public static partial class StorageCommands
                 configuration.QueryParameters.Cursor = cursor;
             }, cancellationToken);
 
-            var json = await OsduJson.ToJsonAsync(result);
+            var json = await OsduJson.ToJsonAsync(result, cancellationToken);
             context.Output.WriteCursor(json, "cursor");
             return context.Output.Write(
                 json,
@@ -122,7 +122,7 @@ public static partial class StorageCommands
             }, cancellationToken);
 
             return context.Output.Write(
-                await OsduJson.ToJsonAsync(result),
+                await OsduJson.ToJsonAsync(result, cancellationToken),
                 OutputSpec.Table(null, ("Id", "id"), ("Version", "version"), ("Kind", "kind"), ("CreateUser", "createUser"), ("CreateTime", "createTime")));
         }, cancellationToken, "service.storage.viewer, service.storage.creator or service.storage.admin"));
 
@@ -180,7 +180,7 @@ public static partial class StorageCommands
             var result = await context.Client.Storage.Query.Records.Headers.PostAsync(body, cancellationToken: cancellationToken);
 
             return context.Output.Write(
-                await OsduJson.ToJsonAsync(result),
+                await OsduJson.ToJsonAsync(result, cancellationToken),
                 OutputSpec.Table("records", ("Id", "id"), ("Version", "version"), ("Kind", "kind"), ("CreateUser", "createUser"), ("CreateTime", "createTime")));
         }, cancellationToken));
 
@@ -285,7 +285,7 @@ public static partial class StorageCommands
             var result = await context.Client.Storage.Records.Versions[id].GetAsync(cancellationToken: cancellationToken);
 
             return context.Output.Write(
-                await OsduJson.ToJsonAsync(result),
+                await OsduJson.ToJsonAsync(result, cancellationToken),
                 OutputSpec.Unwrap("versions"));
         }, cancellationToken, "service.storage.viewer, service.storage.creator or service.storage.admin"));
 
@@ -331,7 +331,7 @@ public static partial class StorageCommands
             }, cancellationToken);
 
             return context.Output.Write(
-                await OsduJson.ToJsonAsync(result),
+                await OsduJson.ToJsonAsync(result, cancellationToken),
                 OutputSpec.Table(null, ("Id", "id"), ("Version", "version"), ("Kind", "kind"), ("CreateUser", "createUser"), ("CreateTime", "createTime")));
         }, cancellationToken, "service.storage.viewer, service.storage.creator or service.storage.admin"));
 
@@ -486,7 +486,7 @@ public static partial class StorageCommands
             var result = await context.Client.Storage.Replay.PostAsync(body, cancellationToken: cancellationToken);
 
             return context.Output.Write(
-                await OsduJson.ToJsonAsync(result),
+                await OsduJson.ToJsonAsync(result, cancellationToken),
                 OutputSpec.Table(null, ("ReplayId", "replayId")));
         }, cancellationToken, "users.datalake.ops"));
 
@@ -515,7 +515,7 @@ public static partial class StorageCommands
             var result = await context.Client.Storage.Replay.Status[id].GetAsync(cancellationToken: cancellationToken);
 
             return context.Output.Write(
-                await OsduJson.ToJsonAsync(result),
+                await OsduJson.ToJsonAsync(result, cancellationToken),
                 OutputSpec.Table(null, ("ReplayId", "replayId"), ("Operation", "operation"), ("State", "overallState"), ("Processed", "processedRecords"), ("Total", "totalRecords"), ("Elapsed", "elapsedTime")));
         }, cancellationToken, "users.datalake.ops"));
 

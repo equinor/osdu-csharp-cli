@@ -23,7 +23,7 @@ version: 1
 
 source:
   name: osdu-csharp-client
-  ref: v2.2.1
+  ref: v3.0.1
   archive: https://github.com/equinor/osdu-csharp-client/archive/refs/tags/{ref}.tar.gz
   specs_path: openapi_specs
   expect_specs: 18

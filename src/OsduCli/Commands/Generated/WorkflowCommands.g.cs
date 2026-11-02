@@ -64,7 +64,7 @@ public static partial class WorkflowCommands
             }, cancellationToken);
 
             return context.Output.Write(
-                await OsduJson.ToJsonAsync(result),
+                await OsduJson.ToJsonAsync(result, cancellationToken),
                 OutputSpec.Table(null, ("Name", "workflowName"), ("Description", "description"), ("CreatedBy", "createdBy")));
         }, cancellationToken, "service.workflow.viewer"));
 
@@ -93,7 +93,7 @@ public static partial class WorkflowCommands
             var result = await context.Client.Workflow.V1.Workflow[workflowName].GetAsync(cancellationToken: cancellationToken);
 
             return context.Output.Write(
-                await OsduJson.ToJsonAsync(result),
+                await OsduJson.ToJsonAsync(result, cancellationToken),
                 OutputSpec.Raw);
         }, cancellationToken, "service.workflow.viewer"));
 
@@ -124,7 +124,7 @@ public static partial class WorkflowCommands
             var result = await context.Client.Workflow.V1.Workflow.PostAsync(body, cancellationToken: cancellationToken);
 
             return context.Output.Write(
-                await OsduJson.ToJsonAsync(result),
+                await OsduJson.ToJsonAsync(result, cancellationToken),
                 OutputSpec.Table(null, ("Name", "workflowName"), ("Id", "workflowId")));
         }, cancellationToken, "service.workflow.admin"));
 
@@ -191,7 +191,7 @@ public static partial class WorkflowCommands
             var result = await context.Client.Workflow.V1.Workflow[workflowName].WorkflowRun.GetAsync(cancellationToken: cancellationToken);
 
             return context.Output.Write(
-                await OsduJson.ToJsonAsync(result),
+                await OsduJson.ToJsonAsync(result, cancellationToken),
                 OutputSpec.Table(null, ("RunId", "runId"), ("Status", "status"), ("StartTimeStamp", "startTimeStamp")));
         }, cancellationToken, "service.workflow.viewer"));
 
@@ -227,7 +227,7 @@ public static partial class WorkflowCommands
             var result = await context.Client.Workflow.V1.Workflow[workflowName].WorkflowRun[runid].GetAsync(cancellationToken: cancellationToken);
 
             return context.Output.Write(
-                await OsduJson.ToJsonAsync(result),
+                await OsduJson.ToJsonAsync(result, cancellationToken),
                 OutputSpec.Raw);
         }, cancellationToken, "service.workflow.viewer"));
 
@@ -265,7 +265,7 @@ public static partial class WorkflowCommands
             var result = await context.Client.Workflow.V1.Workflow[workflowName].WorkflowRun.PostAsync(body, cancellationToken: cancellationToken);
 
             return context.Output.Write(
-                await OsduJson.ToJsonAsync(result),
+                await OsduJson.ToJsonAsync(result, cancellationToken),
                 OutputSpec.Table(null, ("RunId", "runId"), ("Status", "status")));
         }, cancellationToken, "service.workflow.creator"));
 
@@ -314,7 +314,7 @@ public static partial class WorkflowCommands
             var result = await context.Client.Workflow.V1.Workflow[workflowName].WorkflowRun[runid].PutAsync(body, cancellationToken: cancellationToken);
 
             return context.Output.Write(
-                await OsduJson.ToJsonAsync(result),
+                await OsduJson.ToJsonAsync(result, cancellationToken),
                 OutputSpec.Table(null, ("RunId", "runId"), ("Status", "status")));
         }, cancellationToken, "service.workflow.viewer"));
 
@@ -350,7 +350,7 @@ public static partial class WorkflowCommands
             var result = await context.Client.Workflow.V1.Workflow[workflowName].WorkflowRun[runid].LatestInfo.GetAsync(cancellationToken: cancellationToken);
 
             return context.Output.Write(
-                await OsduJson.ToJsonAsync(result),
+                await OsduJson.ToJsonAsync(result, cancellationToken),
                 OutputSpec.Raw);
         }, cancellationToken, "service.workflow.viewer"));
 

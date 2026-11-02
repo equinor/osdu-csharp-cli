@@ -21,7 +21,7 @@
             var result = await context.Client.Storage.Records.PutAsync(body, cancellationToken: cancellationToken);
 
             return context.Output.Write(
-                await OsduJson.ToJsonAsync(result),
+                await OsduJson.ToJsonAsync(result, cancellationToken),
                 OutputSpec.Unwrap("recordIds"));
         }, cancellationToken));
 

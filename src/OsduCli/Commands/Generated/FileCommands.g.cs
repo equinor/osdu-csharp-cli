@@ -58,7 +58,7 @@ public static partial class FileCommands
             var result = await context.Client.File.V2.Files[id].Metadata.GetAsync(cancellationToken: cancellationToken);
 
             return context.Output.Write(
-                await OsduJson.ToJsonAsync(result),
+                await OsduJson.ToJsonAsync(result, cancellationToken),
                 OutputSpec.Raw);
         }, cancellationToken, "service.file.editors, users.datalake.editors, users.datalake.admins or users.datalake.ops"));
 
@@ -89,7 +89,7 @@ public static partial class FileCommands
             var result = await context.Client.File.V2.Files.Metadata.PostAsync(body, cancellationToken: cancellationToken);
 
             return context.Output.Write(
-                await OsduJson.ToJsonAsync(result),
+                await OsduJson.ToJsonAsync(result, cancellationToken),
                 OutputSpec.Table(null, ("Id", "id")));
         }, cancellationToken, "service.file.editors, users.datalake.editors, users.datalake.admins or users.datalake.ops"));
 
@@ -158,7 +158,7 @@ public static partial class FileCommands
             }, cancellationToken);
 
             return context.Output.Write(
-                await OsduJson.ToJsonAsync(result),
+                await OsduJson.ToJsonAsync(result, cancellationToken),
                 OutputSpec.Raw);
         }, cancellationToken, "service.file.editors, users.datalake.editors, users.datalake.admins or users.datalake.ops"));
 
@@ -196,7 +196,7 @@ public static partial class FileCommands
             }, cancellationToken);
 
             return context.Output.Write(
-                await OsduJson.ToJsonAsync(result),
+                await OsduJson.ToJsonAsync(result, cancellationToken),
                 OutputSpec.Raw);
         }, cancellationToken, "service.file.viewers, users.datalake.viewers, users.datalake.editors, users.datalake.admins or users.datalake.ops"));
 

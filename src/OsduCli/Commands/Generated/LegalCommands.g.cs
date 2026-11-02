@@ -61,7 +61,7 @@ public static partial class LegalCommands
             }, cancellationToken);
 
             return context.Output.Write(
-                await OsduJson.ToJsonAsync(result),
+                await OsduJson.ToJsonAsync(result, cancellationToken),
                 OutputSpec.Table("legalTags", ("Name", "name"), ("Description", "description")));
         }, cancellationToken));
 
@@ -89,7 +89,7 @@ public static partial class LegalCommands
             var result = await context.Client.Legal.Legaltags[name].GetAsync(cancellationToken: cancellationToken);
 
             return context.Output.Write(
-                await OsduJson.ToJsonAsync(result),
+                await OsduJson.ToJsonAsync(result, cancellationToken),
                 OutputSpec.Raw);
         }, cancellationToken));
 
@@ -119,7 +119,7 @@ public static partial class LegalCommands
             var result = await context.Client.Legal.Legaltags.PostAsync(body, cancellationToken: cancellationToken);
 
             return context.Output.Write(
-                await OsduJson.ToJsonAsync(result),
+                await OsduJson.ToJsonAsync(result, cancellationToken),
                 OutputSpec.Table(null, ("Name", "name"), ("Description", "description")));
         }, cancellationToken));
 
@@ -149,7 +149,7 @@ public static partial class LegalCommands
             var result = await context.Client.Legal.Legaltags.PutAsync(body, cancellationToken: cancellationToken);
 
             return context.Output.Write(
-                await OsduJson.ToJsonAsync(result),
+                await OsduJson.ToJsonAsync(result, cancellationToken),
                 OutputSpec.Table(null, ("Name", "name"), ("Description", "description")));
         }, cancellationToken));
 
@@ -227,7 +227,7 @@ public static partial class LegalCommands
             var result = await context.Client.Legal.LegaltagsValidate.PostAsync(body, cancellationToken: cancellationToken);
 
             return context.Output.Write(
-                await OsduJson.ToJsonAsync(result),
+                await OsduJson.ToJsonAsync(result, cancellationToken),
                 OutputSpec.Table("invalidLegalTags", ("Name", "name"), ("Reason", "reason")));
         }, cancellationToken));
 
@@ -248,7 +248,7 @@ public static partial class LegalCommands
             var result = await context.Client.Legal.LegaltagsProperties.GetAsync(cancellationToken: cancellationToken);
 
             return context.Output.Write(
-                await OsduJson.ToJsonAsync(result),
+                await OsduJson.ToJsonAsync(result, cancellationToken),
                 OutputSpec.Raw);
         }, cancellationToken));
 

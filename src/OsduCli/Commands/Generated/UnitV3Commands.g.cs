@@ -81,7 +81,7 @@ public static partial class UnitV3Commands
             }, cancellationToken);
 
             return context.Output.Write(
-                await OsduJson.ToJsonAsync(result),
+                await OsduJson.ToJsonAsync(result, cancellationToken),
                 OutputSpec.Table("units", ("Name", "name"), ("Symbol", "displaySymbol"), ("Namespace", "namespace")));
         }, cancellationToken));
 
@@ -120,7 +120,7 @@ public static partial class UnitV3Commands
             }, cancellationToken);
 
             return context.Output.Write(
-                await OsduJson.ToJsonAsync(result),
+                await OsduJson.ToJsonAsync(result, cancellationToken),
                 OutputSpec.Raw);
         }, cancellationToken));
 
@@ -169,7 +169,7 @@ public static partial class UnitV3Commands
             }, cancellationToken);
 
             return context.Output.Write(
-                await OsduJson.ToJsonAsync(result),
+                await OsduJson.ToJsonAsync(result, cancellationToken),
                 OutputSpec.Table("units", ("Name", "name"), ("Symbol", "displaySymbol"), ("Namespace", "namespace")));
         }, cancellationToken));
 
@@ -200,7 +200,7 @@ public static partial class UnitV3Commands
             }, cancellationToken);
 
             return context.Output.Write(
-                await OsduJson.ToJsonAsync(result),
+                await OsduJson.ToJsonAsync(result, cancellationToken),
                 OutputSpec.Table("units", ("Name", "name"), ("Symbol", "displaySymbol"), ("Namespace", "namespace")));
         }, cancellationToken));
 
@@ -231,7 +231,7 @@ public static partial class UnitV3Commands
             }, cancellationToken);
 
             return context.Output.Write(
-                await OsduJson.ToJsonAsync(result),
+                await OsduJson.ToJsonAsync(result, cancellationToken),
                 OutputSpec.Table("units", ("Name", "name"), ("Symbol", "displaySymbol"), ("Namespace", "namespace")));
         }, cancellationToken));
 
@@ -270,7 +270,7 @@ public static partial class UnitV3Commands
             }, cancellationToken);
 
             return context.Output.Write(
-                await OsduJson.ToJsonAsync(result),
+                await OsduJson.ToJsonAsync(result, cancellationToken),
                 OutputSpec.Raw);
         }, cancellationToken));
 
@@ -301,7 +301,7 @@ public static partial class UnitV3Commands
             }, cancellationToken);
 
             return context.Output.Write(
-                await OsduJson.ToJsonAsync(result),
+                await OsduJson.ToJsonAsync(result, cancellationToken),
                 OutputSpec.Table("units", ("Name", "name"), ("Symbol", "displaySymbol"), ("Namespace", "namespace")));
         }, cancellationToken));
 
@@ -338,7 +338,7 @@ public static partial class UnitV3Commands
             }, cancellationToken);
 
             return context.Output.Write(
-                await OsduJson.ToJsonAsync(result),
+                await OsduJson.ToJsonAsync(result, cancellationToken),
                 OutputSpec.Raw);
         }, cancellationToken));
 
@@ -385,7 +385,7 @@ public static partial class UnitV3Commands
             }, cancellationToken);
 
             return context.Output.Write(
-                await OsduJson.ToJsonAsync(result),
+                await OsduJson.ToJsonAsync(result, cancellationToken),
                 OutputSpec.Raw);
         }, cancellationToken));
 
@@ -432,7 +432,7 @@ public static partial class UnitV3Commands
             }, cancellationToken);
 
             return context.Output.Write(
-                await OsduJson.ToJsonAsync(result),
+                await OsduJson.ToJsonAsync(result, cancellationToken),
                 OutputSpec.Raw);
         }, cancellationToken));
 
@@ -453,7 +453,7 @@ public static partial class UnitV3Commands
             var result = await context.Client.UnitV3.V3.Catalog.GetAsync(cancellationToken: cancellationToken);
 
             return context.Output.Write(
-                await OsduJson.ToJsonAsync(result),
+                await OsduJson.ToJsonAsync(result, cancellationToken),
                 OutputSpec.Raw);
         }, cancellationToken));
 
@@ -502,7 +502,7 @@ public static partial class UnitV3Commands
             }, cancellationToken);
 
             return context.Output.Write(
-                await OsduJson.ToJsonAsync(result),
+                await OsduJson.ToJsonAsync(result, cancellationToken),
                 OutputSpec.Raw);
         }, cancellationToken));
 
@@ -539,7 +539,7 @@ public static partial class UnitV3Commands
             }, cancellationToken);
 
             return context.Output.Write(
-                await OsduJson.ToJsonAsync(result),
+                await OsduJson.ToJsonAsync(result, cancellationToken),
                 OutputSpec.Raw);
         }, cancellationToken));
 
@@ -560,7 +560,7 @@ public static partial class UnitV3Commands
             var result = await context.Client.UnitV3.V3.Catalog.Lastmodified.GetAsync(cancellationToken: cancellationToken);
 
             return context.Output.Write(
-                await OsduJson.ToJsonAsync(result),
+                await OsduJson.ToJsonAsync(result, cancellationToken),
                 OutputSpec.Raw);
         }, cancellationToken));
 
@@ -597,7 +597,7 @@ public static partial class UnitV3Commands
             }, cancellationToken);
 
             return context.Output.Write(
-                await OsduJson.ToJsonAsync(result),
+                await OsduJson.ToJsonAsync(result, cancellationToken),
                 OutputSpec.Table("measurements", ("Name", "name"), ("Ancestry", "ancestry"), ("Namespace", "namespace")));
         }, cancellationToken));
 
@@ -628,7 +628,7 @@ public static partial class UnitV3Commands
             }, cancellationToken);
 
             return context.Output.Write(
-                await OsduJson.ToJsonAsync(result),
+                await OsduJson.ToJsonAsync(result, cancellationToken),
                 OutputSpec.Raw);
         }, cancellationToken));
 
@@ -677,7 +677,7 @@ public static partial class UnitV3Commands
             }, cancellationToken);
 
             return context.Output.Write(
-                await OsduJson.ToJsonAsync(result),
+                await OsduJson.ToJsonAsync(result, cancellationToken),
                 OutputSpec.Table("measurements", ("Name", "name"), ("Ancestry", "ancestry"), ("Namespace", "namespace")));
         }, cancellationToken));
 
@@ -714,7 +714,7 @@ public static partial class UnitV3Commands
             }, cancellationToken);
 
             return context.Output.Write(
-                await OsduJson.ToJsonAsync(result),
+                await OsduJson.ToJsonAsync(result, cancellationToken),
                 OutputSpec.Raw);
         }, cancellationToken));
 
@@ -751,7 +751,7 @@ public static partial class UnitV3Commands
             }, cancellationToken);
 
             return context.Output.Write(
-                await OsduJson.ToJsonAsync(result),
+                await OsduJson.ToJsonAsync(result, cancellationToken),
                 OutputSpec.Raw);
         }, cancellationToken));
 
@@ -796,7 +796,7 @@ public static partial class UnitV3Commands
             }, cancellationToken);
 
             return context.Output.Write(
-                await OsduJson.ToJsonAsync(result),
+                await OsduJson.ToJsonAsync(result, cancellationToken),
                 OutputSpec.Raw);
         }, cancellationToken));
 
