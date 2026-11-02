@@ -334,27 +334,33 @@ def derive_builder(path: str) -> str:
 
 
 def returns_value(operation: dict) -> bool:
-    """True when the operation has a 2xx response that may carry a body.
+    """True when Kiota gives the operation's method a return value.
 
-    Determines whether the emitted call is ``var result = await ...`` or a bare ``await``.
+    Determines whether the emitted call is ``var result = await ...`` or a bare ``await``,
+    so it has to agree with Kiota exactly: either mistake fails to compile.
 
-    A 2xx that declares no ``content`` still counts. Kiota cannot type its body, so it
-    returns the raw ``Stream`` rather than nothing — Indexer's ``POST /reindex`` is one.
-    Treating that as void discarded the stream undisposed and dropped whatever the service
-    said; ``OsduJson.ToJsonAsync(Stream)`` reads it as text instead.
+    A 2xx declaring ``content`` returns its model. Statuses that are defined to have no body
+    are ignored even when the spec attaches a schema to them, which several OSDU specs do:
+    Legal's ``DELETE /legaltags/{name}`` declares a 204 whose content is an enum of every HTTP
+    status name, and Kiota generates a void method for it.
 
-    Statuses that are defined to have no body are ignored even when the spec attaches a
-    schema to them, which several OSDU specs do: Legal's ``DELETE /legaltags/{name}``
-    declares a 204 whose content is an enum of every HTTP status name. Kiota reads those
-    the same way and generates a void method, so trusting the spec here would emit
-    ``var result = await ...`` against a void call and fail to compile.
+    With no content declared on any 2xx, Kiota returns the raw ``Stream`` unless a 201, 202,
+    204 or 205 is among the responses, in which case the method is void — ``200`` alone gives
+    a ``Stream``, ``200`` beside ``204`` gives nothing. Indexer's ``POST /reindex`` is the
+    ``Stream`` case: ``OsduJson.ToJsonAsync(Stream)`` reads it as text, where treating it as
+    void discarded the stream undisposed and dropped whatever the service said.
     """
     bodyless = {"204", "205", "304"}
-    for status, response in (operation.get("responses") or {}).items():
-        status = str(status)
-        if status.startswith("2") and status not in bodyless:
-            return True
-    return False
+    no_content = {"201", "202", "204", "205"}
+    responses = {str(status): response or {}
+                 for status, response in (operation.get("responses") or {}).items()}
+    statuses = responses.keys()
+    if any(status.startswith("2") and status not in bodyless and response.get("content")
+           for status, response in responses.items()):
+        return True
+    if any(status in no_content for status in statuses):
+        return False
+    return any(status.startswith("2") and status not in bodyless for status in statuses)
 
 
 def normalise_schema(schema: dict, spec: dict) -> dict:
@@ -1961,7 +1967,7 @@ def emit_command(service: Service, command: Command) -> list[str]:
         if command.total_from or command.cursor_from:
             # Materialised, because the count and the table are read from the same response
             # and serialising twice would be wasteful and could disagree.
-            lines.append("            var json = await OsduJson.ToJsonAsync(result);")
+            lines.append("            var json = await OsduJson.ToJsonAsync(result, cancellationToken);")
             if command.total_from:
                 lines.append(f"            context.Output.WriteTotal(json, "
                              f"{csharp_string(command.total_from)});")
@@ -1972,7 +1978,7 @@ def emit_command(service: Service, command: Command) -> list[str]:
             lines.append("                json,")
         else:
             lines.append("            return context.Output.Write(")
-            lines.append("                await OsduJson.ToJsonAsync(result),")
+            lines.append("                await OsduJson.ToJsonAsync(result, cancellationToken),")
         lines.append(f"                {output_expression(command)});")
     else:
         message = command.message or "Done."
@@ -2093,7 +2099,7 @@ def paged_branch(service: Service, command: Command) -> list[str]:
         f"                        await {target}.{paging.builder}.PostAsync(",
         f"                            await KiotaJsonSerializer.DeserializeAsync<{paging.model}>(",
         f"                                page.ToJsonString(), {paging.model}.CreateFromDiscriminatorValue, pageCancellation),",
-        "                            cancellationToken: pageCancellation)),",
+        "                            cancellationToken: pageCancellation), pageCancellation),",
         f"                    {release},",
         "                    Console.IsErrorRedirected ? null : Console.Error,",
         "                    cancellationToken);",

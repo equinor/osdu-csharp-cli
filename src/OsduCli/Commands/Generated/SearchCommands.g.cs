@@ -269,7 +269,7 @@ public static partial class SearchCommands
                         await context.Client.Search.Query_with_cursor.PostAsync(
                             await KiotaJsonSerializer.DeserializeAsync<CursorQueryRequest>(
                                 page.ToJsonString(), CursorQueryRequest.CreateFromDiscriminatorValue, pageCancellation),
-                            cancellationToken: pageCancellation)),
+                            cancellationToken: pageCancellation), pageCancellation),
                     (cursor, releaseCancellation) => context.Client.Search.Query_with_cursor[cursor].DeleteAsync(cancellationToken: releaseCancellation),
                     Console.IsErrorRedirected ? null : Console.Error,
                     cancellationToken);
@@ -286,7 +286,7 @@ public static partial class SearchCommands
 
             var result = await context.Client.Search.Query.PostAsync(body, cancellationToken: cancellationToken);
 
-            var json = await OsduJson.ToJsonAsync(result);
+            var json = await OsduJson.ToJsonAsync(result, cancellationToken);
             context.Output.WriteTotal(json, "totalCount");
             return context.Output.Write(
                 json,
@@ -342,7 +342,7 @@ public static partial class SearchCommands
             var result = await context.Client.Search.Query.PostAsync(body, cancellationToken: cancellationToken);
 
             return context.Output.Write(
-                await OsduJson.ToJsonAsync(result),
+                await OsduJson.ToJsonAsync(result, cancellationToken),
                 OutputSpec.Table("aggregations", ("Value", "key"), ("Count", "count")));
         }, cancellationToken, "users.datalake.viewers, users.datalake.editors, users.datalake.admins or users.datalake.ops"));
 

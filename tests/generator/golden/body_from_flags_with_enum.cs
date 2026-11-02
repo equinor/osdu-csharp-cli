@@ -42,7 +42,7 @@
 
             var result = await context.Client.Storage.Query.PostAsync(body, cancellationToken: cancellationToken);
 
-            var json = await OsduJson.ToJsonAsync(result);
+            var json = await OsduJson.ToJsonAsync(result, cancellationToken);
             context.Output.WriteTotal(json, "totalCount");
             return context.Output.Write(
                 json,

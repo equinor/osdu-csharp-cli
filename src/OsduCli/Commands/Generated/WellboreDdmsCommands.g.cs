@@ -125,7 +125,7 @@ public static partial class WellboreDdmsCommands
             var result = await context.Client.WellboreDdms.Ddms.V3.Wells[recordId].GetAsync(cancellationToken: cancellationToken);
 
             return context.Output.Write(
-                await OsduJson.ToJsonAsync(result),
+                await OsduJson.ToJsonAsync(result, cancellationToken),
                 OutputSpec.Raw);
         }, cancellationToken, "users.datalake.viewers, users.datalake.editors or users.datalake.admins"));
 
@@ -156,7 +156,7 @@ public static partial class WellboreDdmsCommands
             var result = await context.Client.WellboreDdms.Ddms.V3.Wells.PostAsync(body, cancellationToken: cancellationToken);
 
             return context.Output.Write(
-                await OsduJson.ToJsonAsync(result),
+                await OsduJson.ToJsonAsync(result, cancellationToken),
                 OutputSpec.Unwrap("recordIds"));
         }, cancellationToken, "users.datalake.editors or users.datalake.admins"));
 
@@ -223,7 +223,7 @@ public static partial class WellboreDdmsCommands
             var result = await context.Client.WellboreDdms.Ddms.V3.Wells[recordId].Versions.GetAsync(cancellationToken: cancellationToken);
 
             return context.Output.Write(
-                await OsduJson.ToJsonAsync(result),
+                await OsduJson.ToJsonAsync(result, cancellationToken),
                 OutputSpec.Raw);
         }, cancellationToken, "users.datalake.viewers, users.datalake.editors or users.datalake.admins"));
 
@@ -259,7 +259,7 @@ public static partial class WellboreDdmsCommands
             var result = await context.Client.WellboreDdms.Ddms.V3.Wells[recordId].Versions[version].GetAsync(cancellationToken: cancellationToken);
 
             return context.Output.Write(
-                await OsduJson.ToJsonAsync(result),
+                await OsduJson.ToJsonAsync(result, cancellationToken),
                 OutputSpec.Raw);
         }, cancellationToken, "users.datalake.viewers, users.datalake.editors or users.datalake.admins"));
 
@@ -288,7 +288,7 @@ public static partial class WellboreDdmsCommands
             var result = await context.Client.WellboreDdms.Ddms.V3.Wellbores[recordId].GetAsync(cancellationToken: cancellationToken);
 
             return context.Output.Write(
-                await OsduJson.ToJsonAsync(result),
+                await OsduJson.ToJsonAsync(result, cancellationToken),
                 OutputSpec.Raw);
         }, cancellationToken, "users.datalake.viewers, users.datalake.editors or users.datalake.admins"));
 
@@ -319,7 +319,7 @@ public static partial class WellboreDdmsCommands
             var result = await context.Client.WellboreDdms.Ddms.V3.Wellbores.PostAsync(body, cancellationToken: cancellationToken);
 
             return context.Output.Write(
-                await OsduJson.ToJsonAsync(result),
+                await OsduJson.ToJsonAsync(result, cancellationToken),
                 OutputSpec.Unwrap("recordIds"));
         }, cancellationToken, "users.datalake.editors or users.datalake.admins"));
 
@@ -386,7 +386,7 @@ public static partial class WellboreDdmsCommands
             var result = await context.Client.WellboreDdms.Ddms.V3.Wellbores[recordId].Versions.GetAsync(cancellationToken: cancellationToken);
 
             return context.Output.Write(
-                await OsduJson.ToJsonAsync(result),
+                await OsduJson.ToJsonAsync(result, cancellationToken),
                 OutputSpec.Raw);
         }, cancellationToken, "users.datalake.viewers, users.datalake.editors or users.datalake.admins"));
 
@@ -422,7 +422,7 @@ public static partial class WellboreDdmsCommands
             var result = await context.Client.WellboreDdms.Ddms.V3.Wellbores[recordId].Versions[version].GetAsync(cancellationToken: cancellationToken);
 
             return context.Output.Write(
-                await OsduJson.ToJsonAsync(result),
+                await OsduJson.ToJsonAsync(result, cancellationToken),
                 OutputSpec.Raw);
         }, cancellationToken, "users.datalake.viewers, users.datalake.editors or users.datalake.admins"));
 
@@ -451,7 +451,7 @@ public static partial class WellboreDdmsCommands
             var result = await context.Client.WellboreDdms.Ddms.V3.Welllogs[recordId].GetAsync(cancellationToken: cancellationToken);
 
             return context.Output.Write(
-                await OsduJson.ToJsonAsync(result),
+                await OsduJson.ToJsonAsync(result, cancellationToken),
                 OutputSpec.Raw);
         }, cancellationToken, "users.datalake.viewers, users.datalake.editors or users.datalake.admins"));
 
@@ -482,7 +482,7 @@ public static partial class WellboreDdmsCommands
             var result = await context.Client.WellboreDdms.Ddms.V3.Welllogs.PostAsync(body, cancellationToken: cancellationToken);
 
             return context.Output.Write(
-                await OsduJson.ToJsonAsync(result),
+                await OsduJson.ToJsonAsync(result, cancellationToken),
                 OutputSpec.Unwrap("recordIds"));
         }, cancellationToken, "users.datalake.editors or users.datalake.admins"));
 
@@ -549,7 +549,7 @@ public static partial class WellboreDdmsCommands
             var result = await context.Client.WellboreDdms.Ddms.V3.Welllogs[recordId].Versions.GetAsync(cancellationToken: cancellationToken);
 
             return context.Output.Write(
-                await OsduJson.ToJsonAsync(result),
+                await OsduJson.ToJsonAsync(result, cancellationToken),
                 OutputSpec.Raw);
         }, cancellationToken, "users.datalake.viewers, users.datalake.editors or users.datalake.admins"));
 
@@ -585,7 +585,7 @@ public static partial class WellboreDdmsCommands
             var result = await context.Client.WellboreDdms.Ddms.V3.Welllogs[recordId].Versions[version].GetAsync(cancellationToken: cancellationToken);
 
             return context.Output.Write(
-                await OsduJson.ToJsonAsync(result),
+                await OsduJson.ToJsonAsync(result, cancellationToken),
                 OutputSpec.Raw);
         }, cancellationToken, "users.datalake.viewers, users.datalake.editors or users.datalake.admins"));
 
@@ -660,7 +660,7 @@ public static partial class WellboreDdmsCommands
             }, cancellationToken);
 
             return context.Output.Write(
-                await OsduJson.ToJsonAsync(result),
+                await OsduJson.ToJsonAsync(result, cancellationToken),
                 OutputSpec.Raw);
         }, cancellationToken, "users.datalake.viewers, users.datalake.editors or users.datalake.admins"));
 
@@ -742,7 +742,7 @@ public static partial class WellboreDdmsCommands
             }, cancellationToken);
 
             return context.Output.Write(
-                await OsduJson.ToJsonAsync(result),
+                await OsduJson.ToJsonAsync(result, cancellationToken),
                 OutputSpec.Raw);
         }, cancellationToken, "users.datalake.viewers, users.datalake.editors or users.datalake.admins"));
 
@@ -779,7 +779,7 @@ public static partial class WellboreDdmsCommands
             }, cancellationToken);
 
             return context.Output.Write(
-                await OsduJson.ToJsonAsync(result),
+                await OsduJson.ToJsonAsync(result, cancellationToken),
                 OutputSpec.Raw);
         }, cancellationToken));
 
@@ -823,7 +823,7 @@ public static partial class WellboreDdmsCommands
             }, cancellationToken);
 
             return context.Output.Write(
-                await OsduJson.ToJsonAsync(result),
+                await OsduJson.ToJsonAsync(result, cancellationToken),
                 OutputSpec.Raw);
         }, cancellationToken));
 
@@ -852,7 +852,7 @@ public static partial class WellboreDdmsCommands
             var result = await context.Client.WellboreDdms.Ddms.V3.Wellboretrajectories[recordId].GetAsync(cancellationToken: cancellationToken);
 
             return context.Output.Write(
-                await OsduJson.ToJsonAsync(result),
+                await OsduJson.ToJsonAsync(result, cancellationToken),
                 OutputSpec.Raw);
         }, cancellationToken, "users.datalake.viewers, users.datalake.editors or users.datalake.admins"));
 
@@ -883,7 +883,7 @@ public static partial class WellboreDdmsCommands
             var result = await context.Client.WellboreDdms.Ddms.V3.Wellboretrajectories.PostAsync(body, cancellationToken: cancellationToken);
 
             return context.Output.Write(
-                await OsduJson.ToJsonAsync(result),
+                await OsduJson.ToJsonAsync(result, cancellationToken),
                 OutputSpec.Unwrap("recordIds"));
         }, cancellationToken, "users.datalake.editors or users.datalake.admins"));
 
@@ -950,7 +950,7 @@ public static partial class WellboreDdmsCommands
             var result = await context.Client.WellboreDdms.Ddms.V3.Wellboretrajectories[recordId].Versions.GetAsync(cancellationToken: cancellationToken);
 
             return context.Output.Write(
-                await OsduJson.ToJsonAsync(result),
+                await OsduJson.ToJsonAsync(result, cancellationToken),
                 OutputSpec.Raw);
         }, cancellationToken, "users.datalake.viewers, users.datalake.editors or users.datalake.admins"));
 
@@ -986,7 +986,7 @@ public static partial class WellboreDdmsCommands
             var result = await context.Client.WellboreDdms.Ddms.V3.Wellboretrajectories[recordId].Versions[version].GetAsync(cancellationToken: cancellationToken);
 
             return context.Output.Write(
-                await OsduJson.ToJsonAsync(result),
+                await OsduJson.ToJsonAsync(result, cancellationToken),
                 OutputSpec.Raw);
         }, cancellationToken, "users.datalake.viewers, users.datalake.editors or users.datalake.admins"));
 
@@ -1061,7 +1061,7 @@ public static partial class WellboreDdmsCommands
             }, cancellationToken);
 
             return context.Output.Write(
-                await OsduJson.ToJsonAsync(result),
+                await OsduJson.ToJsonAsync(result, cancellationToken),
                 OutputSpec.Raw);
         }, cancellationToken, "users.datalake.viewers, users.datalake.editors or users.datalake.admins"));
 
@@ -1143,7 +1143,7 @@ public static partial class WellboreDdmsCommands
             }, cancellationToken);
 
             return context.Output.Write(
-                await OsduJson.ToJsonAsync(result),
+                await OsduJson.ToJsonAsync(result, cancellationToken),
                 OutputSpec.Raw);
         }, cancellationToken, "users.datalake.viewers, users.datalake.editors or users.datalake.admins"));
 
@@ -1172,7 +1172,7 @@ public static partial class WellboreDdmsCommands
             var result = await context.Client.WellboreDdms.Ddms.V3.Wellboremarkersets[recordId].GetAsync(cancellationToken: cancellationToken);
 
             return context.Output.Write(
-                await OsduJson.ToJsonAsync(result),
+                await OsduJson.ToJsonAsync(result, cancellationToken),
                 OutputSpec.Raw);
         }, cancellationToken, "users.datalake.viewers, users.datalake.editors or users.datalake.admins"));
 
@@ -1203,7 +1203,7 @@ public static partial class WellboreDdmsCommands
             var result = await context.Client.WellboreDdms.Ddms.V3.Wellboremarkersets.PostAsync(body, cancellationToken: cancellationToken);
 
             return context.Output.Write(
-                await OsduJson.ToJsonAsync(result),
+                await OsduJson.ToJsonAsync(result, cancellationToken),
                 OutputSpec.Unwrap("recordIds"));
         }, cancellationToken, "users.datalake.editors or users.datalake.admins"));
 
@@ -1270,7 +1270,7 @@ public static partial class WellboreDdmsCommands
             var result = await context.Client.WellboreDdms.Ddms.V3.Wellboremarkersets[recordId].Versions.GetAsync(cancellationToken: cancellationToken);
 
             return context.Output.Write(
-                await OsduJson.ToJsonAsync(result),
+                await OsduJson.ToJsonAsync(result, cancellationToken),
                 OutputSpec.Raw);
         }, cancellationToken, "users.datalake.viewers, users.datalake.editors or users.datalake.admins"));
 
@@ -1306,7 +1306,7 @@ public static partial class WellboreDdmsCommands
             var result = await context.Client.WellboreDdms.Ddms.V3.Wellboremarkersets[recordId].Versions[version].GetAsync(cancellationToken: cancellationToken);
 
             return context.Output.Write(
-                await OsduJson.ToJsonAsync(result),
+                await OsduJson.ToJsonAsync(result, cancellationToken),
                 OutputSpec.Raw);
         }, cancellationToken, "users.datalake.viewers, users.datalake.editors or users.datalake.admins"));
 
@@ -1335,7 +1335,7 @@ public static partial class WellboreDdmsCommands
             var result = await context.Client.WellboreDdms.Ddms.V3.Wellboreintervalsets[recordId].GetAsync(cancellationToken: cancellationToken);
 
             return context.Output.Write(
-                await OsduJson.ToJsonAsync(result),
+                await OsduJson.ToJsonAsync(result, cancellationToken),
                 OutputSpec.Raw);
         }, cancellationToken, "users.datalake.viewers, users.datalake.editors or users.datalake.admins"));
 
@@ -1366,7 +1366,7 @@ public static partial class WellboreDdmsCommands
             var result = await context.Client.WellboreDdms.Ddms.V3.Wellboreintervalsets.PostAsync(body, cancellationToken: cancellationToken);
 
             return context.Output.Write(
-                await OsduJson.ToJsonAsync(result),
+                await OsduJson.ToJsonAsync(result, cancellationToken),
                 OutputSpec.Unwrap("recordIds"));
         }, cancellationToken, "users.datalake.editors or users.datalake.admins"));
 
@@ -1433,7 +1433,7 @@ public static partial class WellboreDdmsCommands
             var result = await context.Client.WellboreDdms.Ddms.V3.Wellboreintervalsets[recordId].Versions.GetAsync(cancellationToken: cancellationToken);
 
             return context.Output.Write(
-                await OsduJson.ToJsonAsync(result),
+                await OsduJson.ToJsonAsync(result, cancellationToken),
                 OutputSpec.Raw);
         }, cancellationToken, "users.datalake.viewers, users.datalake.editors or users.datalake.admins"));
 
@@ -1469,7 +1469,7 @@ public static partial class WellboreDdmsCommands
             var result = await context.Client.WellboreDdms.Ddms.V3.Wellboreintervalsets[recordId].Versions[version].GetAsync(cancellationToken: cancellationToken);
 
             return context.Output.Write(
-                await OsduJson.ToJsonAsync(result),
+                await OsduJson.ToJsonAsync(result, cancellationToken),
                 OutputSpec.Raw);
         }, cancellationToken, "users.datalake.viewers, users.datalake.editors or users.datalake.admins"));
 
@@ -1498,7 +1498,7 @@ public static partial class WellboreDdmsCommands
             var result = await context.Client.WellboreDdms.Ddms.V3.Welllogacquisition[recordId].GetAsync(cancellationToken: cancellationToken);
 
             return context.Output.Write(
-                await OsduJson.ToJsonAsync(result),
+                await OsduJson.ToJsonAsync(result, cancellationToken),
                 OutputSpec.Raw);
         }, cancellationToken, "users.datalake.viewers, users.datalake.editors or users.datalake.admins"));
 
@@ -1529,7 +1529,7 @@ public static partial class WellboreDdmsCommands
             var result = await context.Client.WellboreDdms.Ddms.V3.Welllogacquisition.PostAsync(body, cancellationToken: cancellationToken);
 
             return context.Output.Write(
-                await OsduJson.ToJsonAsync(result),
+                await OsduJson.ToJsonAsync(result, cancellationToken),
                 OutputSpec.Unwrap("recordIds"));
         }, cancellationToken, "users.datalake.editors or users.datalake.admins"));
 
@@ -1596,7 +1596,7 @@ public static partial class WellboreDdmsCommands
             var result = await context.Client.WellboreDdms.Ddms.V3.Welllogacquisition[recordId].Versions.GetAsync(cancellationToken: cancellationToken);
 
             return context.Output.Write(
-                await OsduJson.ToJsonAsync(result),
+                await OsduJson.ToJsonAsync(result, cancellationToken),
                 OutputSpec.Raw);
         }, cancellationToken, "users.datalake.viewers, users.datalake.editors or users.datalake.admins"));
 
@@ -1632,7 +1632,7 @@ public static partial class WellboreDdmsCommands
             var result = await context.Client.WellboreDdms.Ddms.V3.Welllogacquisition[recordId].Versions[version].GetAsync(cancellationToken: cancellationToken);
 
             return context.Output.Write(
-                await OsduJson.ToJsonAsync(result),
+                await OsduJson.ToJsonAsync(result, cancellationToken),
                 OutputSpec.Raw);
         }, cancellationToken, "users.datalake.viewers, users.datalake.editors or users.datalake.admins"));
 
@@ -1660,7 +1660,7 @@ public static partial class WellboreDdmsCommands
             var result = await context.Client.WellboreDdms.Ddms.V3.Ppfgdataset[recordId].GetAsync(cancellationToken: cancellationToken);
 
             return context.Output.Write(
-                await OsduJson.ToJsonAsync(result),
+                await OsduJson.ToJsonAsync(result, cancellationToken),
                 OutputSpec.Raw);
         }, cancellationToken));
 
@@ -1691,7 +1691,7 @@ public static partial class WellboreDdmsCommands
             var result = await context.Client.WellboreDdms.Ddms.V3.Ppfgdataset.PostAsync(body, cancellationToken: cancellationToken);
 
             return context.Output.Write(
-                await OsduJson.ToJsonAsync(result),
+                await OsduJson.ToJsonAsync(result, cancellationToken),
                 OutputSpec.Unwrap("recordIds"));
         }, cancellationToken, "users.datalake.editors or users.datalake.admins"));
 
@@ -1756,7 +1756,7 @@ public static partial class WellboreDdmsCommands
             var result = await context.Client.WellboreDdms.Ddms.V3.Ppfgdataset[recordId].Versions.GetAsync(cancellationToken: cancellationToken);
 
             return context.Output.Write(
-                await OsduJson.ToJsonAsync(result),
+                await OsduJson.ToJsonAsync(result, cancellationToken),
                 OutputSpec.Raw);
         }, cancellationToken));
 
@@ -1791,7 +1791,7 @@ public static partial class WellboreDdmsCommands
             var result = await context.Client.WellboreDdms.Ddms.V3.Ppfgdataset[recordId].Versions[version].GetAsync(cancellationToken: cancellationToken);
 
             return context.Output.Write(
-                await OsduJson.ToJsonAsync(result),
+                await OsduJson.ToJsonAsync(result, cancellationToken),
                 OutputSpec.Raw);
         }, cancellationToken));
 
@@ -1866,7 +1866,7 @@ public static partial class WellboreDdmsCommands
             }, cancellationToken);
 
             return context.Output.Write(
-                await OsduJson.ToJsonAsync(result),
+                await OsduJson.ToJsonAsync(result, cancellationToken),
                 OutputSpec.Raw);
         }, cancellationToken, "users.datalake.viewers, users.datalake.editors or users.datalake.admins"));
 
@@ -1948,7 +1948,7 @@ public static partial class WellboreDdmsCommands
             }, cancellationToken);
 
             return context.Output.Write(
-                await OsduJson.ToJsonAsync(result),
+                await OsduJson.ToJsonAsync(result, cancellationToken),
                 OutputSpec.Raw);
         }, cancellationToken, "users.datalake.viewers, users.datalake.editors or users.datalake.admins"));
 
@@ -1976,7 +1976,7 @@ public static partial class WellboreDdmsCommands
             var result = await context.Client.WellboreDdms.Ddms.V3.Wellpressuretestrawmeasurement[recordId].GetAsync(cancellationToken: cancellationToken);
 
             return context.Output.Write(
-                await OsduJson.ToJsonAsync(result),
+                await OsduJson.ToJsonAsync(result, cancellationToken),
                 OutputSpec.Raw);
         }, cancellationToken));
 
@@ -2007,7 +2007,7 @@ public static partial class WellboreDdmsCommands
             var result = await context.Client.WellboreDdms.Ddms.V3.Wellpressuretestrawmeasurement.PostAsync(body, cancellationToken: cancellationToken);
 
             return context.Output.Write(
-                await OsduJson.ToJsonAsync(result),
+                await OsduJson.ToJsonAsync(result, cancellationToken),
                 OutputSpec.Unwrap("recordIds"));
         }, cancellationToken, "users.datalake.editors or users.datalake.admins"));
 
@@ -2072,7 +2072,7 @@ public static partial class WellboreDdmsCommands
             var result = await context.Client.WellboreDdms.Ddms.V3.Wellpressuretestrawmeasurement[recordId].Versions.GetAsync(cancellationToken: cancellationToken);
 
             return context.Output.Write(
-                await OsduJson.ToJsonAsync(result),
+                await OsduJson.ToJsonAsync(result, cancellationToken),
                 OutputSpec.Raw);
         }, cancellationToken));
 
@@ -2107,7 +2107,7 @@ public static partial class WellboreDdmsCommands
             var result = await context.Client.WellboreDdms.Ddms.V3.Wellpressuretestrawmeasurement[recordId].Versions[version].GetAsync(cancellationToken: cancellationToken);
 
             return context.Output.Write(
-                await OsduJson.ToJsonAsync(result),
+                await OsduJson.ToJsonAsync(result, cancellationToken),
                 OutputSpec.Raw);
         }, cancellationToken));
 
@@ -2182,7 +2182,7 @@ public static partial class WellboreDdmsCommands
             }, cancellationToken);
 
             return context.Output.Write(
-                await OsduJson.ToJsonAsync(result),
+                await OsduJson.ToJsonAsync(result, cancellationToken),
                 OutputSpec.Raw);
         }, cancellationToken, "users.datalake.viewers, users.datalake.editors or users.datalake.admins"));
 
@@ -2264,7 +2264,7 @@ public static partial class WellboreDdmsCommands
             }, cancellationToken);
 
             return context.Output.Write(
-                await OsduJson.ToJsonAsync(result),
+                await OsduJson.ToJsonAsync(result, cancellationToken),
                 OutputSpec.Raw);
         }, cancellationToken, "users.datalake.viewers, users.datalake.editors or users.datalake.admins"));
 
@@ -2292,7 +2292,7 @@ public static partial class WellboreDdmsCommands
             var result = await context.Client.WellboreDdms.Ddms.V3.Welllogs[recordId].Sessions.GetAsync(cancellationToken: cancellationToken);
 
             return context.Output.Write(
-                await OsduJson.ToJsonAsync(result),
+                await OsduJson.ToJsonAsync(result, cancellationToken),
                 OutputSpec.Table(null, ("Session", "id"), ("State", "state"), ("Mode", "mode"), ("FromVersion", "fromVersion"), ("Expiry", "expiry")));
         }, cancellationToken));
 
@@ -2327,7 +2327,7 @@ public static partial class WellboreDdmsCommands
             var result = await context.Client.WellboreDdms.Ddms.V3.Welllogs[recordId].Sessions[sessionId].GetAsync(cancellationToken: cancellationToken);
 
             return context.Output.Write(
-                await OsduJson.ToJsonAsync(result),
+                await OsduJson.ToJsonAsync(result, cancellationToken),
                 OutputSpec.Table(null, ("Session", "id"), ("State", "state"), ("Mode", "mode"), ("FromVersion", "fromVersion"), ("Expiry", "expiry")));
         }, cancellationToken));
 
@@ -2384,7 +2384,7 @@ public static partial class WellboreDdmsCommands
             var result = await context.Client.WellboreDdms.Ddms.V3.Welllogs[recordId].Sessions.PostAsync(body, cancellationToken: cancellationToken);
 
             return context.Output.Write(
-                await OsduJson.ToJsonAsync(result),
+                await OsduJson.ToJsonAsync(result, cancellationToken),
                 OutputSpec.Table(null, ("Session", "id"), ("State", "state"), ("Mode", "mode"), ("FromVersion", "fromVersion"), ("Expiry", "expiry")));
         }, cancellationToken));
 
@@ -2432,7 +2432,7 @@ public static partial class WellboreDdmsCommands
             var result = await context.Client.WellboreDdms.Ddms.V3.Welllogs[recordId].Sessions[sessionId].PatchAsync(body, cancellationToken: cancellationToken);
 
             return context.Output.Write(
-                await OsduJson.ToJsonAsync(result),
+                await OsduJson.ToJsonAsync(result, cancellationToken),
                 OutputSpec.Table(null, ("Session", "id"), ("State", "state"), ("Version", "version")));
         }, cancellationToken));
 
@@ -2460,7 +2460,7 @@ public static partial class WellboreDdmsCommands
             var result = await context.Client.WellboreDdms.Ddms.V3.Wellboretrajectories[recordId].Sessions.GetAsync(cancellationToken: cancellationToken);
 
             return context.Output.Write(
-                await OsduJson.ToJsonAsync(result),
+                await OsduJson.ToJsonAsync(result, cancellationToken),
                 OutputSpec.Table(null, ("Session", "id"), ("State", "state"), ("Mode", "mode"), ("FromVersion", "fromVersion"), ("Expiry", "expiry")));
         }, cancellationToken));
 
@@ -2495,7 +2495,7 @@ public static partial class WellboreDdmsCommands
             var result = await context.Client.WellboreDdms.Ddms.V3.Wellboretrajectories[recordId].Sessions[sessionId].GetAsync(cancellationToken: cancellationToken);
 
             return context.Output.Write(
-                await OsduJson.ToJsonAsync(result),
+                await OsduJson.ToJsonAsync(result, cancellationToken),
                 OutputSpec.Table(null, ("Session", "id"), ("State", "state"), ("Mode", "mode"), ("FromVersion", "fromVersion"), ("Expiry", "expiry")));
         }, cancellationToken));
 
@@ -2552,7 +2552,7 @@ public static partial class WellboreDdmsCommands
             var result = await context.Client.WellboreDdms.Ddms.V3.Wellboretrajectories[recordId].Sessions.PostAsync(body, cancellationToken: cancellationToken);
 
             return context.Output.Write(
-                await OsduJson.ToJsonAsync(result),
+                await OsduJson.ToJsonAsync(result, cancellationToken),
                 OutputSpec.Table(null, ("Session", "id"), ("State", "state"), ("Mode", "mode"), ("FromVersion", "fromVersion"), ("Expiry", "expiry")));
         }, cancellationToken));
 
@@ -2600,7 +2600,7 @@ public static partial class WellboreDdmsCommands
             var result = await context.Client.WellboreDdms.Ddms.V3.Wellboretrajectories[recordId].Sessions[sessionId].PatchAsync(body, cancellationToken: cancellationToken);
 
             return context.Output.Write(
-                await OsduJson.ToJsonAsync(result),
+                await OsduJson.ToJsonAsync(result, cancellationToken),
                 OutputSpec.Table(null, ("Session", "id"), ("State", "state"), ("Version", "version")));
         }, cancellationToken));
 
@@ -2628,7 +2628,7 @@ public static partial class WellboreDdmsCommands
             var result = await context.Client.WellboreDdms.Ddms.V3.Ppfgdataset[recordId].Sessions.GetAsync(cancellationToken: cancellationToken);
 
             return context.Output.Write(
-                await OsduJson.ToJsonAsync(result),
+                await OsduJson.ToJsonAsync(result, cancellationToken),
                 OutputSpec.Table(null, ("Session", "id"), ("State", "state"), ("Mode", "mode"), ("FromVersion", "fromVersion"), ("Expiry", "expiry")));
         }, cancellationToken));
 
@@ -2663,7 +2663,7 @@ public static partial class WellboreDdmsCommands
             var result = await context.Client.WellboreDdms.Ddms.V3.Ppfgdataset[recordId].Sessions[sessionId].GetAsync(cancellationToken: cancellationToken);
 
             return context.Output.Write(
-                await OsduJson.ToJsonAsync(result),
+                await OsduJson.ToJsonAsync(result, cancellationToken),
                 OutputSpec.Table(null, ("Session", "id"), ("State", "state"), ("Mode", "mode"), ("FromVersion", "fromVersion"), ("Expiry", "expiry")));
         }, cancellationToken));
 
@@ -2720,7 +2720,7 @@ public static partial class WellboreDdmsCommands
             var result = await context.Client.WellboreDdms.Ddms.V3.Ppfgdataset[recordId].Sessions.PostAsync(body, cancellationToken: cancellationToken);
 
             return context.Output.Write(
-                await OsduJson.ToJsonAsync(result),
+                await OsduJson.ToJsonAsync(result, cancellationToken),
                 OutputSpec.Table(null, ("Session", "id"), ("State", "state"), ("Mode", "mode"), ("FromVersion", "fromVersion"), ("Expiry", "expiry")));
         }, cancellationToken));
 
@@ -2768,7 +2768,7 @@ public static partial class WellboreDdmsCommands
             var result = await context.Client.WellboreDdms.Ddms.V3.Ppfgdataset[recordId].Sessions[sessionId].PatchAsync(body, cancellationToken: cancellationToken);
 
             return context.Output.Write(
-                await OsduJson.ToJsonAsync(result),
+                await OsduJson.ToJsonAsync(result, cancellationToken),
                 OutputSpec.Table(null, ("Session", "id"), ("State", "state"), ("Version", "version")));
         }, cancellationToken));
 
@@ -2796,7 +2796,7 @@ public static partial class WellboreDdmsCommands
             var result = await context.Client.WellboreDdms.Ddms.V3.Wellpressuretestrawmeasurement[recordId].Sessions.GetAsync(cancellationToken: cancellationToken);
 
             return context.Output.Write(
-                await OsduJson.ToJsonAsync(result),
+                await OsduJson.ToJsonAsync(result, cancellationToken),
                 OutputSpec.Table(null, ("Session", "id"), ("State", "state"), ("Mode", "mode"), ("FromVersion", "fromVersion"), ("Expiry", "expiry")));
         }, cancellationToken));
 
@@ -2831,7 +2831,7 @@ public static partial class WellboreDdmsCommands
             var result = await context.Client.WellboreDdms.Ddms.V3.Wellpressuretestrawmeasurement[recordId].Sessions[sessionId].GetAsync(cancellationToken: cancellationToken);
 
             return context.Output.Write(
-                await OsduJson.ToJsonAsync(result),
+                await OsduJson.ToJsonAsync(result, cancellationToken),
                 OutputSpec.Table(null, ("Session", "id"), ("State", "state"), ("Mode", "mode"), ("FromVersion", "fromVersion"), ("Expiry", "expiry")));
         }, cancellationToken));
 
@@ -2888,7 +2888,7 @@ public static partial class WellboreDdmsCommands
             var result = await context.Client.WellboreDdms.Ddms.V3.Wellpressuretestrawmeasurement[recordId].Sessions.PostAsync(body, cancellationToken: cancellationToken);
 
             return context.Output.Write(
-                await OsduJson.ToJsonAsync(result),
+                await OsduJson.ToJsonAsync(result, cancellationToken),
                 OutputSpec.Table(null, ("Session", "id"), ("State", "state"), ("Mode", "mode"), ("FromVersion", "fromVersion"), ("Expiry", "expiry")));
         }, cancellationToken));
 
@@ -2936,7 +2936,7 @@ public static partial class WellboreDdmsCommands
             var result = await context.Client.WellboreDdms.Ddms.V3.Wellpressuretestrawmeasurement[recordId].Sessions[sessionId].PatchAsync(body, cancellationToken: cancellationToken);
 
             return context.Output.Write(
-                await OsduJson.ToJsonAsync(result),
+                await OsduJson.ToJsonAsync(result, cancellationToken),
                 OutputSpec.Table(null, ("Session", "id"), ("State", "state"), ("Version", "version")));
         }, cancellationToken));
 
@@ -2971,7 +2971,7 @@ public static partial class WellboreDdmsCommands
             var result = await context.Client.WellboreDdms.Ddms.V3.Welllogs[recordId].Versions[version].Data.Statistics.PostAsync(cancellationToken: cancellationToken);
 
             return context.Output.Write(
-                await OsduJson.ToJsonAsync(result),
+                await OsduJson.ToJsonAsync(result, cancellationToken),
                 OutputSpec.Raw);
         }, cancellationToken));
 

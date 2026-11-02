@@ -56,7 +56,7 @@ public static partial class CrsConversionCommands
             var result = await context.Client.CrsConversion.V4.Convert.PostAsync(body, cancellationToken: cancellationToken);
 
             return context.Output.Write(
-                await OsduJson.ToJsonAsync(result),
+                await OsduJson.ToJsonAsync(result, cancellationToken),
                 OutputSpec.Raw);
         }, cancellationToken));
 
@@ -86,7 +86,7 @@ public static partial class CrsConversionCommands
             var result = await context.Client.CrsConversion.V4.ConvertTrajectory.PostAsync(body, cancellationToken: cancellationToken);
 
             return context.Output.Write(
-                await OsduJson.ToJsonAsync(result),
+                await OsduJson.ToJsonAsync(result, cancellationToken),
                 OutputSpec.Raw);
         }, cancellationToken));
 
@@ -116,7 +116,7 @@ public static partial class CrsConversionCommands
             var result = await context.Client.CrsConversion.V4.ConvertGeoJson.PostAsync(body, cancellationToken: cancellationToken);
 
             return context.Output.Write(
-                await OsduJson.ToJsonAsync(result),
+                await OsduJson.ToJsonAsync(result, cancellationToken),
                 OutputSpec.Raw);
         }, cancellationToken));
 

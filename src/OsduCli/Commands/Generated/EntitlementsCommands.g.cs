@@ -63,7 +63,7 @@ public static partial class EntitlementsCommands
             }, cancellationToken);
 
             return context.Output.Write(
-                await OsduJson.ToJsonAsync(result),
+                await OsduJson.ToJsonAsync(result, cancellationToken),
                 OutputSpec.Table("groups", ("Email", "email"), ("Name", "name"), ("Description", "description")));
         }, cancellationToken));
 
@@ -104,7 +104,7 @@ public static partial class EntitlementsCommands
             var result = await context.Client.Entitlements.Groups.PostAsync(body, cancellationToken: cancellationToken);
 
             return context.Output.Write(
-                await OsduJson.ToJsonAsync(result),
+                await OsduJson.ToJsonAsync(result, cancellationToken),
                 OutputSpec.Table(null, ("Email", "email"), ("Name", "name")));
         }, cancellationToken));
 
@@ -187,7 +187,7 @@ public static partial class EntitlementsCommands
             }, cancellationToken);
 
             return context.Output.Write(
-                await OsduJson.ToJsonAsync(result),
+                await OsduJson.ToJsonAsync(result, cancellationToken),
                 OutputSpec.Table("members", ("Email", "email"), ("Role", "role")));
         }, cancellationToken));
 
@@ -236,7 +236,7 @@ public static partial class EntitlementsCommands
             var result = await context.Client.Entitlements.Groups[groupEmail].Members.PostAsync(body, cancellationToken: cancellationToken);
 
             return context.Output.Write(
-                await OsduJson.ToJsonAsync(result),
+                await OsduJson.ToJsonAsync(result, cancellationToken),
                 OutputSpec.Table(null, ("Email", "email"), ("Role", "role")));
         }, cancellationToken));
 
@@ -319,7 +319,7 @@ public static partial class EntitlementsCommands
             }, cancellationToken);
 
             return context.Output.Write(
-                await OsduJson.ToJsonAsync(result),
+                await OsduJson.ToJsonAsync(result, cancellationToken),
                 OutputSpec.Raw);
         }, cancellationToken));
 
@@ -373,7 +373,7 @@ public static partial class EntitlementsCommands
             }, cancellationToken);
 
             return context.Output.Write(
-                await OsduJson.ToJsonAsync(result),
+                await OsduJson.ToJsonAsync(result, cancellationToken),
                 OutputSpec.Table("groups", ("Email", "email"), ("Name", "name"), ("Role", "role")));
         }, cancellationToken));
 

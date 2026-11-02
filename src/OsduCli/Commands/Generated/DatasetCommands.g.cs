@@ -62,7 +62,7 @@ public static partial class DatasetCommands
             }, cancellationToken);
 
             return context.Output.Write(
-                await OsduJson.ToJsonAsync(result),
+                await OsduJson.ToJsonAsync(result, cancellationToken),
                 OutputSpec.Table("datasetRegistries", ("Id", "id"), ("Kind", "kind")));
         }, cancellationToken, "service.storage.creator, service.storage.admin or service.storage.viewer"));
 
@@ -93,7 +93,7 @@ public static partial class DatasetCommands
             var result = await context.Client.Dataset.RegisterDataset.PutAsync(body, cancellationToken: cancellationToken);
 
             return context.Output.Write(
-                await OsduJson.ToJsonAsync(result),
+                await OsduJson.ToJsonAsync(result, cancellationToken),
                 OutputSpec.Table("datasetRegistries", ("Id", "id"), ("Kind", "kind")));
         }, cancellationToken, "service.storage.creator or service.storage.admin"));
 
@@ -160,7 +160,7 @@ public static partial class DatasetCommands
             var result = await context.Client.Dataset.MetadataRecord[id].Undelete.PostAsync(cancellationToken: cancellationToken);
 
             return context.Output.Write(
-                await OsduJson.ToJsonAsync(result),
+                await OsduJson.ToJsonAsync(result, cancellationToken),
                 OutputSpec.Raw);
         }, cancellationToken, "service.storage.creator or service.storage.admin"));
 
@@ -199,7 +199,7 @@ public static partial class DatasetCommands
             }, cancellationToken);
 
             return context.Output.Write(
-                await OsduJson.ToJsonAsync(result),
+                await OsduJson.ToJsonAsync(result, cancellationToken),
                 OutputSpec.Raw);
         }, cancellationToken, "service.dataset.editors"));
 
@@ -238,7 +238,7 @@ public static partial class DatasetCommands
             }, cancellationToken);
 
             return context.Output.Write(
-                await OsduJson.ToJsonAsync(result),
+                await OsduJson.ToJsonAsync(result, cancellationToken),
                 OutputSpec.Raw);
         }, cancellationToken, "service.dataset.viewers"));
 
