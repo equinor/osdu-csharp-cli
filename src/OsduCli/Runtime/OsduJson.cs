@@ -76,10 +76,30 @@ public static class OsduJson
             value, serializeOnlyChangedValues: true, cancellationToken);
 
     /// <summary>Whether <paramref name="text"/> is an HTML document rather than text that mentions one.</summary>
+    /// <remarks>
+    /// What may come before the document's start is skipped: comments, which gateways put above
+    /// their pages, and the XML declaration an XHTML page opens with.
+    /// </remarks>
     private static bool IsHtmlPage(string text)
     {
         var start = text.AsSpan().TrimStart();
+        while (Prolog(start) is var skipped and > 0)
+            start = start[skipped..].TrimStart();
+
         return start.StartsWith("<!doctype html", StringComparison.OrdinalIgnoreCase)
             || start.StartsWith("<html", StringComparison.OrdinalIgnoreCase);
+    }
+
+    /// <summary>The length of the comment or XML declaration <paramref name="text"/> starts with, or 0.</summary>
+    private static int Prolog(ReadOnlySpan<char> text)
+    {
+        foreach (var (open, close) in new[] { ("<!--", "-->"), ("<?xml", "?>") })
+        {
+            if (!text.StartsWith(open, StringComparison.OrdinalIgnoreCase)) continue;
+            var end = text[open.Length..].IndexOf(close, StringComparison.Ordinal);
+            return end < 0 ? 0 : open.Length + end + close.Length;
+        }
+
+        return 0;
     }
 }

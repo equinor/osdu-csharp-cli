@@ -31,6 +31,9 @@ public class StreamResponseTests
     [Theory]
     [InlineData("<!DOCTYPE html><html><head><title>Sign in to your account</title></head></html>")]
     [InlineData("\n  <html><title>Sign in to your account</title></html>")]
+    [InlineData("<!-- header --><!DOCTYPE html><html><title>Sign in to your account</title></html>")]
+    [InlineData("<!-- gateway -->\n<!-- v2 -->\n<html><title>Sign in to your account</title></html>")]
+    [InlineData("""<?xml version="1.0" encoding="utf-8"?><!DOCTYPE html><html><title>Sign in to your account</title></html>""")]
     public async Task AnHtmlPageIsReportedNotPrinted(string page)
     {
         // A sign-in screen answered with 200 is not the reindex having started.
@@ -41,10 +44,12 @@ public class StreamResponseTests
             exception.Message);
     }
 
-    [Fact]
-    public async Task TextThatOnlyMentionsMarkupIsStillText() =>
-        Assert.Equal("Use <html> output",
-            JsonSerializer.Deserialize<string>((await OsduJson.ToJsonAsync(Body("Use <html> output")))!));
+    [Theory]
+    [InlineData("Use <html> output")]
+    // A comment that never closes is not a prolog, so nothing after it is taken for a page.
+    [InlineData("<!-- unterminated <html>")]
+    public async Task TextThatOnlyMentionsMarkupIsStillText(string text) =>
+        Assert.Equal(text, JsonSerializer.Deserialize<string>((await OsduJson.ToJsonAsync(Body(text)))!));
 
     [Fact]
     public async Task ReadingStopsWhenTheCommandIsCancelled()
