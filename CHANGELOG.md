@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.20.4](https://github.com/equinor/osdu-csharp-cli/compare/v0.20.3...v0.20.4) (2026-11-09)
+
+
+### Dependencies
+
+* bump the github-actions group with 3 updates ([#88](https://github.com/equinor/osdu-csharp-cli/issues/88)) ([7f6966b](https://github.com/equinor/osdu-csharp-cli/commit/7f6966bb952c3700502f1f40a9918129aec389be))
+
 ## [0.20.3](https://github.com/equinor/osdu-csharp-cli/compare/v0.20.2...v0.20.3) (2026-11-02)
 
 
