@@ -9,7 +9,7 @@ frequent tasks: upgrading the client library, adding a service and releasing.
 
 ## Prerequisites
 
-- **.NET 10 SDK.**
+- **.NET 11 SDK.**
 - **Python 3** with the generator's dependencies: `pip install -r requirements-dev.txt`.
 - **Read access to GitHub Packages.** The CLI is built on
   [`Equinor.OsduCsharpClient`](https://github.com/equinor/osdu-csharp-client), which is
