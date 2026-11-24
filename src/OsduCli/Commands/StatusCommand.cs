@@ -88,7 +88,7 @@ public static class StatusCommand
         ("unit", async (context, cancellationToken) =>
             await OsduJson.ToJsonAsync(
                 await context.Client.UnitV3.V3.Info.GetAsync(cancellationToken: cancellationToken))),
-        // Wellbore DDMS serves /about, not /info; the payload carries the same version fields.
+        // Keep /about for deployments that predate /ddms/v3/info.
         ("wellbore-ddms", async (context, cancellationToken) =>
             await OsduJson.ToJsonAsync(
                 await context.Client.WellboreDdms.About.GetAsync(cancellationToken: cancellationToken))),

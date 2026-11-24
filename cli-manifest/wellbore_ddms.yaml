@@ -36,8 +36,7 @@ description: Wellbore DDMS — typed wellbore records.
 # page, crowding out `record`, `schema` and `search`. They get their own section.
 section: Wellbore DDMS
 
-# Every typed resource under /ddms/v3. The bulk write operations inside these prefixes are
-# claimed by `exclude:` below, not left unscoped.
+# Cover every typed resource under /ddms/v3; account for non-record endpoints in `exclude`.
 scope:
   - "/ddms/v3/*"
 
@@ -973,4 +972,8 @@ handwritten:
     op: { method: post, path: "/ddms/v3/wellpressuretestrawmeasurement/{record_id}/sessions/{session_id}/data" }
     reason: Sends a JSON or Parquet file as a chunk, as it is. Commands/WellboreBulkWrite.cs.
 
-exclude: []
+exclude:
+  - op: { method: get, path: /ddms/v3/info }
+    reason: >
+      Service information belongs in `osducs status wellbore-ddms`, which uses /about
+      for compatibility with deployments that predate /ddms/v3/info.
