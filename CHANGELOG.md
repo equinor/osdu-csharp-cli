@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.20.5](https://github.com/equinor/osdu-csharp-cli/compare/v0.20.4...v0.20.5) (2026-11-24)
+
+
+### Dependencies
+
+* bump the github-actions group across 1 directory with 4 updates ([#91](https://github.com/equinor/osdu-csharp-cli/issues/91)) ([7f439f5](https://github.com/equinor/osdu-csharp-cli/commit/7f439f567bf7b5f3b693e0bccabbdfb0da9bd5f6))
+* bump the OSDU C# client to 3.0.3 and target .NET 11 ([#93](https://github.com/equinor/osdu-csharp-cli/issues/93)) ([1f31c7a](https://github.com/equinor/osdu-csharp-cli/commit/1f31c7ab559a9d6e97e2d77bd5643645b8d1116c))
+
 ## [0.20.4](https://github.com/equinor/osdu-csharp-cli/compare/v0.20.3...v0.20.4) (2026-11-09)
 
 
