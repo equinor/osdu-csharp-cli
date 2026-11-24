@@ -113,8 +113,8 @@ public static partial class LegalCommands
             CliRunner.RunAsync(parseResult, async (context, cancellationToken) =>
         {
             var bodyJson = await CliContext.ReadBodyFileAsync(parseResult.GetValue(fileOption)!, cancellationToken);
-            var body = await KiotaJsonSerializer.DeserializeAsync<LegalTagDto>(
-                bodyJson, LegalTagDto.CreateFromDiscriminatorValue, cancellationToken);
+            var body = await KiotaJsonSerializer.DeserializeAsync<CreateLegalTag>(
+                bodyJson, CreateLegalTag.CreateFromDiscriminatorValue, cancellationToken);
 
             var result = await context.Client.Legal.Legaltags.PostAsync(body, cancellationToken: cancellationToken);
 
