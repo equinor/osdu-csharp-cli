@@ -9,6 +9,7 @@ using Equinor.OsduCsharpClient.Facade;
 using Microsoft.Kiota.Abstractions;
 using Microsoft.Kiota.Abstractions.Authentication;
 using Microsoft.Kiota.Http.HttpClientLibrary;
+using Microsoft.Kiota.Serialization.Json;
 using Xunit;
 
 namespace OsduCli.Tests;
@@ -24,6 +25,15 @@ public sealed class WellboreBulkWriteTests : IDisposable
     private static readonly WellboreBulkWrite.Entity WellLog = WellboreBulkWrite.Entities[0];
 
     private readonly DirectoryInfo _directory = Directory.CreateTempSubdirectory("osducs-bulk-");
+
+    // What CliContext.Create registers before a command runs. Kiota's registries are
+    // process-wide, so without this a test passes only when another test registered first.
+    public WellboreBulkWriteTests()
+    {
+        ApiClientBuilder.RegisterDefaultSerializer<JsonSerializationWriterFactory>();
+        ApiClientBuilder.RegisterDefaultDeserializer<JsonParseNodeFactory>();
+        TextBodyParseNodeFactory.Register();
+    }
 
     public void Dispose() => _directory.Delete(recursive: true);
 
