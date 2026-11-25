@@ -65,6 +65,7 @@ public static class IndexGapsCommand
     internal const string MissingFromSearch = "not in search";
     internal const string MissingFromStorage = "not in storage";
     internal const string NoAccess = "no access";
+    internal const string OtherKind = "other kind in storage";
 
     /// <summary>The most ids Storage's batch fetch takes per request.</summary>
     internal const int FetchBatch = 100;
@@ -173,29 +174,43 @@ public static class IndexGapsCommand
             progress?.WriteLine($"Looking up {Count(differing.Count)} difference(s) in Search again");
         var nowIndexed = await IndexedNowAsync(search, kind, differing, cancellationToken);
 
-        // What Storage still has and lets the caller read, among the records Search lacks.
+        // Both sides are fetched from Storage, which applies the ACL and says what each record
+        // is now: Search lacking one may be its ACL, Storage's list lacking one may be that it
+        // moved to another kind.
         var candidates = notIndexed.Where(id => !nowIndexed.Contains(id)).ToList();
+        var orphans = notStored.Where(nowIndexed.Contains).ToList();
         var readable = new Dictionary<string, string?>(StringComparer.Ordinal);
         var deleted = new HashSet<string>(StringComparer.Ordinal);
-        if (candidates.Count > 0)
+        var toFetch = candidates.Concat(orphans).ToList();
+        if (toFetch.Count > 0)
         {
-            progress?.WriteLine($"Fetching the {Count(candidates.Count)} Search lacks from Storage");
-            await FetchAsync(storage, candidates, readable, deleted, cancellationToken);
+            progress?.WriteLine($"Fetching {Count(toFetch.Count)} difference(s) from Storage");
+            await FetchAsync(storage, toFetch, readable, deleted, cancellationToken);
         }
 
-        // The last look, after the fetch: a record indexed meanwhile is no gap.
-        var gone = await IndexedNowAsync(search, kind, [.. readable.Keys], cancellationToken);
+        // The last look, after the fetch, at both sides.
+        var stillIndexed = await IndexedNowAsync(search, kind,
+            [.. candidates.Where(readable.ContainsKey), .. orphans], cancellationToken);
 
         var gaps = new JsonArray();
         foreach (var id in candidates.Order(StringComparer.Ordinal))
         {
             // Deleted since the list, now of another kind, or indexed since: not a gap of this kind.
-            if (deleted.Contains(id) || gone.Contains(id) || (readable.TryGetValue(id, out var of) && of != kind))
+            if (deleted.Contains(id) || stillIndexed.Contains(id) || (readable.TryGetValue(id, out var of) && of != kind))
                 continue;
             gaps.Add(new JsonObject { ["id"] = id, ["gap"] = readable.ContainsKey(id) ? MissingFromSearch : NoAccess });
         }
-        foreach (var id in notStored.Where(nowIndexed.Contains).Order(StringComparer.Ordinal))
-            gaps.Add(new JsonObject { ["id"] = id, ["gap"] = MissingFromStorage });
+        foreach (var id in orphans.Where(stillIndexed.Contains).Order(StringComparer.Ordinal))
+        {
+            string? gap = deleted.Contains(id) ? MissingFromStorage
+                : !readable.TryGetValue(id, out var now) ? NoAccess
+                // In Storage, but no longer of this kind: its old index entry is left over.
+                : now != kind ? OtherKind
+                // Of this kind after all: written after Storage was listed.
+                : null;
+            if (gap is not null)
+                gaps.Add(new JsonObject { ["id"] = id, ["gap"] = gap });
+        }
 
         return new JsonObject
         {
@@ -270,6 +285,7 @@ public static class IndexGapsCommand
     /// <summary>An id's entity type, its second part, or null when it has none.</summary>
     private static string? EntityType(string id) =>
         id.Split(':') is { Length: >= 3 } parts && parts[0].Length > 0 && parts[1].Length > 0 && parts[2].Length > 0
+            && !parts[1].Contains('*')
             ? parts[1] : null;
 
     /// <summary>
@@ -289,7 +305,7 @@ public static class IndexGapsCommand
             for (var attempt = 0; attempt < FetchAttempts && pending.Count > 0; attempt++)
             {
                 var result = await storage.Query.Records.PostAsync(
-                    new StorageModels.MultiRecordIds { Records = pending }, cancellationToken: cancellationToken);
+                    new StorageModels.MultiRecordIds { Records = pending, Attributes = [NoDataAttribute] }, cancellationToken: cancellationToken);
                 foreach (var record in result?.Records ?? [])
                     if (record.Id is { } id)
                         stored[id] = record.Kind;
@@ -302,6 +318,13 @@ public static class IndexGapsCommand
                     $"so the check is incomplete. Run it again. The first: {pending[0]}");
         }
     }
+
+    /// <summary>
+    /// A data attribute no record has. Storage keeps only the named <c>data.*</c> fields and
+    /// always returns the record's metadata, so this fetches id, kind and ACL without the data:
+    /// smaller, and nothing from it, such as a signed file URL, can reach a <c>--debug</c> log.
+    /// </summary>
+    internal const string NoDataAttribute = "data.osducs-index-gaps-no-data";
 
     /// <summary>How often a batch is fetched while Storage answers some of it with retryRecords.</summary>
     internal const int FetchAttempts = 3;
@@ -389,20 +412,24 @@ public static class IndexGapsCommand
         var missing = Ids(report, MissingFromSearch).Count;
         var orphaned = Ids(report, MissingFromStorage).Count;
         var unreadable = Ids(report, NoAccess).Count;
+        var moved = Ids(report, OtherKind).Count;
         var listed = report["listedCount"] is not null;
         var line = new StringBuilder().Append(listed
             ? $"Checked {Count(report["listedCount"]!.GetValue<int>())} record(s): Search has {Count(report["searchCount"]!.GetValue<int>())}. "
             : $"Storage has {Count(report["storageCount"]!.GetValue<int>())}, Search has {Count(report["searchCount"]!.GetValue<int>())}. ");
-        if (missing == 0 && orphaned == 0 && unreadable == 0)
+        if (missing == 0 && orphaned == 0 && unreadable == 0 && moved == 0)
             return line.Append("No gaps.").ToString();
         line.Append(CultureInfo.InvariantCulture, $"{Count(missing)} not in Search, {Count(orphaned)} not in Storage");
-        line.Append(listed || unreadable > 0 ? $", {Count(unreadable)} you have no access to." : ".");
+        line.Append(listed || unreadable > 0 ? $", {Count(unreadable)} you have no access to" : "");
+        line.Append(moved > 0 ? $", {Count(moved)} now of another kind." : ".");
         if (missing > 0)
             line.Append(" Records written in the last few minutes may still be indexing; --reindex re-indexes the missing ones.");
         if (orphaned > 0)
             line.Append(listed
                 ? " Records not in Storage were never written, or are deleted."
-                : " Records not in Storage are deleted or inactive there but still in the index; re-indexing does not remove them.");
+                : " Records not in Storage are deleted there but still in the index; re-indexing does not remove them.");
+        if (moved > 0)
+            line.Append(" Records now of another kind were written again under a newer kind, and this kind's index still has their old entry.");
         if (unreadable > 0)
             line.Append(" Records you have no access to are in Storage, but their ACL does not include your groups, so neither Search nor Storage shows them to you; they are not re-indexed.");
         return line.ToString();

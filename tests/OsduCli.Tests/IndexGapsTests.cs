@@ -69,6 +69,11 @@ public class IndexGapsTests
         public HashSet<string> IndexedAfterFetch { get; init; } = [];
         /// <summary>The most a Storage list page holds, whatever was asked: its limit is a most.</summary>
         public int StoragePageCap { get; init; } = int.MaxValue;
+        /// <summary>In Storage under another kind than the one listed: moved to a newer version.</summary>
+        public Dictionary<string, string> KindNow { get; init; } = [];
+        /// <summary>Gone from Search once Storage's batch fetch has been asked for them.</summary>
+        public HashSet<string> UnindexedAfterFetch { get; init; } = [];
+        public List<string?> FetchAttributes { get; } = [];
         private bool _storageAsked;
         private bool _fetched;
         public List<string> SearchKinds { get; } = [];
@@ -93,13 +98,14 @@ public class IndexGapsTests
                 var asked = body!["records"]!.AsArray().Select(id => id!.GetValue<string>()).ToList();
                 Assert.True(asked.Count <= IndexGapsCommand.FetchBatch);
                 _fetched = true;
+                FetchAttributes.AddRange(body["attributes"]?.AsArray().Select(a => a?.GetValue<string>()) ?? [null]);
                 var retry = asked.Where(id => RetryOnce.Remove(id) || RetryAlways.Contains(id)).ToList();
                 var rest = asked.Except(retry).ToList();
-                bool Exists(string id) => stored.Contains(id) && !DeletedAfterList.Contains(id);
+                bool Exists(string id) => (stored.Contains(id) || KindNow.ContainsKey(id)) && !DeletedAfterList.Contains(id);
                 response = new JsonObject
                 {
                     ["records"] = new JsonArray([.. rest.Where(id => Exists(id) && !Unreadable.Contains(id))
-                        .Select(id => (JsonNode)new JsonObject { ["id"] = id, ["kind"] = Kind })]),
+                        .Select(id => (JsonNode)new JsonObject { ["id"] = id, ["kind"] = KindNow.GetValueOrDefault(id, Kind) })]),
                     ["invalidRecords"] = new JsonArray([.. rest.Where(id => !Exists(id)).Select(id => (JsonNode)JsonValue.Create(id)!)]),
                     ["retryRecords"] = new JsonArray([.. retry.Select(id => (JsonNode)JsonValue.Create(id)!)]),
                 };
@@ -129,6 +135,8 @@ public class IndexGapsTests
                 var asked = Regex.Matches(body["query"]!.GetValue<string>(), "\"([^\"]+)\"").Select(m => m.Groups[1].Value);
                 // Late records turn up only after Storage was read, as they would during the run.
                 var now = indexed.Concat(_storageAsked ? IndexedLater : []).Concat(_fetched ? IndexedAfterFetch : []).ToHashSet();
+                if (_fetched)
+                    now.ExceptWith(UnindexedAfterFetch);
                 response = new JsonObject
                 {
                     ["results"] = new JsonArray([.. asked.Where(now.Contains).Select(id => (JsonNode)new JsonObject { ["id"] = id })]),
@@ -365,6 +373,7 @@ public class IndexGapsTests
     [InlineData("[[]]", "A JSON list of ids must hold strings")]
     [InlineData("[\"dev:a:1\"", "The list starts with [ but is not JSON")]
     [InlineData("dev:a:1\nnot-an-id\n", "1 entr(ies) are not record ids")]
+    [InlineData("dev:*:1", "1 entr(ies) are not record ids")]
     public void AMalformedListIsRefusedNamingWhy(string text, string expected) =>
         Assert.StartsWith(expected,
             Assert.Throws<Equinor.OsduCsharpClient.Facade.OsduException>(() => IndexGapsCommand.ParseIds(text)).Message,
@@ -402,6 +411,42 @@ public class IndexGapsTests
 
         Assert.Contains("the check is incomplete", error.Message, StringComparison.Ordinal);
         Assert.Equal(IndexGapsCommand.FetchAttempts, platform.Requests.Count(r => r == "POST /api/storage/v2/query/records"));
+    }
+
+    [Fact]
+    public async Task ARecordMovedToAnotherKindIsNotCalledMissingFromStorage()
+    {
+        // 2 is in this kind's index, but Storage lists it under 1.1.0 now.
+        var platform = new Platform(Wells(0, 2), Wells(0, 3))
+        {
+            KindNow = new() { ["dev:master-data--Well:2"] = "osdu:wks:master-data--Well:1.1.0" },
+        };
+
+        var report = await Find(platform);
+
+        Assert.Equal(["dev:master-data--Well:2"], IndexGapsCommand.Ids(report, IndexGapsCommand.OtherKind));
+        Assert.Empty(IndexGapsCommand.Ids(report, IndexGapsCommand.MissingFromStorage));
+        Assert.Contains("1 now of another kind.", IndexGapsCommand.Summary(report), StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task AnIndexEntryRemovedDuringTheFetchIsNoGap()
+    {
+        var platform = new Platform(Wells(0, 1), Wells(0, 3)) { UnindexedAfterFetch = ["dev:master-data--Well:2"] };
+
+        var report = await Find(platform);
+
+        Assert.Equal(["dev:master-data--Well:1"], IndexGapsCommand.Ids(report, IndexGapsCommand.MissingFromStorage));
+    }
+
+    [Fact]
+    public async Task StorageIsFetchedWithoutTheRecordsData()
+    {
+        var platform = new Platform(Wells(0, 2), []);
+
+        await Check(platform, Wells(0, 2));
+
+        Assert.Equal([IndexGapsCommand.NoDataAttribute], platform.FetchAttributes);
     }
 
     [Fact]
