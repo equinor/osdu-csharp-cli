@@ -63,6 +63,14 @@ public class IndexGapsTests
         public HashSet<string> Unreadable { get; init; } = [];
         /// <summary>Answered as retryRecords the first time they are fetched.</summary>
         public HashSet<string> RetryOnce { get; init; } = [];
+        /// <summary>Answered as retryRecords every time.</summary>
+        public HashSet<string> RetryAlways { get; init; } = [];
+        /// <summary>Indexed only once Storage's batch fetch has been asked for them.</summary>
+        public HashSet<string> IndexedAfterFetch { get; init; } = [];
+        /// <summary>The most a Storage list page holds, whatever was asked: its limit is a most.</summary>
+        public int StoragePageCap { get; init; } = int.MaxValue;
+        private bool _storageAsked;
+        private bool _fetched;
         public List<string> SearchKinds { get; } = [];
         /// <summary>Listed by Storage, then deleted before the batch fetch.</summary>
         public HashSet<string> DeletedAfterList { get; init; } = [];
@@ -76,13 +84,16 @@ public class IndexGapsTests
             var path = request.RequestUri!.AbsolutePath;
             var body = request.Content is null ? null : JsonNode.Parse(await request.Content.ReadAsStringAsync(cancellationToken));
             Requests.Add($"{request.Method} {path}");
+            if (path.Contains("/api/storage/", StringComparison.Ordinal))
+                _storageAsked = true;
 
             JsonObject response;
             if (path.EndsWith("/query/records", StringComparison.Ordinal) && request.Method == HttpMethod.Post)
             {
                 var asked = body!["records"]!.AsArray().Select(id => id!.GetValue<string>()).ToList();
                 Assert.True(asked.Count <= IndexGapsCommand.FetchBatch);
-                var retry = asked.Where(RetryOnce.Remove).ToList();
+                _fetched = true;
+                var retry = asked.Where(id => RetryOnce.Remove(id) || RetryAlways.Contains(id)).ToList();
                 var rest = asked.Except(retry).ToList();
                 bool Exists(string id) => stored.Contains(id) && !DeletedAfterList.Contains(id);
                 response = new JsonObject
@@ -104,7 +115,7 @@ public class IndexGapsTests
             {
                 var query = HttpUtility.ParseQueryString(request.RequestUri.Query);
                 Assert.Equal(Kind, query["kind"]);
-                response = Page(stored, query["cursor"], int.Parse(query["limit"]!), id => JsonValue.Create(id)!);
+                response = Page(stored, query["cursor"], Math.Min(StoragePageCap, int.Parse(query["limit"]!)), id => JsonValue.Create(id)!);
             }
             else if (path.EndsWith("/query_with_cursor", StringComparison.Ordinal))
             {
@@ -116,7 +127,8 @@ public class IndexGapsTests
             {
                 SearchKinds.Add(body!["kind"]!.GetValue<string>());
                 var asked = Regex.Matches(body["query"]!.GetValue<string>(), "\"([^\"]+)\"").Select(m => m.Groups[1].Value);
-                var now = indexed.Concat(IndexedLater).ToHashSet();
+                // Late records turn up only after Storage was read, as they would during the run.
+                var now = indexed.Concat(_storageAsked ? IndexedLater : []).Concat(_fetched ? IndexedAfterFetch : []).ToHashSet();
                 response = new JsonObject
                 {
                     ["results"] = new JsonArray([.. asked.Where(now.Contains).Select(id => (JsonNode)new JsonObject { ["id"] = id })]),
@@ -333,7 +345,6 @@ public class IndexGapsTests
 
     [Theory]
     [InlineData("dev:work-product-component--WellLog:OmegaSor-CompLog-34-4-19S:1", "*:*:work-product-component--WellLog:*")]
-    [InlineData("not-an-id", "*:*:*:*")]
     public void AnIdsKindIsItsEntityType(string id, string kind) =>
         Assert.Equal(kind, IndexGapsCommand.KindOf(id));
 
@@ -347,6 +358,50 @@ public class IndexGapsTests
     {
         Assert.Equal(["dev:a:1", "dev:a:2"], IndexGapsCommand.ParseIds("[\"dev:a:1\", \"dev:a:2\"]"));
         Assert.Equal(["dev:a:1"], IndexGapsCommand.ParseIds("[{\"id\": \"dev:a:1\", \"kind\": \"x\"}]"));
+    }
+
+    [Theory]
+    [InlineData("[123]", "A JSON list of ids must hold strings")]
+    [InlineData("[[]]", "A JSON list of ids must hold strings")]
+    [InlineData("[\"dev:a:1\"", "The list starts with [ but is not JSON")]
+    [InlineData("dev:a:1\nnot-an-id\n", "1 entr(ies) are not record ids")]
+    public void AMalformedListIsRefusedNamingWhy(string text, string expected) =>
+        Assert.StartsWith(expected,
+            Assert.Throws<Equinor.OsduCsharpClient.Facade.OsduException>(() => IndexGapsCommand.ParseIds(text)).Message,
+            StringComparison.Ordinal);
+
+    [Fact]
+    public async Task AShortStoragePageWithACursorIsNotTheEnd()
+    {
+        var wells = Wells(0, 2500);
+        var platform = new Platform(wells, wells) { StoragePageCap = 400 };
+
+        var report = await Find(platform);
+
+        Assert.Equal(2500, report["storageCount"]!.GetValue<int>());
+        Assert.Empty(report["results"]!.AsArray());
+        Assert.Equal(7, platform.Requests.Count(r => r == "GET /api/storage/v2/query/records"));
+    }
+
+    [Fact]
+    public async Task ARecordIndexedWhileStorageIsFetchedIsNoGap()
+    {
+        var platform = new Platform(Wells(0, 3), Wells(0, 1)) { IndexedAfterFetch = ["dev:master-data--Well:1"] };
+
+        var report = await Find(platform);
+
+        Assert.Equal(["dev:master-data--Well:2"], IndexGapsCommand.Ids(report, IndexGapsCommand.MissingFromSearch));
+    }
+
+    [Fact]
+    public async Task ARecordStorageKeepsAskingToRetryStopsTheCheck()
+    {
+        var platform = new Platform(Wells(0, 2), []) { RetryAlways = ["dev:master-data--Well:1"] };
+
+        var error = await Assert.ThrowsAsync<Equinor.OsduCsharpClient.Facade.OsduException>(() => Check(platform, Wells(0, 2)));
+
+        Assert.Contains("the check is incomplete", error.Message, StringComparison.Ordinal);
+        Assert.Equal(IndexGapsCommand.FetchAttempts, platform.Requests.Count(r => r == "POST /api/storage/v2/query/records"));
     }
 
     [Fact]

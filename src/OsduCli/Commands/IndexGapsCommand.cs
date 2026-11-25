@@ -127,6 +127,9 @@ public static class IndexGapsCommand
 
                 var missing = Ids(report, MissingFromSearch);
                 context.Output.WriteNote(Summary(report));
+                // Written before anything is asked or re-indexed, so declining, or a failed
+                // re-index, still leaves the result of the whole scan.
+                context.Output.Write(report.ToJsonString(), SpecFor(context.Output.Format));
 
                 if (parseResult.GetValue(reindex) && missing.Count > 0)
                 {
@@ -141,9 +144,7 @@ public static class IndexGapsCommand
                         context.Output.WriteNote(
                             $"The Indexer did not find {Count(notFound.Count)} of them in Storage: {string.Join(", ", notFound.Take(10))}{(notFound.Count > 10 ? ", ..." : "")}");
                 }
-
-                // JSON keeps the counts beside the gaps; only the table shows the gaps alone.
-                return context.Output.Write(report.ToJsonString(), SpecFor(context.Output.Format));
+                return 0;
             }, cancellationToken, $"{ReadRoles}; with --reindex, {ReindexRoles}",
                 "Storage lists a kind's records only for service.storage.admin, which most users lack. Without it, " +
                 "--ids-from checks a list of record ids you have, such as what a loader wrote."));
@@ -182,11 +183,14 @@ public static class IndexGapsCommand
             await FetchAsync(storage, candidates, readable, deleted, cancellationToken);
         }
 
+        // The last look, after the fetch: a record indexed meanwhile is no gap.
+        var gone = await IndexedNowAsync(search, kind, [.. readable.Keys], cancellationToken);
+
         var gaps = new JsonArray();
         foreach (var id in candidates.Order(StringComparer.Ordinal))
         {
-            // Deleted since the list, or now of another kind: not a gap of this kind.
-            if (deleted.Contains(id) || (readable.TryGetValue(id, out var of) && of != kind))
+            // Deleted since the list, now of another kind, or indexed since: not a gap of this kind.
+            if (deleted.Contains(id) || gone.Contains(id) || (readable.TryGetValue(id, out var of) && of != kind))
                 continue;
             gaps.Add(new JsonObject { ["id"] = id, ["gap"] = readable.ContainsKey(id) ? MissingFromSearch : NoAccess });
         }
@@ -211,7 +215,7 @@ public static class IndexGapsCommand
         StorageClient storage, SearchClient search, IReadOnlyList<string> ids, TextWriter? progress, CancellationToken cancellationToken)
     {
         progress?.WriteLine($"Looking up {Count(ids.Count)} record(s) in Search");
-        var indexed = await IndexedByTypeAsync(search, ids, cancellationToken);
+        var indexed = await IndexedByTypeAsync(search, ids, KindOf, cancellationToken);
         var notIndexed = ids.Where(id => !indexed.Contains(id)).ToList();
 
         var stored = new Dictionary<string, string?>(StringComparer.Ordinal);
@@ -222,16 +226,17 @@ public static class IndexGapsCommand
             await FetchAsync(storage, notIndexed, stored, notStored, cancellationToken);
         }
 
-        var nowIndexed = await IndexedByTypeAsync(search, [.. stored.Keys], cancellationToken);
+        // The second look, at every id Search lacked, under the kind Storage gave where it gave one.
+        var nowIndexed = await IndexedByTypeAsync(search, notIndexed,
+            id => stored.TryGetValue(id, out var of) && of is not null ? of : KindOf(id), cancellationToken);
 
         var gaps = new JsonArray();
-        foreach (var id in notIndexed.Order(StringComparer.Ordinal))
+        foreach (var id in notIndexed.Where(id => !nowIndexed.Contains(id)).Order(StringComparer.Ordinal))
         {
-            var gap = stored.ContainsKey(id) ? (nowIndexed.Contains(id) ? null : MissingFromSearch)
+            var gap = stored.ContainsKey(id) ? MissingFromSearch
                 : notStored.Contains(id) ? MissingFromStorage
                 : NoAccess;
-            if (gap is not null)
-                gaps.Add(new JsonObject { ["id"] = id, ["gap"] = gap });
+            gaps.Add(new JsonObject { ["id"] = id, ["gap"] = gap });
         }
 
         return new JsonObject
@@ -248,10 +253,10 @@ public static class IndexGapsCommand
     /// with 429, as too costly, and it searches every index in the partition.
     /// </summary>
     private static async Task<HashSet<string>> IndexedByTypeAsync(
-        SearchClient search, IReadOnlyList<string> ids, CancellationToken cancellationToken)
+        SearchClient search, IReadOnlyList<string> ids, Func<string, string> kindOf, CancellationToken cancellationToken)
     {
         var found = new HashSet<string>(StringComparer.Ordinal);
-        foreach (var group in ids.GroupBy(KindOf))
+        foreach (var group in ids.GroupBy(kindOf))
             found.UnionWith(await IndexedNowAsync(search, group.Key, [.. group], cancellationToken));
         return found;
     }
@@ -260,8 +265,12 @@ public static class IndexGapsCommand
     /// The kinds a record id can belong to: <c>dev:work-product-component--WellLog:x</c> is of
     /// <c>*:*:work-product-component--WellLog:*</c>, the entity type being an id's second part.
     /// </summary>
-    internal static string KindOf(string id) =>
-        id.Split(':') is { Length: >= 3 } parts && parts[1].Length > 0 ? $"*:*:{parts[1]}:*" : "*:*:*:*";
+    internal static string KindOf(string id) => $"*:*:{EntityType(id)}:*";
+
+    /// <summary>An id's entity type, its second part, or null when it has none.</summary>
+    private static string? EntityType(string id) =>
+        id.Split(':') is { Length: >= 3 } parts && parts[0].Length > 0 && parts[1].Length > 0 && parts[2].Length > 0
+            ? parts[1] : null;
 
     /// <summary>
     /// Fetches <paramref name="ids"/> from Storage in batches and sorts them into those it
@@ -275,8 +284,9 @@ public static class IndexGapsCommand
         foreach (var batch in ids.Chunk(FetchBatch))
         {
             var pending = batch.ToList();
-            // Ids Storage asks to be retried are asked for once more, then left as unreadable.
-            for (var attempt = 0; attempt < 2 && pending.Count > 0; attempt++)
+            // Ids Storage asks to be retried are asked for again. Still pending after that, they
+            // are neither readable nor denied, so the check cannot finish rather than guess.
+            for (var attempt = 0; attempt < FetchAttempts && pending.Count > 0; attempt++)
             {
                 var result = await storage.Query.Records.PostAsync(
                     new StorageModels.MultiRecordIds { Records = pending }, cancellationToken: cancellationToken);
@@ -286,8 +296,15 @@ public static class IndexGapsCommand
                 notStored.UnionWith(result?.InvalidRecords ?? []);
                 pending = result?.RetryRecords ?? [];
             }
+            if (pending.Count > 0)
+                throw new OsduException(
+                    $"Storage asked for {Count(pending.Count)} record(s) to be fetched again {FetchAttempts} times, " +
+                    $"so the check is incomplete. Run it again. The first: {pending[0]}");
         }
     }
+
+    /// <summary>How often a batch is fetched while Storage answers some of it with retryRecords.</summary>
+    internal const int FetchAttempts = 3;
 
     /// <summary>
     /// The record ids in <paramref name="path"/>, or stdin for <c>-</c>: a JSON array of ids,
@@ -312,9 +329,18 @@ public static class IndexGapsCommand
         IEnumerable<string> ids;
         if (text.TrimStart().StartsWith('['))
         {
-            ids = (JsonNode.Parse(text) as JsonArray ?? [])
+            JsonNode? parsed;
+            try
+            {
+                parsed = JsonNode.Parse(text);
+            }
+            catch (System.Text.Json.JsonException exception)
+            {
+                throw new OsduException($"The list starts with [ but is not JSON: {exception.Message}");
+            }
+            ids = (parsed as JsonArray ?? [])
                 .Select(item => item is JsonValue value && value.TryGetValue<string>(out var id) ? id
-                    : item?["id"] is JsonValue inner && inner.TryGetValue<string>(out var nested) ? nested
+                    : item is JsonObject record && record["id"] is JsonValue inner && inner.TryGetValue<string>(out var nested) ? nested
                     : throw new OsduException("A JSON list of ids must hold strings, or objects with an \"id\"."));
         }
         else
@@ -325,6 +351,13 @@ public static class IndexGapsCommand
         var distinct = ids.Distinct(StringComparer.Ordinal).ToList();
         if (distinct.Count == 0)
             throw new OsduException("The list has no record ids.");
+        // Each is searched for under its entity type; without one, only every kind would do,
+        // which ADME refuses.
+        var malformed = distinct.Where(id => EntityType(id) is null).ToList();
+        if (malformed.Count > 0)
+            throw new OsduException(
+                $"{Count(malformed.Count)} entr(ies) are not record ids of the form <partition>:<entity type>:<id>: " +
+                string.Join(", ", malformed.Take(5).Select(id => $"\"{id}\"")) + (malformed.Count > 5 ? ", ..." : ""));
         return distinct;
     }
 
@@ -380,51 +413,110 @@ public static class IndexGapsCommand
             .Where(item => item!["gap"]!.GetValue<string>() == gap)
             .Select(item => item!["id"]!.GetValue<string>())];
 
+    /// <summary>
+    /// Every id Search has of <paramref name="kind"/>, through its cursor, page by page into
+    /// one set, so no page outlives its turn. A cursor left open by an error or an
+    /// interruption is released.
+    /// </summary>
     private static async Task<HashSet<string>> SearchIdsAsync(
         SearchClient search, string kind, TextWriter? progress, CancellationToken cancellationToken)
     {
-        var request = new JsonObject { ["kind"] = kind, ["returnedFields"] = new JsonArray("id") };
-        var json = await CursorPaging.CollectAsync(
-            request, limit: null, PageSize, "limit", "cursor", "results", "totalCount",
-            async (page, pageCancellation) => await OsduJson.ToJsonAsync(
-                await search.Query_with_cursor.PostAsync(
-                    (await KiotaJsonSerializer.DeserializeAsync<SearchModels.CursorQueryRequest>(
-                        page.ToJsonString(), SearchModels.CursorQueryRequest.CreateFromDiscriminatorValue, pageCancellation))!,
-                    cancellationToken: pageCancellation), pageCancellation),
-            (cursor, releaseCancellation) => search.Query_with_cursor[cursor].DeleteAsync(cancellationToken: releaseCancellation),
-            progress, cancellationToken);
-        return IdsOf(json, item => item?["id"]);
+        var ids = new HashSet<string>(StringComparer.Ordinal);
+        string? cursor = null;
+        long? total = null;
+        try
+        {
+            do
+            {
+                var request = new JsonObject { ["kind"] = kind, ["returnedFields"] = new JsonArray("id"), ["limit"] = PageSize };
+                if (cursor is not null)
+                    request["cursor"] = cursor;
+                var page = JsonNode.Parse(await OsduJson.ToJsonAsync(
+                    await search.Query_with_cursor.PostAsync(
+                        (await KiotaJsonSerializer.DeserializeAsync<SearchModels.CursorQueryRequest>(
+                            request.ToJsonString(), SearchModels.CursorQueryRequest.CreateFromDiscriminatorValue, cancellationToken))!,
+                        cancellationToken: cancellationToken), cancellationToken) ?? "null");
+                total ??= page?["totalCount"] is JsonValue count && count.TryGetValue<long>(out var matches) ? matches : null;
+                var received = ids.Count;
+                ids.UnionWith(IdsOf(page, item => item?["id"]));
+                cursor = page?["cursor"] is JsonValue next && next.TryGetValue<string>(out var text) && text.Length > 0 ? text : null;
+                progress?.Write($"\rRead {CursorPaging.Progress(ids.Count, total)}");
+                // An empty page ends it whatever the cursor says, rather than following it forever.
+                if (ids.Count == received)
+                    break;
+            }
+            while (cursor is not null);
+        }
+        finally
+        {
+            progress?.WriteLine();
+            if (cursor is not null)
+                await ReleaseQuietlyAsync(search, cursor);
+        }
+        return ids;
     }
 
+    private static async Task ReleaseQuietlyAsync(SearchClient search, string cursor)
+    {
+        using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(5));
+        try
+        {
+            await search.Query_with_cursor[cursor].DeleteAsync(cancellationToken: timeout.Token);
+        }
+        catch (Exception exception) when (exception is not OutOfMemoryException)
+        {
+            // The scan's own outcome is what matters; an unreleased cursor expires.
+        }
+    }
+
+    /// <summary>
+    /// Every id Storage has of <paramref name="kind"/>, page by page into one set. Storage's
+    /// limit is a most, not a promise, so a short page is not the end: only a page with no
+    /// cursor is.
+    /// </summary>
     private static async Task<HashSet<string>> StorageIdsAsync(
         StorageClient storage, string kind, TextWriter? progress, CancellationToken cancellationToken)
     {
-        var json = await CursorPaging.CollectAsync(
-            new JsonObject(), limit: null, PageSize, "limit", "cursor", "results", totalProperty: null,
-            async (page, pageCancellation) =>
+        var ids = new HashSet<string>(StringComparer.Ordinal);
+        string? cursor = null;
+        var seen = new HashSet<string>(StringComparer.Ordinal);
+        try
+        {
+            do
             {
+                StorageModels.DatastoreQueryResult? page;
                 try
                 {
-                    return await OsduJson.ToJsonAsync(await storage.Query.Records.GetAsync(configuration =>
+                    var asked = cursor;
+                    page = await storage.Query.Records.GetAsync(configuration =>
                     {
                         configuration.QueryParameters.Kind = kind;
-                        configuration.QueryParameters.Limit = page["limit"]!.GetValue<int>();
-                        configuration.QueryParameters.Cursor = page["cursor"]?.GetValue<string>();
-                    }, pageCancellation), pageCancellation);
+                        configuration.QueryParameters.Limit = PageSize;
+                        configuration.QueryParameters.Cursor = asked;
+                    }, cancellationToken);
                 }
                 // Storage answers a kind it has no records of with 404, "Kind or cursor not found".
                 // On the first page there is no cursor, so it is the kind: Storage has none, and
                 // whatever Search has of it is not in Storage. Later, it is the cursor, an error.
-                catch (ApiException exception) when (exception.ResponseStatusCode == 404 && page["cursor"] is null)
+                catch (ApiException exception) when (exception.ResponseStatusCode == 404 && cursor is null)
                 {
-                    return """{"results":[]}""";
+                    break;
                 }
-            },
-            // Storage's cursor is a continuation token, not something it holds open.
-            (_, _) => Task.CompletedTask,
-            progress, cancellationToken);
-        // Storage answers bare id strings, not objects.
-        return IdsOf(json, item => item);
+                // Storage answers bare id strings.
+                ids.UnionWith(page?.Results ?? []);
+                cursor = string.IsNullOrEmpty(page?.Cursor) ? null : page.Cursor;
+                progress?.Write($"\rRead {CursorPaging.Progress(ids.Count, null)}");
+                // A cursor seen before would read the same pages again.
+                if (cursor is not null && !seen.Add(cursor))
+                    throw new OsduException("Storage answered a cursor it had answered before, so its list cannot be read to the end.");
+            }
+            while (cursor is not null);
+        }
+        finally
+        {
+            progress?.WriteLine();
+        }
+        return ids;
     }
 
     /// <summary>Which of <paramref name="ids"/> Search has indexed now.</summary>
@@ -445,7 +537,7 @@ public static class IndexGapsCommand
                 (await KiotaJsonSerializer.DeserializeAsync<SearchModels.QueryRequest>(
                     body.ToJsonString(), SearchModels.QueryRequest.CreateFromDiscriminatorValue, cancellationToken))!,
                 cancellationToken: cancellationToken);
-            found.UnionWith(IdsOf(await OsduJson.ToJsonAsync(result, cancellationToken), item => item?["id"]));
+            found.UnionWith(IdsOf(JsonNode.Parse(await OsduJson.ToJsonAsync(result, cancellationToken) ?? "null"), item => item?["id"]));
         }
         return found;
     }
@@ -454,10 +546,10 @@ public static class IndexGapsCommand
     internal static string IdQuery(IEnumerable<string> ids) =>
         "id:(" + string.Join(" OR ", ids.Select(id => "\"" + id.Replace("\\", "\\\\").Replace("\"", "\\\"") + "\"")) + ")";
 
-    private static HashSet<string> IdsOf(string? json, Func<JsonNode?, JsonNode?> id)
+    private static HashSet<string> IdsOf(JsonNode? page, Func<JsonNode?, JsonNode?> id)
     {
         var ids = new HashSet<string>(StringComparer.Ordinal);
-        if (JsonNode.Parse(json ?? "null")?["results"] is JsonArray results)
+        if (page?["results"] is JsonArray results)
             foreach (var item in results)
                 if (id(item) is JsonValue value && value.TryGetValue<string>(out var text))
                     ids.Add(text);
