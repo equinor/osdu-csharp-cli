@@ -6,15 +6,18 @@ using Equinor.OsduCli.Runtime;
 using Equinor.OsduCsharpClient.Indexer;
 using Equinor.OsduCsharpClient.Search;
 using Equinor.OsduCsharpClient.Storage;
+using Equinor.OsduCsharpClient.Facade;
 using IndexerModels = Equinor.OsduCsharpClient.Indexer.Models;
 using SearchModels = Equinor.OsduCsharpClient.Search.Models;
+using StorageModels = Equinor.OsduCsharpClient.Storage.Models;
 using Microsoft.Kiota.Abstractions.Serialization;
 
 namespace Equinor.OsduCli.Commands;
 
 /// <summary>
 /// <c>osducs index gaps</c> — the records of a kind that Storage holds and Search has not
-/// indexed, and the other way round; with <c>--reindex</c>, re-indexes the missing ones.
+/// indexed, and the other way round; or, with <c>--ids-from</c>, which of a list of records
+/// Search lacks. With <c>--reindex</c>, re-indexes the missing ones.
 /// </summary>
 /// <remarks>
 /// <para>Search only finds records that reached the index. A record whose indexing failed
@@ -32,6 +35,13 @@ namespace Equinor.OsduCli.Commands;
 /// <para>Storage lists records only by exact kind, so the kind cannot have wildcards. Both
 /// lists are held in memory: a kind of a few million records is fine, the whole partition is
 /// not what this is for.</para>
+///
+/// <para>Listing a kind needs <c>service.storage.admin</c>, because Storage's list ignores
+/// record ACLs. <c>--ids-from</c> is the check for everyone else: the ids come from the
+/// caller, typically what a loader wrote, and each is looked up in Search, and only those
+/// Search lacks are fetched from Storage, through the batch fetch the viewer roles admit.
+/// That fetch leaves out records the caller cannot read, so those are told apart from
+/// records Storage does not have.</para>
 /// </remarks>
 public static class IndexGapsCommand
 {
@@ -46,9 +56,13 @@ public static class IndexGapsCommand
 
     internal const string MissingFromSearch = "not in search";
     internal const string MissingFromStorage = "not in storage";
+    internal const string NoAccess = "no access";
+
+    /// <summary>The most ids Storage's batch fetch takes per request.</summary>
+    internal const int FetchBatch = 100;
 
     private const string ReadRoles =
-        "service.storage.admin, and one of users.datalake.viewers, editors, admins or ops for Search";
+        "with --kind, service.storage.admin; with --ids-from, service.storage.viewer; and one of users.datalake.viewers, editors, admins or ops for Search";
     private const string ReindexRoles = "service.search.admin";
 
     private static readonly OutputSpec Columns = OutputSpec.Table("results", ("Id", "id"), ("Gap", "gap"));
@@ -57,8 +71,11 @@ public static class IndexGapsCommand
     {
         var kind = new Option<string>("--kind", "-k")
         {
-            Description = "Exact kind to check, e.g. osdu:wks:master-data--Well:1.0.0. No wildcards: Storage lists records only by exact kind.",
-            Required = true,
+            Description = "Exact kind to check, e.g. osdu:wks:master-data--Well:1.0.0. No wildcards: Storage lists records only by exact kind. Needs service.storage.admin.",
+        };
+        var idsFrom = new Option<string>("--ids-from")
+        {
+            Description = "Check only these records instead of a whole kind: a file with one record id per line, or a JSON array of ids, or - for stdin. Needs only viewer roles.",
         };
         var reindex = new Option<bool>("--reindex")
         {
@@ -70,14 +87,19 @@ public static class IndexGapsCommand
         };
 
         var command = new Command("gaps",
-            "Find the records of a kind that Storage holds and Search has not indexed, and the other way round.");
+            "Find the records of a kind, or in a list, that Storage holds and Search has not indexed.");
         CommandRoles.Set(command, $"{ReadRoles}; with --reindex, {ReindexRoles}", operatorRole: true);
         command.Options.Add(kind);
+        command.Options.Add(idsFrom);
         command.Options.Add(reindex);
         command.Options.Add(yes);
 
         command.Validators.Add(result =>
         {
+            var byKind = result.GetResult(kind) is not null;
+            var byList = result.GetResult(idsFrom) is not null;
+            if (byKind == byList)
+                result.AddError("Give --kind, to check a whole kind, or --ids-from, to check a list of records, but not both.");
             if (OptionValues.Usable(result, kind) is { } value && value.Contains('*'))
                 result.AddError("--kind cannot have wildcards: Storage lists records only by exact kind. Run it once per version.");
             if (result.GetResult(yes) is not null && !OptionValues.Usable(result, reindex))
@@ -87,9 +109,13 @@ public static class IndexGapsCommand
         command.SetAction((parseResult, cancellationToken) =>
             CliRunner.RunAsync(parseResult, async (context, token) =>
             {
-                var kindValue = parseResult.GetValue(kind)!;
+                var kindValue = parseResult.GetValue(kind);
                 var progress = Console.IsErrorRedirected ? null : Console.Error;
-                var report = await FindAsync(context.Client.Storage, context.Client.Search, kindValue, progress, token);
+                var report = kindValue is not null
+                    ? await FindAsync(context.Client.Storage, context.Client.Search, kindValue, progress, token)
+                    : await CheckAsync(context.Client.Storage, context.Client.Search,
+                        ReadIds(parseResult.GetValue(idsFrom)!), progress, token);
+                var what = kindValue ?? "the listed records";
 
                 var missing = Ids(report, MissingFromSearch);
                 context.Output.WriteNote(Summary(report));
@@ -97,7 +123,7 @@ public static class IndexGapsCommand
                 if (parseResult.GetValue(reindex) && missing.Count > 0)
                 {
                     if (!Confirmation.Confirm(
-                            $"Re-index {Count(missing.Count)} record(s) of {kindValue} that Search does not have.",
+                            $"Re-index {Count(missing.Count)} record(s) of {what} that Search does not have.",
                             parseResult.GetValue(yes), context))
                         return 1;
                     var requested = await ReindexAsync(context.Client.Indexer, missing, token);
@@ -108,7 +134,7 @@ public static class IndexGapsCommand
                 return context.Output.Write(report.ToJsonString(), Columns);
             }, cancellationToken, $"{ReadRoles}; with --reindex, {ReindexRoles}",
                 "Storage lists a kind's records only for service.storage.admin, which most users lack. Without it, " +
-                "`record search --query \"NOT index.statusCode:200\"` finds the records indexed with warnings, though not the missing ones."));
+                "--ids-from checks a list of record ids you have, such as what a loader wrote."));
 
         return command;
     }
@@ -149,6 +175,132 @@ public static class IndexGapsCommand
         };
     }
 
+    /// <summary>
+    /// Checks <paramref name="ids"/>: which Search has, and of the rest, which Storage has, does
+    /// not have, or does not let the caller read. Those Storage has are looked up in Search once
+    /// more before they are reported, as in <see cref="FindAsync"/>.
+    /// </summary>
+    internal static async Task<JsonObject> CheckAsync(
+        StorageClient storage, SearchClient search, IReadOnlyList<string> ids, TextWriter? progress, CancellationToken cancellationToken)
+    {
+        progress?.WriteLine($"Looking up {Count(ids.Count)} record(s) in Search");
+        var indexed = await IndexedByTypeAsync(search, ids, cancellationToken);
+        var notIndexed = ids.Where(id => !indexed.Contains(id)).ToList();
+
+        var stored = new HashSet<string>(StringComparer.Ordinal);
+        var notStored = new HashSet<string>(StringComparer.Ordinal);
+        if (notIndexed.Count > 0)
+        {
+            progress?.WriteLine($"Looking up the {Count(notIndexed.Count)} Search does not have in Storage");
+            await FetchAsync(storage, notIndexed, stored, notStored, cancellationToken);
+        }
+
+        var nowIndexed = await IndexedByTypeAsync(search, [.. stored], cancellationToken);
+
+        var gaps = new JsonArray();
+        foreach (var id in notIndexed.Order(StringComparer.Ordinal))
+        {
+            var gap = stored.Contains(id) ? (nowIndexed.Contains(id) ? null : MissingFromSearch)
+                : notStored.Contains(id) ? MissingFromStorage
+                : NoAccess;
+            if (gap is not null)
+                gaps.Add(new JsonObject { ["id"] = id, ["gap"] = gap });
+        }
+
+        return new JsonObject
+        {
+            ["listedCount"] = ids.Count,
+            ["searchCount"] = indexed.Count + nowIndexed.Count,
+            ["results"] = gaps,
+        };
+    }
+
+    /// <summary>
+    /// Which of <paramref name="ids"/> Search has, asked per entity type. A listed record may be
+    /// of any version, so the kind is a wildcard, but not <c>*:*:*:*</c>: ADME answers that
+    /// with 429, as too costly, and it searches every index in the partition.
+    /// </summary>
+    private static async Task<HashSet<string>> IndexedByTypeAsync(
+        SearchClient search, IReadOnlyList<string> ids, CancellationToken cancellationToken)
+    {
+        var found = new HashSet<string>(StringComparer.Ordinal);
+        foreach (var group in ids.GroupBy(KindOf))
+            found.UnionWith(await IndexedNowAsync(search, group.Key, [.. group], cancellationToken));
+        return found;
+    }
+
+    /// <summary>
+    /// The kinds a record id can belong to: <c>dev:work-product-component--WellLog:x</c> is of
+    /// <c>*:*:work-product-component--WellLog:*</c>, the entity type being an id's second part.
+    /// </summary>
+    internal static string KindOf(string id) =>
+        id.Split(':') is { Length: >= 3 } parts && parts[1].Length > 0 ? $"*:*:{parts[1]}:*" : "*:*:*:*";
+
+    /// <summary>
+    /// Fetches <paramref name="ids"/> from Storage in batches and sorts them into those it
+    /// returned and those it reported missing. Ids it returned neither way are the ones the
+    /// caller cannot read: Storage drops them after its ACL check without saying so.
+    /// </summary>
+    private static async Task FetchAsync(
+        StorageClient storage, IReadOnlyList<string> ids, HashSet<string> stored, HashSet<string> notStored,
+        CancellationToken cancellationToken)
+    {
+        foreach (var batch in ids.Chunk(FetchBatch))
+        {
+            var pending = batch.ToList();
+            // Ids Storage asks to be retried are asked for once more, then left as unreadable.
+            for (var attempt = 0; attempt < 2 && pending.Count > 0; attempt++)
+            {
+                var result = await storage.Query.Records.PostAsync(
+                    new StorageModels.MultiRecordIds { Records = pending }, cancellationToken: cancellationToken);
+                foreach (var record in result?.Records ?? [])
+                    if (record.Id is { } id)
+                        stored.Add(id);
+                notStored.UnionWith(result?.InvalidRecords ?? []);
+                pending = result?.RetryRecords ?? [];
+            }
+        }
+    }
+
+    /// <summary>
+    /// The record ids in <paramref name="path"/>, or stdin for <c>-</c>: a JSON array of ids,
+    /// or one id per line, with blank lines and lines starting <c>#</c> left out.
+    /// </summary>
+    internal static List<string> ReadIds(string path)
+    {
+        string text;
+        try
+        {
+            text = path == "-" ? Console.In.ReadToEnd() : File.ReadAllText(path);
+        }
+        catch (IOException exception)
+        {
+            throw new OsduException($"Cannot read {path}: {exception.Message}");
+        }
+        return ParseIds(text);
+    }
+
+    internal static List<string> ParseIds(string text)
+    {
+        IEnumerable<string> ids;
+        if (text.TrimStart().StartsWith('['))
+        {
+            ids = (JsonNode.Parse(text) as JsonArray ?? [])
+                .Select(item => item is JsonValue value && value.TryGetValue<string>(out var id) ? id
+                    : item?["id"] is JsonValue inner && inner.TryGetValue<string>(out var nested) ? nested
+                    : throw new OsduException("A JSON list of ids must hold strings, or objects with an \"id\"."));
+        }
+        else
+        {
+            ids = text.Split('\n').Select(line => line.Trim())
+                .Where(line => line.Length > 0 && !line.StartsWith('#'));
+        }
+        var distinct = ids.Distinct(StringComparer.Ordinal).ToList();
+        if (distinct.Count == 0)
+            throw new OsduException("The list has no record ids.");
+        return distinct;
+    }
+
     /// <summary>Re-indexes <paramref name="ids"/> in batches, and returns how many were sent.</summary>
     internal static async Task<int> ReindexAsync(IndexerClient indexer, IReadOnlyList<string> ids, CancellationToken cancellationToken)
     {
@@ -165,15 +317,23 @@ public static class IndexGapsCommand
     {
         var missing = Ids(report, MissingFromSearch).Count;
         var orphaned = Ids(report, MissingFromStorage).Count;
-        var line = new StringBuilder().Append(CultureInfo.InvariantCulture,
-            $"Storage has {Count(report["storageCount"]!.GetValue<int>())}, Search has {Count(report["searchCount"]!.GetValue<int>())}. ");
-        if (missing == 0 && orphaned == 0)
+        var unreadable = Ids(report, NoAccess).Count;
+        var listed = report["listedCount"] is not null;
+        var line = new StringBuilder().Append(listed
+            ? $"Checked {Count(report["listedCount"]!.GetValue<int>())} record(s): Search has {Count(report["searchCount"]!.GetValue<int>())}. "
+            : $"Storage has {Count(report["storageCount"]!.GetValue<int>())}, Search has {Count(report["searchCount"]!.GetValue<int>())}. ");
+        if (missing == 0 && orphaned == 0 && unreadable == 0)
             return line.Append("No gaps.").ToString();
-        line.Append(CultureInfo.InvariantCulture, $"{Count(missing)} not in Search, {Count(orphaned)} not in Storage.");
+        line.Append(CultureInfo.InvariantCulture, $"{Count(missing)} not in Search, {Count(orphaned)} not in Storage");
+        line.Append(listed ? $", {Count(unreadable)} you have no access to." : ".");
         if (missing > 0)
             line.Append(" Records written in the last few minutes may still be indexing; --reindex re-indexes the missing ones.");
         if (orphaned > 0)
-            line.Append(" Records not in Storage are deleted or inactive there but still in the index; re-indexing does not remove them.");
+            line.Append(listed
+                ? " Records not in Storage were never written, or are deleted."
+                : " Records not in Storage are deleted or inactive there but still in the index; re-indexing does not remove them.");
+        if (unreadable > 0)
+            line.Append(" Records you have no access to are in Storage, but their ACL does not include your groups, so neither Search nor Storage shows them to you.");
         return line.ToString();
     }
 

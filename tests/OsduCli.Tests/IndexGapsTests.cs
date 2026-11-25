@@ -37,13 +37,16 @@ public class IndexGapsTests
     [InlineData("index gaps --kind osdu:wks:master-data--Well:1.0.0")]
     [InlineData("index gaps -k osdu:wks:master-data--Well:1.0.0 --reindex")]
     [InlineData("index gaps -k osdu:wks:master-data--Well:1.0.0 --reindex --yes")]
+    [InlineData("index gaps --ids-from loaded.txt")]
+    [InlineData("index gaps --ids-from - --reindex")]
     public void WhatCanBeCombinedParses(string line) =>
         Assert.Empty(Root().Parse(line.Split(' ')).Errors);
 
     [Theory]
     [InlineData("index gaps --kind osdu:wks:master-data--Well:*", "--kind cannot have wildcards")]
     [InlineData("index gaps --kind osdu:wks:master-data--Well:1.0.0 --yes", "--yes applies only with --reindex.")]
-    [InlineData("index gaps", "Option '--kind' is required.")]
+    [InlineData("index gaps", "Give --kind, to check a whole kind, or --ids-from")]
+    [InlineData("index gaps --kind osdu:wks:master-data--Well:1.0.0 --ids-from loaded.txt", "Give --kind, to check a whole kind, or --ids-from")]
     public void WhatCannotIsRefusedWhileParsing(string line, string expected) =>
         Assert.Contains(Root().Parse(line.Split(' ')).Errors,
             error => error.Message.StartsWith(expected, StringComparison.Ordinal));
@@ -56,6 +59,11 @@ public class IndexGapsTests
     private sealed class Platform(IReadOnlyList<string> stored, IReadOnlyList<string> indexed) : HttpMessageHandler
     {
         public HashSet<string> IndexedLater { get; init; } = [];
+        /// <summary>In Storage, but not readable by the caller: its batch fetch leaves them out.</summary>
+        public HashSet<string> Unreadable { get; init; } = [];
+        /// <summary>Answered as retryRecords the first time they are fetched.</summary>
+        public HashSet<string> RetryOnce { get; init; } = [];
+        public List<string> SearchKinds { get; } = [];
         public List<string> Requests { get; } = [];
         public List<string[]> Reindexed { get; } = [];
 
@@ -66,7 +74,21 @@ public class IndexGapsTests
             Requests.Add($"{request.Method} {path}");
 
             JsonObject response;
-            if (path.EndsWith("/query/records", StringComparison.Ordinal))
+            if (path.EndsWith("/query/records", StringComparison.Ordinal) && request.Method == HttpMethod.Post)
+            {
+                var asked = body!["records"]!.AsArray().Select(id => id!.GetValue<string>()).ToList();
+                Assert.True(asked.Count <= IndexGapsCommand.FetchBatch);
+                var retry = asked.Where(RetryOnce.Remove).ToList();
+                var rest = asked.Except(retry).ToList();
+                response = new JsonObject
+                {
+                    ["records"] = new JsonArray([.. rest.Where(id => stored.Contains(id) && !Unreadable.Contains(id))
+                        .Select(id => (JsonNode)new JsonObject { ["id"] = id, ["kind"] = Kind })]),
+                    ["invalidRecords"] = new JsonArray([.. rest.Where(id => !stored.Contains(id)).Select(id => (JsonNode)JsonValue.Create(id)!)]),
+                    ["retryRecords"] = new JsonArray([.. retry.Select(id => (JsonNode)JsonValue.Create(id)!)]),
+                };
+            }
+            else if (path.EndsWith("/query/records", StringComparison.Ordinal))
             {
                 var query = HttpUtility.ParseQueryString(request.RequestUri.Query);
                 Assert.Equal(Kind, query["kind"]);
@@ -80,7 +102,8 @@ public class IndexGapsTests
             }
             else if (path.EndsWith("/query", StringComparison.Ordinal))
             {
-                var asked = Regex.Matches(body!["query"]!.GetValue<string>(), "\"([^\"]+)\"").Select(m => m.Groups[1].Value);
+                SearchKinds.Add(body!["kind"]!.GetValue<string>());
+                var asked = Regex.Matches(body["query"]!.GetValue<string>(), "\"([^\"]+)\"").Select(m => m.Groups[1].Value);
                 var now = indexed.Concat(IndexedLater).ToHashSet();
                 response = new JsonObject
                 {
@@ -189,6 +212,87 @@ public class IndexGapsTests
         Assert.Equal([1000, 1000, 1], platform.Reindexed.Select(batch => batch.Length));
         Assert.Equal(ids, platform.Reindexed.SelectMany(batch => batch));
     }
+
+    private static Task<JsonObject> Check(Platform platform, IReadOnlyList<string> ids) =>
+        IndexGapsCommand.CheckAsync(
+            new StorageClient(Adapter(platform, "storage")), new SearchClient(Adapter(platform, "search")),
+            ids, null, TestContext.Current.CancellationToken);
+
+    [Fact]
+    public async Task AListedRecordIsSortedByWhereItIs()
+    {
+        // 0-249 indexed; 250-259 stored, not indexed; 260-264 not stored; 265-269 unreadable.
+        var stored = Wells(0, 260).Concat(Wells(265, 5)).ToList();
+        var platform = new Platform(stored, Wells(0, 250)) { Unreadable = [.. Wells(265, 5)] };
+
+        var report = await Check(platform, Wells(0, 270));
+
+        Assert.Equal(Wells(250, 10), IndexGapsCommand.Ids(report, IndexGapsCommand.MissingFromSearch));
+        Assert.Equal(Wells(260, 5), IndexGapsCommand.Ids(report, IndexGapsCommand.MissingFromStorage));
+        Assert.Equal(Wells(265, 5), IndexGapsCommand.Ids(report, IndexGapsCommand.NoAccess));
+        Assert.Equal(270, report["listedCount"]!.GetValue<int>());
+        Assert.Equal(250, report["searchCount"]!.GetValue<int>());
+        Assert.Contains("10 not in Search, 5 not in Storage, 5 you have no access to.",
+            IndexGapsCommand.Summary(report), StringComparison.Ordinal);
+        // Only what Search lacks is fetched from Storage, and nothing is listed.
+        Assert.DoesNotContain(platform.Requests, r => r == "GET /api/storage/v2/query/records");
+        Assert.Single(platform.Requests, r => r == "POST /api/storage/v2/query/records");
+    }
+
+    [Fact]
+    public async Task AListedRecordIndexedDuringTheCheckIsNoGap()
+    {
+        var platform = new Platform(Wells(0, 3), Wells(0, 1)) { IndexedLater = ["dev:master-data--Well:1"] };
+
+        var report = await Check(platform, Wells(0, 3));
+
+        Assert.Equal(["dev:master-data--Well:2"], IndexGapsCommand.Ids(report, IndexGapsCommand.MissingFromSearch));
+        Assert.Equal(2, report["searchCount"]!.GetValue<int>());
+    }
+
+    [Fact]
+    public async Task ARecordStorageAsksToRetryIsAskedForAgain()
+    {
+        var platform = new Platform(Wells(0, 2), []) { RetryOnce = ["dev:master-data--Well:1"] };
+
+        var report = await Check(platform, Wells(0, 2));
+
+        Assert.Equal(Wells(0, 2), IndexGapsCommand.Ids(report, IndexGapsCommand.MissingFromSearch));
+        Assert.Equal(2, platform.Requests.Count(r => r == "POST /api/storage/v2/query/records"));
+    }
+
+    [Fact]
+    public async Task SearchIsAskedPerEntityTypeNotForEveryKind()
+    {
+        var ids = new[] { "dev:work-product-component--WellLog:a", "dev:master-data--Wellbore:b", "dev:work-product-component--WellLog:c" };
+        var platform = new Platform(ids, ids);
+
+        await Check(platform, ids);
+
+        Assert.Equal(["*:*:work-product-component--WellLog:*", "*:*:master-data--Wellbore:*"], platform.SearchKinds);
+    }
+
+    [Theory]
+    [InlineData("dev:work-product-component--WellLog:OmegaSor-CompLog-34-4-19S:1", "*:*:work-product-component--WellLog:*")]
+    [InlineData("not-an-id", "*:*:*:*")]
+    public void AnIdsKindIsItsEntityType(string id, string kind) =>
+        Assert.Equal(kind, IndexGapsCommand.KindOf(id));
+
+    [Fact]
+    public void AListIsOneIdPerLineWithoutBlanksCommentsOrRepeats() =>
+        Assert.Equal(["dev:a:1", "dev:a:2"],
+            IndexGapsCommand.ParseIds("# loaded 2026-11-25\r\ndev:a:1\r\n\r\n  dev:a:2  \ndev:a:1\n"));
+
+    [Fact]
+    public void AListCanBeAJsonArrayOfIdsOrRecords()
+    {
+        Assert.Equal(["dev:a:1", "dev:a:2"], IndexGapsCommand.ParseIds("[\"dev:a:1\", \"dev:a:2\"]"));
+        Assert.Equal(["dev:a:1"], IndexGapsCommand.ParseIds("[{\"id\": \"dev:a:1\", \"kind\": \"x\"}]"));
+    }
+
+    [Fact]
+    public void AnEmptyListIsRefused() =>
+        Assert.Throws<Equinor.OsduCsharpClient.Facade.OsduException>(() => IndexGapsCommand.ParseIds("# nothing\n\n"));
 
     [Fact]
     public void AnIdQueryQuotesEachId() =>
