@@ -48,7 +48,11 @@
        enum, and Indexer's reindex and provision operations return the raw body as a Stream.
 
        3.0.1 fixes 3.0.0's Search spatialFilter, which could not be serialised: every search
-       with a bounding box or distance filter failed before it was sent. -->
+       with a bounding box or distance filter failed before it was sent.
+
+       4.0.0 targets .NET 11, as this CLI already does, and is built with Runtime Async. Its API
+       and specs are unchanged from 3.0.3; the logging and configuration abstractions it no
+       longer references come from the .NET 11 shared framework. -->
   <ItemGroup>
     <PackageReference Include="Equinor.OsduCsharpClient" Version="4.0.0"/>
     <PackageReference Include="Equinor.OsduCsharpClient.Msal" Version="4.0.0"/>
