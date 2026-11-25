@@ -557,6 +557,10 @@ many and asking first. *Not in storage* is one deleted or made inactive in Stora
 in the index, which re-indexing does not remove. Every difference is looked up again in Search
 before it is reported, so a record indexed or deleted while the command ran is left out.
 
+Storage's list of a kind ignores record ACLs, and Search does not, so a record Search lacks is
+fetched from Storage before it is reported. One whose ACL leaves you out is *no access*, not
+a gap, and `--reindex` leaves it alone. `-o json` gives the counts beside the gaps.
+
 The kind must be exact, since Storage lists records only by exact kind; run it once per
 version. Listing a kind needs `service.storage.admin`, since Storage's list ignores record ACLs,
 and `--reindex` needs `service.search.admin`.

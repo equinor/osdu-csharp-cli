@@ -64,6 +64,10 @@ public class IndexGapsTests
         /// <summary>Answered as retryRecords the first time they are fetched.</summary>
         public HashSet<string> RetryOnce { get; init; } = [];
         public List<string> SearchKinds { get; } = [];
+        /// <summary>Listed by Storage, then deleted before the batch fetch.</summary>
+        public HashSet<string> DeletedAfterList { get; init; } = [];
+        /// <summary>Storage has no record of the kind, and answers its list with 404.</summary>
+        public bool KindMissing { get; init; }
         public List<string> Requests { get; } = [];
         public List<string[]> Reindexed { get; } = [];
 
@@ -80,12 +84,20 @@ public class IndexGapsTests
                 Assert.True(asked.Count <= IndexGapsCommand.FetchBatch);
                 var retry = asked.Where(RetryOnce.Remove).ToList();
                 var rest = asked.Except(retry).ToList();
+                bool Exists(string id) => stored.Contains(id) && !DeletedAfterList.Contains(id);
                 response = new JsonObject
                 {
-                    ["records"] = new JsonArray([.. rest.Where(id => stored.Contains(id) && !Unreadable.Contains(id))
+                    ["records"] = new JsonArray([.. rest.Where(id => Exists(id) && !Unreadable.Contains(id))
                         .Select(id => (JsonNode)new JsonObject { ["id"] = id, ["kind"] = Kind })]),
-                    ["invalidRecords"] = new JsonArray([.. rest.Where(id => !stored.Contains(id)).Select(id => (JsonNode)JsonValue.Create(id)!)]),
+                    ["invalidRecords"] = new JsonArray([.. rest.Where(id => !Exists(id)).Select(id => (JsonNode)JsonValue.Create(id)!)]),
                     ["retryRecords"] = new JsonArray([.. retry.Select(id => (JsonNode)JsonValue.Create(id)!)]),
+                };
+            }
+            else if (path.EndsWith("/query/records", StringComparison.Ordinal) && KindMissing)
+            {
+                return new HttpResponseMessage(HttpStatusCode.NotFound)
+                {
+                    Content = new StringContent("""{"code":404,"reason":"Kind or cursor not found"}""", Encoding.UTF8, "application/json"),
                 };
             }
             else if (path.EndsWith("/query/records", StringComparison.Ordinal))
@@ -112,8 +124,13 @@ public class IndexGapsTests
             }
             else if (path.EndsWith("/reindex/records", StringComparison.Ordinal))
             {
-                Reindexed.Add([.. body!["recordIds"]!.AsArray().Select(id => id!.GetValue<string>())]);
-                response = new JsonObject();
+                string[] asked = [.. body!["recordIds"]!.AsArray().Select(id => id!.GetValue<string>())];
+                Reindexed.Add(asked);
+                response = new JsonObject
+                {
+                    ["reindexRecordIds"] = new JsonArray([.. asked.Where(stored.Contains).Select(id => (JsonNode)JsonValue.Create(id)!)]),
+                    ["notFoundRecordIds"] = new JsonArray([.. asked.Where(id => !stored.Contains(id)).Select(id => (JsonNode)JsonValue.Create(id)!)]),
+                };
             }
             else
             {
@@ -202,15 +219,57 @@ public class IndexGapsTests
     [Fact]
     public async Task MissingRecordsAreReindexedInBatches()
     {
-        var platform = new Platform([], []);
         var ids = Wells(0, 2001);
+        var platform = new Platform(Wells(0, 2000), []);
 
-        var sent = await IndexGapsCommand.ReindexAsync(
+        var notFound = await IndexGapsCommand.ReindexAsync(
             new IndexerClient(Adapter(platform, "indexer")), ids, TestContext.Current.CancellationToken);
 
-        Assert.Equal(2001, sent);
+        Assert.Equal(["dev:master-data--Well:2000"], notFound);
         Assert.Equal([1000, 1000, 1], platform.Reindexed.Select(batch => batch.Length));
         Assert.Equal(ids, platform.Reindexed.SelectMany(batch => batch));
+    }
+
+    [Fact]
+    public async Task ARecordAnAdminCannotReadIsNoAccessNotAGap()
+    {
+        // Storage's list shows every record; Search, and the batch fetch, only readable ones.
+        var platform = new Platform(Wells(0, 3), Wells(0, 1)) { Unreadable = ["dev:master-data--Well:2"] };
+
+        var report = await Find(platform);
+
+        Assert.Equal(["dev:master-data--Well:1"], IndexGapsCommand.Ids(report, IndexGapsCommand.MissingFromSearch));
+        Assert.Equal(["dev:master-data--Well:2"], IndexGapsCommand.Ids(report, IndexGapsCommand.NoAccess));
+        Assert.Contains("1 you have no access to.", IndexGapsCommand.Summary(report), StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task ARecordDeletedAfterStorageListedItIsNoGap()
+    {
+        var platform = new Platform(Wells(0, 3), Wells(0, 1)) { DeletedAfterList = ["dev:master-data--Well:2"] };
+
+        var report = await Find(platform);
+
+        Assert.Equal(["dev:master-data--Well:1"], IndexGapsCommand.Ids(report, IndexGapsCommand.MissingFromSearch));
+        Assert.Single(report["results"]!.AsArray());
+    }
+
+    [Fact]
+    public async Task AKindStorageHasNoneOfLeavesWhatSearchHasNotInStorage()
+    {
+        var platform = new Platform([], Wells(0, 2)) { KindMissing = true };
+
+        var report = await Find(platform);
+
+        Assert.Equal(0, report["storageCount"]!.GetValue<int>());
+        Assert.Equal(Wells(0, 2), IndexGapsCommand.Ids(report, IndexGapsCommand.MissingFromStorage));
+    }
+
+    [Fact]
+    public void JsonOutputKeepsTheCountsAndATableShowsTheGaps()
+    {
+        Assert.Same(OutputSpec.Raw, IndexGapsCommand.SpecFor(OutputFormat.Json));
+        Assert.Equal("results", IndexGapsCommand.SpecFor(OutputFormat.Table).Root);
     }
 
     private static Task<JsonObject> Check(Platform platform, IReadOnlyList<string> ids) =>

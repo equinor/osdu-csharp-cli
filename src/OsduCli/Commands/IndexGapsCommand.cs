@@ -10,6 +10,7 @@ using Equinor.OsduCsharpClient.Facade;
 using IndexerModels = Equinor.OsduCsharpClient.Indexer.Models;
 using SearchModels = Equinor.OsduCsharpClient.Search.Models;
 using StorageModels = Equinor.OsduCsharpClient.Storage.Models;
+using Microsoft.Kiota.Abstractions;
 using Microsoft.Kiota.Abstractions.Serialization;
 
 namespace Equinor.OsduCli.Commands;
@@ -31,6 +32,13 @@ namespace Equinor.OsduCli.Commands;
 /// list and not in Search's; one deleted is the other way round. Either is resolved by the
 /// second look once the Indexer has caught up, so what is left is a real gap, or a record the
 /// Indexer is still working on.</para>
+///
+/// <para>A record Storage lists and Search lacks is then fetched from Storage before it is
+/// reported. Storage's list ignores ACLs and Search applies them, so an admin outside a
+/// record's data groups finds it in one and not the other: the fetch applies the ACL too,
+/// and leaves such a record out, so it is reported as <i>no access</i> rather than as a gap,
+/// and is not re-indexed. A record deleted since Storage listed it is answered as invalid by
+/// the fetch, and dropped.</para>
 ///
 /// <para>Storage lists records only by exact kind, so the kind cannot have wildcards. Both
 /// lists are held in memory: a kind of a few million records is fine, the whole partition is
@@ -126,12 +134,16 @@ public static class IndexGapsCommand
                             $"Re-index {Count(missing.Count)} record(s) of {what} that Search does not have.",
                             parseResult.GetValue(yes), context))
                         return 1;
-                    var requested = await ReindexAsync(context.Client.Indexer, missing, token);
+                    var notFound = await ReindexAsync(context.Client.Indexer, missing, token);
                     context.Output.WriteNote(
-                        $"Asked the Indexer to re-index {Count(requested)} record(s). Run the command again in a few minutes to check.");
+                        $"Asked the Indexer to re-index {Count(missing.Count - notFound.Count)} record(s). Run the command again in a few minutes to check.");
+                    if (notFound.Count > 0)
+                        context.Output.WriteNote(
+                            $"The Indexer did not find {Count(notFound.Count)} of them in Storage: {string.Join(", ", notFound.Take(10))}{(notFound.Count > 10 ? ", ..." : "")}");
                 }
 
-                return context.Output.Write(report.ToJsonString(), Columns);
+                // JSON keeps the counts beside the gaps; only the table shows the gaps alone.
+                return context.Output.Write(report.ToJsonString(), SpecFor(context.Output.Format));
             }, cancellationToken, $"{ReadRoles}; with --reindex, {ReindexRoles}",
                 "Storage lists a kind's records only for service.storage.admin, which most users lack. Without it, " +
                 "--ids-from checks a list of record ids you have, such as what a loader wrote."));
@@ -160,9 +172,24 @@ public static class IndexGapsCommand
             progress?.WriteLine($"Looking up {Count(differing.Count)} difference(s) in Search again");
         var nowIndexed = await IndexedNowAsync(search, kind, differing, cancellationToken);
 
+        // What Storage still has and lets the caller read, among the records Search lacks.
+        var candidates = notIndexed.Where(id => !nowIndexed.Contains(id)).ToList();
+        var readable = new Dictionary<string, string?>(StringComparer.Ordinal);
+        var deleted = new HashSet<string>(StringComparer.Ordinal);
+        if (candidates.Count > 0)
+        {
+            progress?.WriteLine($"Fetching the {Count(candidates.Count)} Search lacks from Storage");
+            await FetchAsync(storage, candidates, readable, deleted, cancellationToken);
+        }
+
         var gaps = new JsonArray();
-        foreach (var id in notIndexed.Where(id => !nowIndexed.Contains(id)).Order(StringComparer.Ordinal))
-            gaps.Add(new JsonObject { ["id"] = id, ["gap"] = MissingFromSearch });
+        foreach (var id in candidates.Order(StringComparer.Ordinal))
+        {
+            // Deleted since the list, or now of another kind: not a gap of this kind.
+            if (deleted.Contains(id) || (readable.TryGetValue(id, out var of) && of != kind))
+                continue;
+            gaps.Add(new JsonObject { ["id"] = id, ["gap"] = readable.ContainsKey(id) ? MissingFromSearch : NoAccess });
+        }
         foreach (var id in notStored.Where(nowIndexed.Contains).Order(StringComparer.Ordinal))
             gaps.Add(new JsonObject { ["id"] = id, ["gap"] = MissingFromStorage });
 
@@ -187,7 +214,7 @@ public static class IndexGapsCommand
         var indexed = await IndexedByTypeAsync(search, ids, cancellationToken);
         var notIndexed = ids.Where(id => !indexed.Contains(id)).ToList();
 
-        var stored = new HashSet<string>(StringComparer.Ordinal);
+        var stored = new Dictionary<string, string?>(StringComparer.Ordinal);
         var notStored = new HashSet<string>(StringComparer.Ordinal);
         if (notIndexed.Count > 0)
         {
@@ -195,12 +222,12 @@ public static class IndexGapsCommand
             await FetchAsync(storage, notIndexed, stored, notStored, cancellationToken);
         }
 
-        var nowIndexed = await IndexedByTypeAsync(search, [.. stored], cancellationToken);
+        var nowIndexed = await IndexedByTypeAsync(search, [.. stored.Keys], cancellationToken);
 
         var gaps = new JsonArray();
         foreach (var id in notIndexed.Order(StringComparer.Ordinal))
         {
-            var gap = stored.Contains(id) ? (nowIndexed.Contains(id) ? null : MissingFromSearch)
+            var gap = stored.ContainsKey(id) ? (nowIndexed.Contains(id) ? null : MissingFromSearch)
                 : notStored.Contains(id) ? MissingFromStorage
                 : NoAccess;
             if (gap is not null)
@@ -242,7 +269,7 @@ public static class IndexGapsCommand
     /// caller cannot read: Storage drops them after its ACL check without saying so.
     /// </summary>
     private static async Task FetchAsync(
-        StorageClient storage, IReadOnlyList<string> ids, HashSet<string> stored, HashSet<string> notStored,
+        StorageClient storage, IReadOnlyList<string> ids, Dictionary<string, string?> stored, HashSet<string> notStored,
         CancellationToken cancellationToken)
     {
         foreach (var batch in ids.Chunk(FetchBatch))
@@ -255,7 +282,7 @@ public static class IndexGapsCommand
                     new StorageModels.MultiRecordIds { Records = pending }, cancellationToken: cancellationToken);
                 foreach (var record in result?.Records ?? [])
                     if (record.Id is { } id)
-                        stored.Add(id);
+                        stored[id] = record.Kind;
                 notStored.UnionWith(result?.InvalidRecords ?? []);
                 pending = result?.RetryRecords ?? [];
             }
@@ -301,16 +328,27 @@ public static class IndexGapsCommand
         return distinct;
     }
 
-    /// <summary>Re-indexes <paramref name="ids"/> in batches, and returns how many were sent.</summary>
-    internal static async Task<int> ReindexAsync(IndexerClient indexer, IReadOnlyList<string> ids, CancellationToken cancellationToken)
+    /// <summary>
+    /// Re-indexes <paramref name="ids"/> in batches, and returns those the Indexer answered it
+    /// could not find in Storage.
+    /// </summary>
+    internal static async Task<List<string>> ReindexAsync(IndexerClient indexer, IReadOnlyList<string> ids, CancellationToken cancellationToken)
     {
+        var notFound = new List<string>();
         foreach (var batch in ids.Chunk(ReindexBatch))
         {
             var body = new IndexerModels.ReindexRecordsRequest { RecordIds = [.. batch] };
-            await indexer.Reindex.Records.PostAsync(body, cancellationToken: cancellationToken);
+            // Read rather than discarded, so a page answered with 200 fails instead of passing.
+            var json = await OsduJson.ToJsonAsync(
+                await indexer.Reindex.Records.PostAsync(body, cancellationToken: cancellationToken), cancellationToken);
+            if (JsonNode.Parse(json ?? "null")?["notFoundRecordIds"] is JsonArray missing)
+                notFound.AddRange(missing.Select(id => id?.GetValue<string>()).OfType<string>());
         }
-        return ids.Count;
+        return notFound;
     }
+
+    /// <summary>The gaps alone for a table; for JSON, the whole report, counts included.</summary>
+    internal static OutputSpec SpecFor(OutputFormat format) => format == OutputFormat.Json ? OutputSpec.Raw : Columns;
 
     /// <summary>The one-line account of a comparison, for stderr.</summary>
     internal static string Summary(JsonObject report)
@@ -325,7 +363,7 @@ public static class IndexGapsCommand
         if (missing == 0 && orphaned == 0 && unreadable == 0)
             return line.Append("No gaps.").ToString();
         line.Append(CultureInfo.InvariantCulture, $"{Count(missing)} not in Search, {Count(orphaned)} not in Storage");
-        line.Append(listed ? $", {Count(unreadable)} you have no access to." : ".");
+        line.Append(listed || unreadable > 0 ? $", {Count(unreadable)} you have no access to." : ".");
         if (missing > 0)
             line.Append(" Records written in the last few minutes may still be indexing; --reindex re-indexes the missing ones.");
         if (orphaned > 0)
@@ -333,7 +371,7 @@ public static class IndexGapsCommand
                 ? " Records not in Storage were never written, or are deleted."
                 : " Records not in Storage are deleted or inactive there but still in the index; re-indexing does not remove them.");
         if (unreadable > 0)
-            line.Append(" Records you have no access to are in Storage, but their ACL does not include your groups, so neither Search nor Storage shows them to you.");
+            line.Append(" Records you have no access to are in Storage, but their ACL does not include your groups, so neither Search nor Storage shows them to you; they are not re-indexed.");
         return line.ToString();
     }
 
@@ -363,12 +401,25 @@ public static class IndexGapsCommand
     {
         var json = await CursorPaging.CollectAsync(
             new JsonObject(), limit: null, PageSize, "limit", "cursor", "results", totalProperty: null,
-            async (page, pageCancellation) => await OsduJson.ToJsonAsync(await storage.Query.Records.GetAsync(configuration =>
+            async (page, pageCancellation) =>
             {
-                configuration.QueryParameters.Kind = kind;
-                configuration.QueryParameters.Limit = page["limit"]!.GetValue<int>();
-                configuration.QueryParameters.Cursor = page["cursor"]?.GetValue<string>();
-            }, pageCancellation), pageCancellation),
+                try
+                {
+                    return await OsduJson.ToJsonAsync(await storage.Query.Records.GetAsync(configuration =>
+                    {
+                        configuration.QueryParameters.Kind = kind;
+                        configuration.QueryParameters.Limit = page["limit"]!.GetValue<int>();
+                        configuration.QueryParameters.Cursor = page["cursor"]?.GetValue<string>();
+                    }, pageCancellation), pageCancellation);
+                }
+                // Storage answers a kind it has no records of with 404, "Kind or cursor not found".
+                // On the first page there is no cursor, so it is the kind: Storage has none, and
+                // whatever Search has of it is not in Storage. Later, it is the cursor, an error.
+                catch (ApiException exception) when (exception.ResponseStatusCode == 404 && page["cursor"] is null)
+                {
+                    return """{"results":[]}""";
+                }
+            },
             // Storage's cursor is a continuation token, not something it holds open.
             (_, _) => Task.CompletedTask,
             progress, cancellationToken);
