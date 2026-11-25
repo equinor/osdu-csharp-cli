@@ -106,6 +106,19 @@ exclude:
     reason: Infrastructure probe, covered by `osducs status`.
 
 handwritten:
+  - command: index gaps
+    op: { method: post, path: /reindex/records }
+    reason: >
+      Compares a kind's record ids in Storage with Search, or checks a list of ids, and with
+      --reindex sends the missing ones here. It reads from Storage and Search and decides what
+      to send, which no single manifest entry can express. Commands/IndexGapsCommand.cs,
+      through the Customize hook.
+    # The spec's roles are only --reindex's. Listing a kind is Storage's admin-only list;
+    # --ids-from needs viewer roles only, so it must not read as an operator-only command.
+    roles: >-
+      service.storage.admin with --kind; with --ids-from, viewer roles only; service.search.admin
+      with --reindex
+
   - command: status
     op: { method: get, path: /info }
     reason: >
