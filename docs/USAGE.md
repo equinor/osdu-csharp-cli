@@ -554,7 +554,8 @@ dev:master-data--Well:1001  not in search
 
 *Not in search* is a record the Indexer never indexed; `--reindex` asks it to, after saying how
 many and asking first. *Not in storage* is one deleted or made inactive in Storage that is still
-in the index, which re-indexing does not remove. Every difference is looked up again in Search
+in the index, for instance when its delete event was lost; `--reindex` sends these too, and the
+Indexer, not finding them in Storage, removes them from the index. Every difference is looked up again in Search
 before it is reported, so a record indexed or deleted while the command ran is left out.
 
 Storage's list of a kind ignores record ACLs, and Search does not, so a record Search lacks is

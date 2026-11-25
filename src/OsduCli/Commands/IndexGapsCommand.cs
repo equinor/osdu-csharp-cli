@@ -88,7 +88,8 @@ public static class IndexGapsCommand
         };
         var reindex = new Option<bool>("--reindex")
         {
-            Description = "Re-index the records Search does not have, " + ReindexBatch + " per request. Needs " + ReindexRoles + ".",
+            Description = "Re-index the records Search does not have and, with --kind, have the Indexer remove those Storage no longer has, " +
+                ReindexBatch + " per request. Needs " + ReindexRoles + ".",
         };
         var yes = new Option<bool>("--yes")
         {
@@ -127,23 +128,29 @@ public static class IndexGapsCommand
                 var what = kindValue ?? "the listed records";
 
                 var missing = Ids(report, MissingFromSearch);
+                var orphaned = Orphans(report);
                 context.Output.WriteNote(Summary(report));
                 // Written before anything is asked or re-indexed, so declining, or a failed
                 // re-index, still leaves the result of the whole scan.
                 context.Output.Write(report.ToJsonString(), SpecFor(context.Output.Format));
 
-                if (parseResult.GetValue(reindex) && missing.Count > 0)
+                if (parseResult.GetValue(reindex) && missing.Count + orphaned.Count > 0)
                 {
-                    if (!Confirmation.Confirm(
-                            $"Re-index {Count(missing.Count)} record(s) of {what} that Search does not have.",
+                    if (!Confirmation.Confirm(ReindexAction(missing.Count, orphaned.Count, what),
                             parseResult.GetValue(yes), context))
                         return 1;
-                    var notFound = await ReindexAsync(context.Client.Indexer, missing, token);
+                    // The Indexer re-indexes what Storage has, and removes from the index what
+                    // Storage does not, answering those as not found.
+                    var notFound = await ReindexAsync(context.Client.Indexer, [.. missing, .. orphaned], token);
+                    var expected = new HashSet<string>(orphaned, StringComparer.Ordinal);
+                    var gone = notFound.Where(id => !expected.Contains(id)).ToList();
                     context.Output.WriteNote(
-                        $"Asked the Indexer to re-index {Count(missing.Count - notFound.Count)} record(s). Run the command again in a few minutes to check.");
-                    if (notFound.Count > 0)
+                        $"Asked the Indexer to re-index {Count(missing.Count - gone.Count)} record(s)" +
+                        (orphaned.Count > 0 ? $" and to remove {Count(orphaned.Count)} from the index" : "") +
+                        ". Run the command again in a few minutes to check.");
+                    if (gone.Count > 0)
                         context.Output.WriteNote(
-                            $"The Indexer did not find {Count(notFound.Count)} of them in Storage: {string.Join(", ", notFound.Take(10))}{(notFound.Count > 10 ? ", ..." : "")}");
+                            $"The Indexer did not find {Count(gone.Count)} of the records to re-index in Storage: {string.Join(", ", gone.Take(10))}{(gone.Count > 10 ? ", ..." : "")}");
                 }
                 return 0;
             }, cancellationToken, $"{ReadRoles}; with --reindex, {ReindexRoles}",
@@ -403,6 +410,20 @@ public static class IndexGapsCommand
         return notFound;
     }
 
+    /// <summary>
+    /// The records <c>--reindex</c> sends for removal: those a kind's index has and Storage no
+    /// longer does. A listed record not in Storage is not in Search either, so nothing to remove.
+    /// </summary>
+    internal static List<string> Orphans(JsonObject report) =>
+        report["listedCount"] is null ? Ids(report, MissingFromStorage) : [];
+
+    internal static string ReindexAction(int missing, int orphaned, string what) => (missing, orphaned) switch
+    {
+        (_, 0) => $"Re-index {Count(missing)} record(s) of {what} that Search does not have.",
+        (0, _) => $"Remove {Count(orphaned)} record(s) of {what} from the index that Storage no longer has.",
+        _ => $"Re-index {Count(missing)} record(s) of {what} that Search does not have, and remove {Count(orphaned)} from the index that Storage no longer has.",
+    };
+
     /// <summary>The gaps alone for a table; for JSON, the whole report, counts included.</summary>
     internal static OutputSpec SpecFor(OutputFormat format) => format == OutputFormat.Json ? OutputSpec.Raw : Columns;
 
@@ -427,7 +448,7 @@ public static class IndexGapsCommand
         if (orphaned > 0)
             line.Append(listed
                 ? " Records not in Storage were never written, or are deleted."
-                : " Records not in Storage are deleted there but still in the index; re-indexing does not remove them.");
+                : " Records not in Storage are deleted there but still in the index; --reindex has the Indexer remove them.");
         if (moved > 0)
             line.Append(" Records now of another kind were written again under a newer kind, and this kind's index still has their old entry.");
         if (unreadable > 0)

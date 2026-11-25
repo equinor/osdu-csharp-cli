@@ -226,6 +226,30 @@ public class IndexGapsTests
     }
 
     [Fact]
+    public async Task ReindexAlsoSendsWhatAKindsIndexHasAndStorageDoesNot()
+    {
+        var report = await Find(new Platform(Wells(0, 1200), Wells(5, 1200)));
+
+        Assert.Equal(Wells(1200, 5), IndexGapsCommand.Orphans(report));
+        Assert.Contains("--reindex has the Indexer remove them.", IndexGapsCommand.Summary(report), StringComparison.Ordinal);
+        Assert.Equal(
+            "Re-index 5 record(s) of k that Search does not have, and remove 5 from the index that Storage no longer has.",
+            IndexGapsCommand.ReindexAction(5, 5, "k"));
+        Assert.Equal("Remove 2 record(s) of k from the index that Storage no longer has.", IndexGapsCommand.ReindexAction(0, 2, "k"));
+        Assert.Equal("Re-index 3 record(s) of k that Search does not have.", IndexGapsCommand.ReindexAction(3, 0, "k"));
+    }
+
+    [Fact]
+    public async Task AListedRecordNotInStorageIsNotSentForRemoval()
+    {
+        // Not in Storage and not in Search either: there is nothing in the index to remove.
+        var report = await Check(new Platform(Wells(0, 2), Wells(0, 2)), Wells(0, 3));
+
+        Assert.Equal(["dev:master-data--Well:2"], IndexGapsCommand.Ids(report, IndexGapsCommand.MissingFromStorage));
+        Assert.Empty(IndexGapsCommand.Orphans(report));
+    }
+
+    [Fact]
     public async Task ARecordIndexedDuringTheScanIsNoGap()
     {
         var stored = Wells(0, 10);
