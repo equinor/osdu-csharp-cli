@@ -532,6 +532,37 @@ osducs group list --all                                                        #
 osducs group list --all --type data                                            # data groups only; also user, service
 ```
 
+### Finding records Search has not indexed
+
+Search only finds records that reached the index. A record whose indexing failed before it
+was written, or whose change event was lost, is simply absent, and nothing reports it.
+`index gaps` compares the ids a kind has in Storage with those in Search:
+
+```bash
+osducs index gaps --kind "osdu:wks:master-data--Well:1.0.0"            # what differs
+osducs index gaps --kind "osdu:wks:master-data--Well:1.0.0" --reindex  # and re-index what Search lacks
+osducs index gaps --kind "osdu:wks:master-data--Well:1.0.0" -o json    # counts and gaps, for a script
+```
+
+```
+Storage has 4,812, Search has 4,810. 2 not in Search, 0 not in Storage. Records written in the last few minutes may still be indexing; --reindex re-indexes the missing ones.
+Id                          Gap
+--------------------------  -------------
+dev:master-data--Well:1000  not in search
+dev:master-data--Well:1001  not in search
+```
+
+*Not in search* is a record the Indexer never indexed; `--reindex` asks it to, after saying how
+many and asking first. *Not in storage* is one deleted or made inactive in Storage that is still
+in the index, which re-indexing does not remove. Every difference is looked up again in Search
+before it is reported, so a record indexed or deleted while the command ran is left out.
+
+The kind must be exact, since Storage lists records only by exact kind; run it once per
+version. It needs `service.storage.admin` to list Storage, and `service.search.admin` for
+`--reindex`. Records that were indexed with a warning, such as a failed CRS conversion, are in
+Search and not a gap; find them with
+`osducs record search --kind <kind> --query "NOT index.statusCode:200" --returned-fields id,index`.
+
 Notification subscriptions are kept by Register. A subscription sends a topic's messages to a push
 endpoint, with a secret the endpoint checks them by; its file holds `name`, `topic`,
 `pushEndpoint` and the `secret`, which is why it is read from a file rather than options.
