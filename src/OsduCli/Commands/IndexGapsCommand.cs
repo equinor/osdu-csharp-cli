@@ -139,18 +139,9 @@ public static class IndexGapsCommand
                     if (!Confirmation.Confirm(ReindexAction(missing.Count, orphaned.Count, what),
                             parseResult.GetValue(yes), context))
                         return 1;
-                    // The Indexer re-indexes what Storage has, and removes from the index what
-                    // Storage does not, answering those as not found.
-                    var notFound = await ReindexAsync(context.Client.Indexer, [.. missing, .. orphaned], token);
-                    var expected = new HashSet<string>(orphaned, StringComparer.Ordinal);
-                    var gone = notFound.Where(id => !expected.Contains(id)).ToList();
-                    context.Output.WriteNote(
-                        $"Asked the Indexer to re-index {Count(missing.Count - gone.Count)} record(s)" +
-                        (orphaned.Count > 0 ? $" and to remove {Count(orphaned.Count)} from the index" : "") +
-                        ". Run the command again in a few minutes to check.");
-                    if (gone.Count > 0)
-                        context.Output.WriteNote(
-                            $"The Indexer did not find {Count(gone.Count)} of the records to re-index in Storage: {string.Join(", ", gone.Take(10))}{(gone.Count > 10 ? ", ..." : "")}");
+                    var notFound = await ReindexGapsAsync(context.Client.Indexer, report, token);
+                    foreach (var note in ReindexOutcome(missing, orphaned, notFound))
+                        context.Output.WriteNote(note);
                 }
                 return 0;
             }, cancellationToken, $"{ReadRoles}; with --reindex, {ReindexRoles}",
@@ -416,6 +407,36 @@ public static class IndexGapsCommand
     /// </summary>
     internal static List<string> Orphans(JsonObject report) =>
         report["listedCount"] is null ? Ids(report, MissingFromStorage) : [];
+
+    /// <summary>
+    /// Sends what <c>--reindex</c> fixes: the records Search lacks and, for a kind, those
+    /// Storage no longer has. Returns the ids the Indexer answered it could not find in Storage.
+    /// </summary>
+    internal static Task<List<string>> ReindexGapsAsync(IndexerClient indexer, JsonObject report, CancellationToken cancellationToken) =>
+        ReindexAsync(indexer, [.. Ids(report, MissingFromSearch), .. Orphans(report)], cancellationToken);
+
+    /// <summary>
+    /// What the Indexer was asked to do, from its answer rather than the scan: it looks every id
+    /// up in Storage again, re-indexes those it finds, and removes the rest from the index where
+    /// the index has them. So a record restored since the scan is re-indexed, and one deleted
+    /// since is removed.
+    /// </summary>
+    internal static IEnumerable<string> ReindexOutcome(
+        IReadOnlyList<string> missing, IReadOnlyList<string> orphaned, IReadOnlyList<string> notFound)
+    {
+        var sent = missing.Count + orphaned.Count;
+        var gone = new HashSet<string>(notFound, StringComparer.Ordinal);
+        yield return $"Asked the Indexer to re-index {Count(sent - gone.Count)} record(s)" +
+            (gone.Count > 0 ? $" and to remove {Count(gone.Count)} that Storage does not have from the index" : "") +
+            ". Run the command again in a few minutes to check.";
+        var deletedSince = missing.Where(gone.Contains).ToList();
+        if (deletedSince.Count > 0)
+            yield return $"{Count(deletedSince.Count)} of the records not in Search are no longer in Storage either: " +
+                $"{string.Join(", ", deletedSince.Take(10))}{(deletedSince.Count > 10 ? ", ..." : "")}";
+        var restored = orphaned.Count(id => !gone.Contains(id));
+        if (restored > 0)
+            yield return $"{Count(restored)} of the records not in Storage were found there again, so they are re-indexed instead.";
+    }
 
     internal static string ReindexAction(int missing, int orphaned, string what) => (missing, orphaned) switch
     {

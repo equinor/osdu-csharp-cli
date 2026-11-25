@@ -240,6 +240,66 @@ public class IndexGapsTests
     }
 
     [Fact]
+    public async Task ReindexSendsTheMissingAndTheOrphansOfAKind()
+    {
+        // 0-1199 stored, 5-1204 indexed: 0-4 never indexed, 1200-1204 deleted from Storage.
+        var platform = new Platform(Wells(0, 1200), Wells(5, 1200));
+        var report = await Find(platform);
+
+        var notFound = await IndexGapsCommand.ReindexGapsAsync(
+            new IndexerClient(Adapter(platform, "indexer")), report, TestContext.Current.CancellationToken);
+
+        Assert.Equal([.. Wells(0, 5), .. Wells(1200, 5)], platform.Reindexed.SelectMany(batch => batch));
+        Assert.Equal(Wells(1200, 5), notFound);
+        Assert.Equal(
+            ["Asked the Indexer to re-index 5 record(s) and to remove 5 that Storage does not have from the index. Run the command again in a few minutes to check."],
+            IndexGapsCommand.ReindexOutcome(Wells(0, 5), Wells(1200, 5), notFound));
+    }
+
+    [Fact]
+    public async Task ReindexOfOnlyOrphansSendsOnlyThem()
+    {
+        var platform = new Platform([], Wells(0, 2)) { KindMissing = true };
+        var report = await Find(platform);
+
+        await IndexGapsCommand.ReindexGapsAsync(
+            new IndexerClient(Adapter(platform, "indexer")), report, TestContext.Current.CancellationToken);
+
+        Assert.Equal(Wells(0, 2), platform.Reindexed.SelectMany(batch => batch));
+    }
+
+    [Fact]
+    public async Task ReindexOfAListSendsOnlyWhatSearchLacks()
+    {
+        // 0-1 indexed, 2 stored only, 3 nowhere.
+        var platform = new Platform(Wells(0, 3), Wells(0, 2));
+        var report = await Check(platform, Wells(0, 4));
+
+        await IndexGapsCommand.ReindexGapsAsync(
+            new IndexerClient(Adapter(platform, "indexer")), report, TestContext.Current.CancellationToken);
+
+        Assert.Equal(["dev:master-data--Well:2"], platform.Reindexed.SelectMany(batch => batch));
+    }
+
+    [Fact]
+    public void TheOutcomeFollowsWhatTheIndexerFoundNotTheScan()
+    {
+        // Well:1 was deleted after the scan; orphan Well:9 was written again.
+        string[] missing = ["dev:master-data--Well:0", "dev:master-data--Well:1"];
+        string[] orphaned = ["dev:master-data--Well:8", "dev:master-data--Well:9"];
+        string[] notFound = ["dev:master-data--Well:1", "dev:master-data--Well:8"];
+
+        var notes = IndexGapsCommand.ReindexOutcome(missing, orphaned, notFound).ToList();
+
+        Assert.Equal(
+            "Asked the Indexer to re-index 2 record(s) and to remove 2 that Storage does not have from the index. Run the command again in a few minutes to check.",
+            notes[0]);
+        Assert.Equal("1 of the records not in Search are no longer in Storage either: dev:master-data--Well:1", notes[1]);
+        Assert.Equal("1 of the records not in Storage were found there again, so they are re-indexed instead.", notes[2]);
+        Assert.Equal(3, notes.Count);
+    }
+
+    [Fact]
     public async Task AListedRecordNotInStorageIsNotSentForRemoval()
     {
         // Not in Storage and not in Search either: there is nothing in the index to remove.
