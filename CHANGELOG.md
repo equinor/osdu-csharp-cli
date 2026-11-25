@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.20.6](https://github.com/equinor/osdu-csharp-cli/compare/v0.20.5...v0.20.6) (2026-11-25)
+
+
+### Dependencies
+
+* move to Equinor.OsduCsharpClient 4.0.0 ([#94](https://github.com/equinor/osdu-csharp-cli/issues/94)) ([4b4fb4d](https://github.com/equinor/osdu-csharp-cli/commit/4b4fb4db6698956c50deb5362ac75020117c8d4f))
+
 ## [0.20.5](https://github.com/equinor/osdu-csharp-cli/compare/v0.20.4...v0.20.5) (2026-11-24)
 
 
