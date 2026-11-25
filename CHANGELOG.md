@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.21.1](https://github.com/equinor/osdu-csharp-cli/compare/v0.21.0...v0.21.1) (2026-11-25)
+
+
+### Bug Fixes
+
+* have `index gaps --reindex` remove records Storage no longer has ([#99](https://github.com/equinor/osdu-csharp-cli/issues/99)) ([d9adfaa](https://github.com/equinor/osdu-csharp-cli/commit/d9adfaa00a9f8c0e92f24d503c78a603dfda22dc))
+
 ## [0.21.0](https://github.com/equinor/osdu-csharp-cli/compare/v0.20.6...v0.21.0) (2026-11-25)
 
 
