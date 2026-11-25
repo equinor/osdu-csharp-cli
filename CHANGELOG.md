@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.21.0](https://github.com/equinor/osdu-csharp-cli/compare/v0.20.6...v0.21.0) (2026-11-25)
+
+
+### Features
+
+* add `index gaps` to find records Search has not indexed ([#96](https://github.com/equinor/osdu-csharp-cli/issues/96)) ([650ea8d](https://github.com/equinor/osdu-csharp-cli/commit/650ea8d673a3b8aef59790b223f80fbf8aea944c))
+
 ## [0.20.6](https://github.com/equinor/osdu-csharp-cli/compare/v0.20.5...v0.20.6) (2026-11-25)
 
 
