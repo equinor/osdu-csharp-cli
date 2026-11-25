@@ -532,6 +532,59 @@ osducs group list --all                                                        #
 osducs group list --all --type data                                            # data groups only; also user, service
 ```
 
+### Finding records Search has not indexed
+
+Search only finds records that reached the index. A record whose indexing failed before it
+was written, or whose change event was lost, is simply absent, and nothing reports it.
+`index gaps` compares the ids a kind has in Storage with those in Search:
+
+```bash
+osducs index gaps --kind "osdu:wks:work-product-component--WellLog:1.4.0"            # what differs
+osducs index gaps --kind "osdu:wks:work-product-component--WellLog:1.4.0" --reindex  # and re-index what Search lacks
+osducs index gaps --kind "osdu:wks:work-product-component--WellLog:1.4.0" -o json    # counts and gaps, for a script
+```
+
+```
+Storage has 4,812, Search has 4,810. 2 not in Search, 0 not in Storage. Records written in the last few minutes may still be indexing; --reindex re-indexes the missing ones.
+Id                          Gap
+--------------------------  -------------
+dev:master-data--Well:1000  not in search
+dev:master-data--Well:1001  not in search
+```
+
+*Not in search* is a record the Indexer never indexed; `--reindex` asks it to, after saying how
+many and asking first. *Not in storage* is one deleted or made inactive in Storage that is still
+in the index, which re-indexing does not remove. Every difference is looked up again in Search
+before it is reported, so a record indexed or deleted while the command ran is left out.
+
+Storage's list of a kind ignores record ACLs, and Search does not, so a record Search lacks is
+fetched from Storage before it is reported. One whose ACL leaves you out is *no access*, not
+a gap, and `--reindex` leaves it alone. A record in the index but missing from Storage's list is
+fetched too: *other kind in storage* is one written again under a newer kind, whose old entry
+is left in this kind's index. `-o json` gives the counts beside the gaps.
+
+The kind must be exact, since Storage lists records only by exact kind; run it once per
+version. Listing a kind needs `service.storage.admin`, since Storage's list ignores record ACLs,
+and `--reindex` needs `service.search.admin`.
+
+Without `service.storage.admin`, check the records you know about instead: the ids a loader
+wrote, in a file with one per line, or as a JSON array of ids or of records with an `id`. `-`
+reads them from stdin. This needs only the viewer roles:
+
+```bash
+osducs index gaps --ids-from loaded-welllogs.txt
+osducs index gaps --ids-from loaded-welllogs.json -o json
+```
+
+Each id is looked up in Search, and only those Search lacks are fetched from Storage. Besides
+*not in search*, a listed record can be *not in storage*, never written or since deleted, or
+*no access*: Storage has it, but its ACL does not include your groups, so neither service shows
+it to you. The ids can be of any kind and version; Search is asked per entity type.
+
+Records that were indexed with a warning, such as a failed CRS conversion, are in Search and not
+a gap; find them with
+`osducs record search --kind <kind> --query "NOT index.statusCode:200" --returned-fields id,index`.
+
 Notification subscriptions are kept by Register. A subscription sends a topic's messages to a push
 endpoint, with a secret the endpoint checks them by; its file holds `name`, `topic`,
 `pushEndpoint` and the `secret`, which is why it is read from a file rather than options.
