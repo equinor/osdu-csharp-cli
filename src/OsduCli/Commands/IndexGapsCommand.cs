@@ -88,7 +88,8 @@ public static class IndexGapsCommand
         };
         var reindex = new Option<bool>("--reindex")
         {
-            Description = "Re-index the records Search does not have, " + ReindexBatch + " per request. Needs " + ReindexRoles + ".",
+            Description = "Re-index the records Search does not have and, with --kind, have the Indexer remove those Storage no longer has, " +
+                ReindexBatch + " per request. Needs " + ReindexRoles + ".",
         };
         var yes = new Option<bool>("--yes")
         {
@@ -127,23 +128,20 @@ public static class IndexGapsCommand
                 var what = kindValue ?? "the listed records";
 
                 var missing = Ids(report, MissingFromSearch);
+                var orphaned = Orphans(report);
                 context.Output.WriteNote(Summary(report));
                 // Written before anything is asked or re-indexed, so declining, or a failed
                 // re-index, still leaves the result of the whole scan.
                 context.Output.Write(report.ToJsonString(), SpecFor(context.Output.Format));
 
-                if (parseResult.GetValue(reindex) && missing.Count > 0)
+                if (parseResult.GetValue(reindex) && missing.Count + orphaned.Count > 0)
                 {
-                    if (!Confirmation.Confirm(
-                            $"Re-index {Count(missing.Count)} record(s) of {what} that Search does not have.",
+                    if (!Confirmation.Confirm(ReindexAction(missing.Count, orphaned.Count, what),
                             parseResult.GetValue(yes), context))
                         return 1;
-                    var notFound = await ReindexAsync(context.Client.Indexer, missing, token);
-                    context.Output.WriteNote(
-                        $"Asked the Indexer to re-index {Count(missing.Count - notFound.Count)} record(s). Run the command again in a few minutes to check.");
-                    if (notFound.Count > 0)
-                        context.Output.WriteNote(
-                            $"The Indexer did not find {Count(notFound.Count)} of them in Storage: {string.Join(", ", notFound.Take(10))}{(notFound.Count > 10 ? ", ..." : "")}");
+                    var notFound = await ReindexGapsAsync(context.Client.Indexer, report, token);
+                    foreach (var note in ReindexOutcome(missing, orphaned, notFound))
+                        context.Output.WriteNote(note);
                 }
                 return 0;
             }, cancellationToken, $"{ReadRoles}; with --reindex, {ReindexRoles}",
@@ -403,6 +401,50 @@ public static class IndexGapsCommand
         return notFound;
     }
 
+    /// <summary>
+    /// The records <c>--reindex</c> sends for removal: those a kind's index has and Storage no
+    /// longer does. A listed record not in Storage is not in Search either, so nothing to remove.
+    /// </summary>
+    internal static List<string> Orphans(JsonObject report) =>
+        report["listedCount"] is null ? Ids(report, MissingFromStorage) : [];
+
+    /// <summary>
+    /// Sends what <c>--reindex</c> fixes: the records Search lacks and, for a kind, those
+    /// Storage no longer has. Returns the ids the Indexer answered it could not find in Storage.
+    /// </summary>
+    internal static Task<List<string>> ReindexGapsAsync(IndexerClient indexer, JsonObject report, CancellationToken cancellationToken) =>
+        ReindexAsync(indexer, [.. Ids(report, MissingFromSearch), .. Orphans(report)], cancellationToken);
+
+    /// <summary>
+    /// What the Indexer was asked to do, from its answer rather than the scan: it looks every id
+    /// up in Storage again, re-indexes those it finds, and removes the rest from the index where
+    /// the index has them. So a record restored since the scan is re-indexed, and one deleted
+    /// since is removed.
+    /// </summary>
+    internal static IEnumerable<string> ReindexOutcome(
+        IReadOnlyList<string> missing, IReadOnlyList<string> orphaned, IReadOnlyList<string> notFound)
+    {
+        var sent = missing.Count + orphaned.Count;
+        var gone = new HashSet<string>(notFound, StringComparer.Ordinal);
+        yield return $"Asked the Indexer to re-index {Count(sent - gone.Count)} record(s)" +
+            (gone.Count > 0 ? $" and to remove {Count(gone.Count)} that Storage does not have from the index" : "") +
+            ". Run the command again in a few minutes to check.";
+        var deletedSince = missing.Where(gone.Contains).ToList();
+        if (deletedSince.Count > 0)
+            yield return $"{Count(deletedSince.Count)} of the records not in Search are no longer in Storage either: " +
+                $"{string.Join(", ", deletedSince.Take(10))}{(deletedSince.Count > 10 ? ", ..." : "")}";
+        var restored = orphaned.Count(id => !gone.Contains(id));
+        if (restored > 0)
+            yield return $"{Count(restored)} of the records not in Storage were found there again, so they are re-indexed instead.";
+    }
+
+    internal static string ReindexAction(int missing, int orphaned, string what) => (missing, orphaned) switch
+    {
+        (_, 0) => $"Re-index {Count(missing)} record(s) of {what} that Search does not have.",
+        (0, _) => $"Remove {Count(orphaned)} record(s) of {what} from the index that Storage no longer has.",
+        _ => $"Re-index {Count(missing)} record(s) of {what} that Search does not have, and remove {Count(orphaned)} from the index that Storage no longer has.",
+    };
+
     /// <summary>The gaps alone for a table; for JSON, the whole report, counts included.</summary>
     internal static OutputSpec SpecFor(OutputFormat format) => format == OutputFormat.Json ? OutputSpec.Raw : Columns;
 
@@ -427,7 +469,7 @@ public static class IndexGapsCommand
         if (orphaned > 0)
             line.Append(listed
                 ? " Records not in Storage were never written, or are deleted."
-                : " Records not in Storage are deleted there but still in the index; re-indexing does not remove them.");
+                : " Records not in Storage are deleted there but still in the index; --reindex has the Indexer remove them.");
         if (moved > 0)
             line.Append(" Records now of another kind were written again under a newer kind, and this kind's index still has their old entry.");
         if (unreadable > 0)
