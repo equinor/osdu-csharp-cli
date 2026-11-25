@@ -50,8 +50,8 @@
        3.0.1 fixes 3.0.0's Search spatialFilter, which could not be serialised: every search
        with a bounding box or distance filter failed before it was sent. -->
   <ItemGroup>
-    <PackageReference Include="Equinor.OsduCsharpClient" Version="3.0.3"/>
-    <PackageReference Include="Equinor.OsduCsharpClient.Msal" Version="3.0.3"/>
+    <PackageReference Include="Equinor.OsduCsharpClient" Version="4.0.0"/>
+    <PackageReference Include="Equinor.OsduCsharpClient.Msal" Version="4.0.0"/>
   </ItemGroup>
 
   <!-- For the `azure` authentication mode: `az login`, a managed or workload identity, or
