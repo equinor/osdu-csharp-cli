@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.22.0](https://github.com/equinor/osdu-csharp-cli/compare/v0.21.1...v0.22.0) (2026-11-27)
+
+
+### Features
+
+* add `index status`, counting per kind the records indexed with a problem ([#101](https://github.com/equinor/osdu-csharp-cli/issues/101)) ([f434d84](https://github.com/equinor/osdu-csharp-cli/commit/f434d84fa756759c810c0b5356a5e7661a02bf78))
+
 ## [0.21.1](https://github.com/equinor/osdu-csharp-cli/compare/v0.21.0...v0.21.1) (2026-11-25)
 
 
