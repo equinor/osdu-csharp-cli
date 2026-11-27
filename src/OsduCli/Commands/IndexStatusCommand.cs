@@ -80,7 +80,8 @@ public static class IndexStatusCommand
         var rest = await Task.WhenAll(
             ByKindAsync(search, kind, NoSchema, cancellationToken),
             ByKindAsync(search, kind, Other, cancellationToken));
-        var columns = new[] { ("warnings", warnings), ("noSchema", rest[0]), ("other", rest[1]) };
+        var answers = new[] { ("warnings", warnings), ("noSchema", rest[0]), ("other", rest[1]) };
+        var columns = answers.Select(answer => (answer.Item1, answer.Item2.Kinds)).ToArray();
 
         // A kind absent from an answer Search cut at its limit has an unknown count there.
         long? CountOf(Dictionary<string, long> answer, string name) =>
@@ -99,10 +100,11 @@ public static class IndexStatusCommand
                 return (JsonNode)item;
             });
 
+        // The totals are Search's count of matching records, which a cut answer's buckets fall short of.
         var report = new JsonObject { ["kind"] = kind };
-        foreach (var (field, answer) in columns)
-            report[field] = answer.Values.Sum();
-        report["total"] = columns.Sum(column => column.Item2.Values.Sum());
+        foreach (var (field, answer) in answers)
+            report[field] = answer.Total;
+        report["total"] = answers.Sum(answer => answer.Item2.Total);
         report["truncated"] = columns.Any(column => column.Item2.Count >= BucketLimit);
         report["kinds"] = new JsonArray([.. rows]);
         return report;
@@ -136,8 +138,11 @@ public static class IndexStatusCommand
         return line;
     }
 
-    /// <summary>Records matching <paramref name="query"/>, counted per kind by one Search aggregation.</summary>
-    private static async Task<Dictionary<string, long>> ByKindAsync(
+    /// <summary>
+    /// Records matching <paramref name="query"/>, counted per kind by one Search aggregation,
+    /// and Search's exact count of them all, which the buckets fall short of when they are cut.
+    /// </summary>
+    private static async Task<(Dictionary<string, long> Kinds, long Total)> ByKindAsync(
         SearchClient search, string kind, string query, CancellationToken cancellationToken)
     {
         var body = new JsonObject
@@ -145,6 +150,7 @@ public static class IndexStatusCommand
             ["kind"] = kind,
             ["query"] = query,
             ["aggregateBy"] = "kind",
+            ["trackTotalCount"] = true,
             ["returnedFields"] = new JsonArray("id"),
             ["limit"] = 1,
         };
@@ -152,12 +158,15 @@ public static class IndexStatusCommand
             (await KiotaJsonSerializer.DeserializeAsync<SearchModels.QueryRequest>(
                 body.ToJsonString(), SearchModels.QueryRequest.CreateFromDiscriminatorValue, cancellationToken))!,
             cancellationToken: cancellationToken);
+        var answer = JsonNode.Parse(await OsduJson.ToJsonAsync(result, cancellationToken) ?? "null");
         var counts = new Dictionary<string, long>(StringComparer.Ordinal);
-        if (JsonNode.Parse(await OsduJson.ToJsonAsync(result, cancellationToken) ?? "null")?["aggregations"] is JsonArray buckets)
+        if (answer?["aggregations"] is JsonArray buckets)
             foreach (var bucket in buckets)
                 if (bucket?["key"]?.GetValue<string>() is { } key)
                     counts[key] = bucket["count"]?.GetValue<long>() ?? 0;
-        return counts;
+        // A record indexed between the count and the buckets can make them disagree; keep the larger.
+        var total = Math.Max(answer?["totalCount"]?.GetValue<long>() ?? 0, counts.Values.Sum());
+        return (counts, total);
     }
 
     private static string Count(JsonNode count) => count.GetValue<long>().ToString("N0", CultureInfo.InvariantCulture);

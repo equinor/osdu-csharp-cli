@@ -25,6 +25,9 @@ public class IndexStatusTests
     /// <summary>Search, answering each query with the buckets given for it.</summary>
     private sealed class Search(Dictionary<string, (string? Key, long Count)[]> buckets) : HttpMessageHandler
     {
+        /// <summary>Search's count of matching records per query, where it exceeds the buckets.</summary>
+        public Dictionary<string, long> Totals { get; init; } = [];
+
         public List<JsonNode> Bodies { get; } = [];
         /// <summary>"start" and "end" of each request, by query, in the order they happened.</summary>
         public List<string> Events { get; } = [];
@@ -46,7 +49,7 @@ public class IndexStatusTests
             {
                 ["results"] = new JsonArray(),
                 ["aggregations"] = new JsonArray([.. answer.Select(b => (JsonNode)new JsonObject { ["key"] = b.Key, ["count"] = b.Count })]),
-                ["totalCount"] = answer.Sum(b => b.Count),
+                ["totalCount"] = Totals.GetValueOrDefault(query, answer.Sum(b => b.Count)),
             };
             return new HttpResponseMessage(HttpStatusCode.OK)
             {
@@ -116,6 +119,7 @@ public class IndexStatusTests
         Assert.All(search.Bodies, body =>
         {
             Assert.Equal("kind", body["aggregateBy"]!.GetValue<string>());
+            Assert.True(body["trackTotalCount"]!.GetValue<bool>());
             Assert.Equal("*:*:work-product-component--WellLog:*", body["kind"]!.GetValue<string>());
         });
     }
@@ -155,6 +159,24 @@ public class IndexStatusTests
         var k0 = rows.Single(row => row!["kind"]!.GetValue<string>() == "osdu:wks:k0:1.0.0")!;
         Assert.Equal(5, k0["warnings"]!.GetValue<long>());
         Assert.Equal(5, k0["total"]!.GetValue<long>());
+    }
+
+    [Fact]
+    public async Task TheTotalsAreSearchsCountNotTheSumOfACutAnswer()
+    {
+        // 1,001 kinds with one warning each: Search answers 1,000 buckets but counts 1,001 records.
+        var cut = Enumerable.Range(0, IndexStatusCommand.BucketLimit).Select(i => ((string?)$"osdu:wks:k{i}:1.0.0", 1L)).ToArray();
+        var search = new Search(new() { [IndexStatusCommand.Warning] = cut, [IndexStatusCommand.NoSchema] = [(WellLog, 2)] })
+        {
+            Totals = new() { [IndexStatusCommand.Warning] = 1001 },
+        };
+
+        var report = await Count(search);
+
+        Assert.Equal(1001, report["warnings"]!.GetValue<long>());
+        Assert.Equal(2, report["noSchema"]!.GetValue<long>());
+        Assert.Equal(1003, report["total"]!.GetValue<long>());
+        Assert.StartsWith("1,001 with warnings (400)", IndexStatusCommand.Summary(report), StringComparison.Ordinal);
     }
 
     [Fact]

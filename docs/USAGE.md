@@ -659,7 +659,8 @@ kinds.
 It is one Search aggregation by kind per column, so it needs only the viewer roles, and counts
 only the records you can read. Search answers at most 1,000 kinds per aggregation; if it reaches
 that, the summary says so, a count Search may have cut is left blank (`null` in JSON) rather
-than shown as 0, and `--kind` narrows it. Records that never reached the
+than shown as 0, and `--kind` narrows it. The totals in the summary and in `-o json` are Search's
+count of every matching record, so they hold even then. Records that never reached the
 index have no `index` block and are not counted;
 [`index gaps`](#finding-records-search-has-not-indexed) finds those.
 
