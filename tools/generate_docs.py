@@ -39,7 +39,7 @@ Hand-written commands — `osducs status`, `osducs record add`, `osducs file upl
 `osducs file download`, `osducs completion` — are not listed here, since no manifest describes
 their options; `record add` is in [USAGE.md](USAGE.md#writing-records), and the file commands in
 [USAGE.md](USAGE.md#files). Neither are `group list`'s `--all` and `--type`, added by hand; see
-[USAGE.md](USAGE.md#operations), nor `osducs index gaps`, which finds records Search has not
+[USAGE.md](USAGE.md#listing-every-group), nor `osducs index gaps`, which finds records Search has not
 indexed, and `osducs index status`, which counts per kind the records indexed with a problem;
 see [USAGE.md](USAGE.md#finding-records-search-has-not-indexed) and
 [USAGE.md](USAGE.md#counting-records-indexed-with-a-problem). Run `osducs --help` for the full
