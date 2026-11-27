@@ -219,8 +219,8 @@ An application has no accounts to choose between, so `--user` is refused with su
 and `account list` says so rather than listing the browser sign-ins.
 
 The Python CLI's other modes — `refresh_token`, and those named after a cloud provider other
-than Azure — are not supported. A profile using one is refused with that said, rather than signed in through a
-browser instead.
+than Azure — are not supported. A profile using one is refused with that said, rather than
+signed in through a browser instead.
 
 ## Signing in through Azure
 
@@ -362,6 +362,9 @@ Only keyword-indexed fields can be aggregated. On ADME dev that means envelope f
 `kind`, `type`, `namespace`, `authority`, `source`, `legal.legaltags`, `acl.owners`,
 `acl.viewers`, `createUser` — and **not** `data.*`.
 
+To count the records indexed with a warning or without a schema, per kind, use
+[`index status`](#counting-records-indexed-with-a-problem).
+
 ### By location
 
 ```bash
@@ -419,9 +422,9 @@ guess. `--dry-run` stops before writing, whatever is in the file.
 
 The file is checked first, and every problem is listed with its record: a missing or empty
 `kind`, `acl`, `legal` or `data`, an id that is not a string, an id from another data partition,
-or an id twice. A record with no id, or a `null` one, is created with an id Storage assigns. Storage takes at most 500
-records in one request, so a longer file is refused; split it. The file is sent as it is, not
-rewritten.
+or an id twice. A record with no id, or a `null` one, is created with an id Storage assigns.
+Storage takes at most 500 records in one request, so a longer file is refused; split it. The file
+is sent as it is, not rewritten.
 
 `--skip-unchanged` leaves a record alone when it is identical to its latest version, so running
 the same file again does not stack up identical versions; those are reported as `unchanged`.
@@ -430,6 +433,8 @@ the same file again does not stack up identical versions; those are reported as 
 
 `file download` saves a file's bytes, and `file upload` uploads a file and creates the record that
 describes it.
+
+### Downloading a file
 
 ```bash
 osducs file download --id "dev:dataset--File.Generic:259d…"               # under the name its record gives
@@ -445,8 +450,10 @@ dev:dataset--File.Generic:259d…  /home/me/logs/no_6608!10-17_s~jan_lfptest.las
 The bytes are checked against the checksum in the file's record, MD5 or SHA-256, or against the
 MD5 storage keeps when the record has none. A file that does not match is not saved, and a
 download that fails or is interrupted leaves nothing behind under the name. An existing file is
-only replaced with `--force`, and a `--path` directory that does not exist yet is created. The name comes from the record, with anything that could lead
-outside the directory replaced.
+only replaced with `--force`, and a `--path` directory that does not exist yet is created. The
+name comes from the record, with anything that could lead outside the directory replaced.
+
+### Uploading a file
 
 ```bash
 osducs file upload --file log.las \
@@ -511,12 +518,16 @@ would mean reading the whole file into memory first.
 
 ## Operations
 
+These commands look after the index, replay and purge records, and see the whole data partition.
+Most need operator roles, such as `service.search.admin`, `users.datalake.ops` or
+`service.storage.admin`; `index gaps --ids-from` and `index status` need only the viewer roles.
+Each command's `--help` says which under *Requires*, and the command reference lists
+[every command that needs an operator role](COMMANDS.md#commands-that-need-an-operator-role).
+
+### Re-indexing, replaying and purging
+
 The `index` commands re-index from Storage, and delete a kind's index; `record replay` sends
 records from Storage to what consumes them again, and `record purge` deletes for good.
-`group list --all` lists every group in the data partition, where `group list` lists yours. They
-need operator roles, such as `service.search.admin`, `users.datalake.ops` or
-`service.storage.admin`. Each command's `--help` says which under *Requires*, and the command
-reference lists [every command that needs an operator role](COMMANDS.md#commands-that-need-an-operator-role).
 
 ```bash
 osducs index reindex --kind "osdu:wks:master-data--Well:1.0.0"                # re-index a kind in place
@@ -528,15 +539,46 @@ osducs record replay --operation reindex --kind "osdu:wks:master-data--Well:1.0.
 osducs record replay-status --id f506be08-b51f-4cdd-a9ee-d9454ad51600         # -o json for each kind
 osducs record purge --id "dev:master-data--Well:1000"                         # the record and every version, for good
 osducs record version purge --id "dev:master-data--Well:1000" --limit 5       # versions, keeping the latest
+```
+
+`record replay` takes `--operation reindex`, which sends the records to the Indexer, or `replay`,
+which publishes them as record changes to every consumer. It prints a replay id to follow with
+`record replay-status`.
+
+### Listing every group
+
+`group list` lists the groups you are a member of; `group list --all` lists every group in the
+data partition, and `--type` narrows it.
+
+```bash
 osducs group list --all                                                        # every group in the data partition
 osducs group list --all --type data                                            # data groups only; also user, service
 ```
+
+### Commands that ask first
+
+A command that deletes, or reaches across the whole data partition, says what it is about to do
+and where, and asks:
+
+```
+Delete the search index of osdu:wks:master-data--Well:1.0.0. Its records stay in Storage, but searches for the kind find nothing until it is re-indexed.
+Data partition dev on https://<instance>.energy.azure.com.
+Go ahead? [y/N]
+```
+
+`--yes` skips the question but not the two lines above it, so a script's log still says what it
+did and where. Without a terminal to ask at, and without `--yes`, the command refuses rather
+than guess. `index reindex` asks only with `--force-clean`: re-indexing a kind in place is
+routine, deleting its index first is not. `record replay` asks only without `--kind`, for the
+same reason. Every `delete` asks as well, `record delete` and `group member delete` included.
 
 ### Finding records Search has not indexed
 
 Search only finds records that reached the index. A record whose indexing failed before it
 was written, or whose change event was lost, is simply absent, and nothing reports it.
-`index gaps` compares the ids a kind has in Storage with those in Search:
+`index gaps` compares the ids a kind has in Storage with those in Search, or, for those without
+an admin role, checks a list of records you give it; see
+[Checking a list of records](#checking-a-list-of-records).
 
 ```bash
 osducs index gaps --kind "osdu:wks:work-product-component--WellLog:1.4.0"            # what differs
@@ -555,8 +597,9 @@ dev:master-data--Well:1001  not in search
 *Not in search* is a record the Indexer never indexed; `--reindex` asks it to, after saying how
 many and asking first. *Not in storage* is one deleted or made inactive in Storage that is still
 in the index, for instance when its delete event was lost; `--reindex` sends these too, and the
-Indexer, not finding them in Storage, removes them from the index. Every difference is looked up again in Search
-before it is reported, so a record indexed or deleted while the command ran is left out.
+Indexer, not finding them in Storage, removes them from the index. Every difference is looked up
+again in Search before it is reported, so a record indexed or deleted while the command ran is
+left out.
 
 Storage's list of a kind ignores record ACLs, and Search does not, so a record Search lacks is
 fetched from Storage before it is reported. One whose ACL leaves you out is *no access*, not
@@ -567,6 +610,8 @@ is left in this kind's index. `-o json` gives the counts beside the gaps.
 The kind must be exact, since Storage lists records only by exact kind; run it once per
 version. Listing a kind needs `service.storage.admin`, since Storage's list ignores record ACLs,
 and `--reindex` needs `service.search.admin`.
+
+#### Checking a list of records
 
 Without `service.storage.admin`, check the records you know about instead: the ids a loader
 wrote, in a file with one per line, or as a JSON array of ids or of records with an `id`. `-`
@@ -583,8 +628,43 @@ Each id is looked up in Search, and only those Search lacks are fetched from Sto
 it to you. The ids can be of any kind and version; Search is asked per entity type.
 
 Records that were indexed with a warning, such as a failed CRS conversion, are in Search and not
-a gap; find them with
-`osducs record search --kind <kind> --query "NOT index.statusCode:200" --returned-fields id,index`.
+a gap; [`index status`](#counting-records-indexed-with-a-problem) counts them.
+
+### Counting records indexed with a problem
+
+The Indexer writes an `index` block on each record it indexes, with a `statusCode` and a
+`trace`. 200 is a clean index. 400 is a warning: the record is in the index, but part of it
+could not be indexed, such as a CRS conversion that failed. 404 is *schema not found*: the
+record is indexed without its schema, so only its metadata can be searched, not its `data`.
+`index status` counts these per kind:
+
+```bash
+osducs index status                                                   # every kind
+osducs index status --kind "*:*:work-product-component--WellLog:*"    # the WellLog versions
+osducs index status --kind "*:*:work-product-component--WellLog:*" -o json
+```
+
+```
+16 with warnings (400) in 2 kind(s), 0 without a schema (404), 0 with another code. Only records you can read are counted. See why with: osducs record search -k osdu:wks:work-product-component--WellLog:1.2.0 -q "index.statusCode:400" --returned-fields id,index
+Kind                                            Warnings (400)  No schema (404)  Other  Total
+----------------------------------------------  --------------  ---------------  -----  -----
+osdu:wks:work-product-component--WellLog:1.2.0  15              0                0      15
+osdu:wks:work-product-component--WellLog:1.3.0  1               0                0      1
+```
+
+*Other* is any code that is neither 200, 400 nor 404. The summary ends with the search that
+lists the records behind the top row, with their traces. `-o json` gives the totals beside the
+kinds.
+
+It is one Search aggregation by kind per column, so it needs only the viewer roles, and counts
+only the records you can read. Search answers at most 1,000 kinds per aggregation; if it reaches
+that, the summary says so, a count Search may have cut is left blank (`null` in JSON) rather
+than shown as 0, and `--kind` narrows it. The totals in the summary and in `-o json` are Search's
+count of every matching record, so they hold even then. Records that never reached the
+index have no `index` block and are not counted;
+[`index gaps`](#finding-records-search-has-not-indexed) finds those.
+
+## Notification subscriptions
 
 Notification subscriptions are kept by Register. A subscription sends a topic's messages to a push
 endpoint, with a secret the endpoint checks them by; its file holds `name`, `topic`,
@@ -603,25 +683,6 @@ by the notification id a subscription is created with.
 
 The subscription and secret files are sent as they are written, and `--debug` leaves the bodies
 of `subscription add`, `update-secret` and `find` out of its log, since they carry the secret.
-
-`record replay` takes `--operation reindex`, which sends the records to the Indexer, or `replay`,
-which publishes them as record changes to every consumer. It prints a replay id to follow with
-`record replay-status`.
-
-A command that deletes, or reaches across the whole data partition, says what it is about to do
-and where, and asks:
-
-```
-Delete the search index of osdu:wks:master-data--Well:1.0.0. Its records stay in Storage, but searches for the kind find nothing until it is re-indexed.
-Data partition dev on https://<instance>.energy.azure.com.
-Go ahead? [y/N]
-```
-
-`--yes` skips the question but not the two lines above it, so a script's log still says what it
-did and where. Without a terminal to ask at, and without `--yes`, the command refuses rather
-than guess. `index reindex` asks only with `--force-clean`: re-indexing a kind in place is
-routine, deleting its index first is not. `record replay` asks only without `--kind`, for the
-same reason. Every `delete` asks as well, `record delete` and `group member delete` included.
 
 ## Shell completion
 

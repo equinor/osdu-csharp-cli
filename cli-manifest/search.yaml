@@ -204,6 +204,15 @@ exclude:
     reason: Infrastructure probe, covered by `osducs status`.
 
 handwritten:
+  - command: index status
+    op: { method: post, path: /query }
+    reason: >
+      Counts per kind the records whose index block has statusCode 400 (warning), 404 (no
+      schema) or any other code but 200. Search returns no key when it aggregates by the
+      numeric index.statusCode, so it runs one aggregation by kind per column and merges them
+      into one row per kind, which no single manifest entry can express.
+      Commands/IndexStatusCommand.cs, through the Indexer's Customize hook.
+    roles: users.datalake.viewers, users.datalake.editors, users.datalake.admins or users.datalake.ops
   - command: status
     op: { method: get, path: /info }
     reason: >
