@@ -583,8 +583,38 @@ Each id is looked up in Search, and only those Search lacks are fetched from Sto
 it to you. The ids can be of any kind and version; Search is asked per entity type.
 
 Records that were indexed with a warning, such as a failed CRS conversion, are in Search and not
-a gap; find them with
-`osducs record search --kind <kind> --query "NOT index.statusCode:200" --returned-fields id,index`.
+a gap; `index status` counts them.
+
+### Counting records indexed with a problem
+
+The Indexer writes an `index` block on each record it indexes, with a `statusCode` and a
+`trace`. 200 is a clean index. 400 is a warning: the record is in the index, but part of it
+could not be indexed, such as a CRS conversion that failed. 404 is *schema not found*: the
+record is indexed without its schema, so only its metadata can be searched, not its `data`.
+`index status` counts these per kind:
+
+```bash
+osducs index status                                                   # every kind
+osducs index status --kind "*:*:work-product-component--WellLog:*"    # the WellLog versions
+osducs index status --kind "*:*:work-product-component--WellLog:*" -o json
+```
+
+```
+16 with warnings (400) in 2 kind(s), 0 without a schema (404), 0 with another code. Only records you can read are counted. See why with: osducs record search -k osdu:wks:work-product-component--WellLog:1.2.0 -q "index.statusCode:400" --returned-fields id,index
+Kind                                            Warnings (400)  No schema (404)  Other  Total
+----------------------------------------------  --------------  ---------------  -----  -----
+osdu:wks:work-product-component--WellLog:1.2.0  15              0                0      15
+osdu:wks:work-product-component--WellLog:1.3.0  1               0                0      1
+```
+
+*Other* is any code that is neither 200, 400 nor 404. The summary ends with the search that
+lists the records behind the top row, with their traces. `-o json` gives the totals beside the
+kinds.
+
+It is one Search aggregation by kind per code, run together, so it needs only the viewer roles,
+and counts only the records you can read. Search answers at most 1,000 kinds per aggregation;
+if it reaches that, the summary says so, and `--kind` narrows it. Records that never reached the
+index have no `index` block and are not counted; `index gaps` finds those.
 
 Notification subscriptions are kept by Register. A subscription sends a topic's messages to a push
 endpoint, with a secret the endpoint checks them by; its file holds `name`, `topic`,
