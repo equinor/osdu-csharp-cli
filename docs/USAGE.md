@@ -656,9 +656,10 @@ osdu:wks:work-product-component--WellLog:1.3.0  1               0               
 lists the records behind the top row, with their traces. `-o json` gives the totals beside the
 kinds.
 
-It is one Search aggregation by kind per code, run together, so it needs only the viewer roles,
-and counts only the records you can read. Search answers at most 1,000 kinds per aggregation;
-if it reaches that, the summary says so, and `--kind` narrows it. Records that never reached the
+It is one Search aggregation by kind per column, so it needs only the viewer roles, and counts
+only the records you can read. Search answers at most 1,000 kinds per aggregation; if it reaches
+that, the summary says so, a count Search may have cut is left blank (`null` in JSON) rather
+than shown as 0, and `--kind` narrows it. Records that never reached the
 index have no `index` block and are not counted;
 [`index gaps`](#finding-records-search-has-not-indexed) finds those.
 
